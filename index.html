@@ -479,14 +479,13 @@ function ClaimForm({clinic,claimData,onSave,onBack}){
   const ALL_TABS=["Patient & Claim","Diagnosis","Imaging","Treatment Plan","Certificate of Capacity","Allied Health Forms","RTW & Rehab Plan","Referral & Export"];
   const NO_DIAG_PROFS=["Occupational Therapist","Exercise Physiologist"];
   const NO_MED_PROFS=["Physiotherapist","Osteopath","Chiropractor","Podiatrist","Occupational Therapist","Exercise Physiologist","Psychologist"];
-  const PSYCH_PROFS=["Psychologist"];
+  const[tab,setTab]=useState(0);
+  const[claim,setClaim]=useState(claimData||{id:"claim_"+Date.now(),scheme:"WorkCover",status:"Active",createdAt:new Date().toISOString(),clinicId:clinic.id});
   const prof=claim.practitionerProfession||"";
   const TABS=ALL_TABS.filter(t=>{
     if(t==="Diagnosis"&&NO_DIAG_PROFS.includes(prof))return false;
     return true;
   });
-  const[tab,setTab]=useState(0);
-  const[claim,setClaim]=useState(claimData||{id:"claim_"+Date.now(),scheme:"WorkCover",status:"Active",createdAt:new Date().toISOString(),clinicId:clinic.id});
   const[practitioners,setPractitioners]=useState([]);
   const[savedModal,setSavedModal]=useState(false);
   const[draftModal,setDraftModal]=useState(false);
