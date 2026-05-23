@@ -536,51 +536,70 @@ function Tab1({claim,up,practitioners}){
   const jurLabels={vic:"Victoria",nsw:"NSW",qld:"QLD",sa:"SA",wa:"WA",act:"ACT",tas:"TAS",nt:"NT",federal:"Federal (Comcare)"};
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Patient & Claim Details"),
-    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Select the scheme first - this drives fee schedules, insurers and forms throughout the claim."),
-    div({key:"jur",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Jurisdiction"),
-      div({key:"pills",style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}},
-        jurs.map(j=>{
-          const active=claim.jurisdiction===j||(j==="vic"&&!claim.jurisdiction);
-          const isActive=j==="vic";
-          return btn({key:j,onClick:()=>isActive?up("jurisdiction",j):alert(jurLabels[j]+" coming soon!"),style:{...S.pill,...(active?S.pillT:S.pillM),fontSize:"0.82rem",padding:"8px 16px",...(!isActive?{opacity:0.45}:{})}},jurLabels[j]+(isActive?"":" (coming soon)"));
-        })
-      ),
-      e(OK,{key:"ok"},"Victoria - WorkSafe Victoria and TAC schemes active"),
-    ]),
-    div({key:"scheme",style:S.card},[
-      e("label",{key:"l",style:S.label},"Claim scheme *"),
-      div({key:"tog",style:{display:"flex",gap:8,padding:"4px",background:"rgba(255,255,255,0.04)",borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",width:"fit-content",marginBottom:12}},[
-        btn({key:"wc",onClick:()=>up("scheme","WorkCover"),style:{padding:"10px 28px",borderRadius:9,border:"none",fontWeight:700,fontSize:"0.9rem",cursor:"pointer",background:claim.scheme==="WorkCover"?"#0057A8":"transparent",color:claim.scheme==="WorkCover"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"WorkCover"),
-        btn({key:"tac",onClick:()=>up("scheme","TAC"),style:{padding:"10px 28px",borderRadius:9,border:"none",fontWeight:700,fontSize:"0.9rem",cursor:"pointer",background:claim.scheme==="TAC"?"#C0392B":"transparent",color:claim.scheme==="TAC"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"TAC"),
+    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Select the scheme and insurer first — this drives fee schedules, forms and item codes throughout the claim."),
+
+    // ── Row 1: Scheme + Insurer side by side ──
+    div({key:"row1",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:0}},[
+      div({key:"scheme",style:S.card},[
+        e("label",{key:"l",style:S.label},"Claim scheme *"),
+        div({key:"jur",style:{marginBottom:14}},[
+          div({key:"pills",style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}},
+            jurs.map(j=>{
+              const active=claim.jurisdiction===j||(j==="vic"&&!claim.jurisdiction);
+              const isActive=j==="vic";
+              return e("button",{key:j,onClick:()=>isActive?up("jurisdiction",j):alert(jurLabels[j]+" coming soon!"),style:{...S.pill,...(active?S.pillT:S.pillM),fontSize:"0.72rem",padding:"5px 10px",...(!isActive?{opacity:0.4}:{})}},jurLabels[j]+(isActive?"":" soon"));
+            })
+          ),
+        ]),
+        div({key:"tog",style:{display:"flex",gap:8,padding:"4px",background:"rgba(255,255,255,0.04)",borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",width:"fit-content",marginBottom:12}},[
+          e("button",{key:"wc",onClick:()=>up("scheme","WorkCover"),style:{padding:"10px 24px",borderRadius:9,border:"none",fontWeight:700,fontSize:"0.9rem",cursor:"pointer",background:claim.scheme==="WorkCover"?"#0057A8":"transparent",color:claim.scheme==="WorkCover"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"WorkCover"),
+          e("button",{key:"tac",onClick:()=>up("scheme","TAC"),style:{padding:"10px 24px",borderRadius:9,border:"none",fontWeight:700,fontSize:"0.9rem",cursor:"pointer",background:claim.scheme==="TAC"?"#C0392B":"transparent",color:claim.scheme==="TAC"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"TAC"),
+        ]),
+        claim.scheme==="WorkCover"&&e(WARN,{key:"wc"},"WorkSafe Victoria — WorkSafe fee schedule and forms apply"),
+        claim.scheme==="TAC"&&div({key:"tac",style:{background:"rgba(192,57,43,0.08)",border:"1px solid rgba(192,57,43,0.25)",borderRadius:12,padding:"12px 16px",color:"#E67E22",fontSize:"0.82rem"}},"TAC — Transport Accident Commission fees and forms apply"),
       ]),
-      claim.scheme==="WorkCover"&&e(WARN,{key:"wc"},"WorkSafe Victoria - WorkSafe fee schedule and forms apply"),
-      claim.scheme==="TAC"&&div({key:"tac",style:{background:"rgba(192,57,43,0.08)",border:"1px solid rgba(192,57,43,0.25)",borderRadius:12,padding:"12px 16px",color:"#E67E22",fontSize:"0.82rem",marginBottom:16}},"TAC - Transport Accident Commission fees and forms apply"),
+      div({key:"ins",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:14}},"Insurer"),
+        e(Sel,{key:"is",label:"Select insurer",value:claim.insurerId,onChange:selIns,options:(INSURERS[claim.scheme]||INSURERS.WorkCover).map(i=>({value:i.id,label:i.name})),required:true}),
+        si&&si.id!=="other"&&div({key:"det",style:{...S.cardSm,marginTop:4}},[
+          div({key:"ph",style:{fontSize:"0.8rem",color:"#5B7A99"}},si.phone),
+          div({key:"ad",style:{fontSize:"0.78rem",color:"#5B7A99",marginTop:3}},si.address),
+        ]),
+        claim.insurerId==="other"&&div({key:"custom",style:{marginTop:10}},[
+          e(Inp,{key:"n",label:"Insurer name",value:claim.insurerNameCustom,onChange:v=>up("insurerNameCustom",v),placeholder:"Enter insurer name"}),
+          e(Inp,{key:"e",label:"Accounts payable email",value:claim.insurerEmail,onChange:v=>up("insurerEmail",v),type:"email",placeholder:"ap@insurer.com.au"}),
+          e("button",{key:"req",style:{...S.pill,...S.pillA,fontSize:"0.78rem"},onClick:()=>alert("Request submitted!")},"Request to add this insurer"),
+        ]),
+      ]),
     ]),
-    div({key:"pat",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Patient information"),
-      div({key:"g",style:S.g2},[
+
+    // ── Row 2: Patient info + Practitioner side by side ──
+    div({key:"row2",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:0}},[
+      div({key:"pat",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:14}},"Patient information"),
         e(Inp,{key:"n",label:"Full name",value:claim.patientName,onChange:v=>up("patientName",v),placeholder:"Jane Smith",required:true}),
         e(Inp,{key:"d",label:"Date of birth",value:claim.dob,onChange:v=>up("dob",v),type:"date",required:true}),
-      ]),
-      e(Inp,{key:"a",label:"Address",value:claim.patientAddress,onChange:v=>up("patientAddress",v),placeholder:"123 Main St, Melbourne VIC 3000"}),
-      div({key:"g2",style:S.g2},[
+        e(Inp,{key:"a",label:"Address",value:claim.patientAddress,onChange:v=>up("patientAddress",v),placeholder:"123 Main St, Melbourne VIC 3000"}),
         e(Inp,{key:"e",label:"Email",value:claim.patientEmail,onChange:v=>up("patientEmail",v),type:"email",placeholder:"patient@email.com"}),
         e(Inp,{key:"ph",label:"Phone",value:claim.patientPhone,onChange:v=>up("patientPhone",v),placeholder:"04XX XXX XXX"}),
       ]),
-    ]),
-    div({key:"claim",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Claim information"),
-      div({key:"g",style:S.g2},[
+      div({key:"prac",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:14}},"Treating practitioner"),
+        e(Sel,{key:"ps",label:"Select practitioner",value:claim.practitionerId,onChange:selPrac,options:practitioners.map(p=>({value:p.id,label:p.name+" - "+p.profession})),required:true}),
+        sp&&e(OK,{key:"ok"},"Provider No: "+sp.providerNo+" - "+sp.profession),
+        practitioners.length===0&&e(WARN,{key:"warn"},"No practitioners added. Go to Practitioners in the sidebar."),
+        e(Inp,{key:"nrd",label:"Next review date",value:claim.nextReviewDate,onChange:v=>up("nextReviewDate",v),type:"date"}),
+        div({key:"div",style:{borderTop:"1px solid rgba(255,255,255,0.07)",margin:"16px 0"}}),
+        div({key:"ch",style:{fontWeight:600,fontSize:"0.85rem",marginBottom:12}},"Claim information"),
         e(Inp,{key:"cn",label:"Claim number",value:claim.claimNumber,onChange:v=>up("claimNumber",v),placeholder:"WC-2025-XXXXX"}),
         e(Inp,{key:"doi",label:"Date of injury",value:claim.dateOfInjury,onChange:v=>up("dateOfInjury",v),type:"date",required:true}),
-      ]),
-      e(Sel,{key:"st",label:"Claim status",value:claim.status,onChange:v=>up("status",v),options:["Active","Pending Approval","Approved","Closed","Disputed"]}),
-      claim.scheme==="WorkCover"&&div({key:"emp",style:S.g2},[
-        e(Inp,{key:"en",label:"Employer name",value:claim.employerName,onChange:v=>up("employerName",v),placeholder:"ABC Company Pty Ltd"}),
-        e(Inp,{key:"ec",label:"Employer contact",value:claim.employerContact,onChange:v=>up("employerContact",v),placeholder:"HR Manager - 03 XXXX XXXX"}),
+        e(Sel,{key:"st",label:"Claim status",value:claim.status,onChange:v=>up("status",v),options:["Active","Pending Approval","Approved","Closed","Disputed"]}),
+        claim.scheme==="WorkCover"&&e(Inp,{key:"en",label:"Employer name",value:claim.employerName,onChange:v=>up("employerName",v),placeholder:"ABC Company Pty Ltd"}),
+        claim.scheme==="WorkCover"&&e(Inp,{key:"ec",label:"Employer contact",value:claim.employerContact,onChange:v=>up("employerContact",v),placeholder:"HR Manager - 03 XXXX XXXX"}),
       ]),
     ]),
+
+    // ── Injury details ──
     div({key:"inj",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:6}},"Injury details"),
       div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"These details auto-populate referral letters and treatment plan templates."),
@@ -597,26 +616,8 @@ function Tab1({claim,up,practitioners}){
       e(Ta,{key:"caus",label:"Causation / pathophysiology",value:claim.injuryCausation,onChange:v=>up("injuryCausation",v),placeholder:"Clinical opinion on causation - how did the mechanism cause this specific injury? Include pathophysiology and sequelae...",rows:3}),
       e(Ta,{key:"pre",label:"Pre-existing conditions / relevant history",value:claim.preExisting,onChange:v=>up("preExisting",v),placeholder:"Relevant prior injuries or pre-existing conditions..."}),
     ]),
-    div({key:"prac",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Treating practitioner"),
-      e(Sel,{key:"ps",label:"Select practitioner",value:claim.practitionerId,onChange:selPrac,options:practitioners.map(p=>({value:p.id,label:p.name+" - "+p.profession})),required:true}),
-      sp&&e(OK,{key:"ok"},"Provider No: "+sp.providerNo+" - "+sp.profession),
-      practitioners.length===0&&e(WARN,{key:"warn"},"No practitioners added. Go to Practitioners in the sidebar."),
-      e(Inp,{key:"nrd",label:"Next review date",value:claim.nextReviewDate,onChange:v=>up("nextReviewDate",v),type:"date"}),
-    ]),
-    div({key:"ins",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Insurer"),
-      e(Sel,{key:"is",label:"Select insurer",value:claim.insurerId,onChange:selIns,options:(INSURERS[claim.scheme]||INSURERS.WorkCover).map(i=>({value:i.id,label:i.name})),required:true}),
-      si&&si.id!=="other"&&div({key:"det",style:{...S.cardSm,marginTop:8}},[
-        div({key:"ph",style:{fontSize:"0.82rem",color:"#5B7A99"}},si.phone),
-        div({key:"ad",style:{fontSize:"0.82rem",color:"#5B7A99",marginTop:3}},si.address),
-      ]),
-      claim.insurerId==="other"&&div({key:"custom",style:{marginTop:12}},[
-        e(Inp,{key:"n",label:"Insurer name",value:claim.insurerNameCustom,onChange:v=>up("insurerNameCustom",v),placeholder:"Enter insurer name"}),
-        e(Inp,{key:"e",label:"Accounts payable email",value:claim.insurerEmail,onChange:v=>up("insurerEmail",v),type:"email",placeholder:"ap@insurer.com.au"}),
-        btn({key:"req",style:{...S.pill,...S.pillA,fontSize:"0.78rem"},onClick:()=>alert("Request submitted! We will add this insurer soon.")},"Request to add this insurer"),
-      ]),
-    ]),
+
+    // ── Consent ──
     div({key:"consent",style:S.card},
       div({style:{display:"flex",alignItems:"center",gap:12,cursor:"pointer"},onClick:()=>up("consent",!claim.consent)},[
         div({key:"cb",style:{width:20,height:20,borderRadius:6,border:claim.consent?"none":"1.5px solid #5B7A99",background:claim.consent?"#00C9A7":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#07101E",fontWeight:700,fontSize:"0.75rem",flexShrink:0}},claim.consent?"v":""),
@@ -626,11 +627,14 @@ function Tab1({claim,up,practitioners}){
   ]);
 }
 
-// ── TAB 2: DIAGNOSIS ──────────────────────────────────────────────────────────
+
 function Tab2({claim,up}){
   const[q,setQ]=useState("");
   const[show,setShow]=useState(false);
   const[diags,setDiags]=useState(claim.diagnoses||[]);
+  const[dSubTab,setDSubTab]=useState(0);
+  const DSUB=["Diagnosis & Capacity","Psychosocial","Clinical Assessment"];
+  const dSubStyle=i=>({padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:dSubTab===i?"rgba(0,201,167,0.1)":"transparent",color:dSubTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:dSubTab===i?"2px solid #00C9A7":"none"});
   const sugg=useMemo(()=>{
     if(!q||q.length<2)return[];
     const ql=q.toLowerCase();
@@ -646,7 +650,7 @@ function Tab2({claim,up}){
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Diagnosis"),
     NO_DIAG_PROFS&&NO_DIAG_PROFS.includes(claim.practitionerProfession)&&e(WARN,{key:"nd"},"Diagnosis is completed by the referring medical practitioner or allied health practitioner. OTs and Exercise Physiologists cannot diagnose conditions."),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Search and add conditions. Capacity limitations auto-populate the Certificate of Capacity."),
-    div({key:"diag",style:S.card},[
+    dSubTab===0&&div({key:"diag",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:14}},"Conditions / Diagnosis"),
       div({key:"sw",style:{position:"relative"}},[
         inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:42},placeholder:"Search conditions (e.g. low back pain, PTSD)...",value:q,onChange:ev=>{setQ(ev.target.value);setShow(true);},onFocus:()=>setShow(true),onBlur:()=>setTimeout(()=>setShow(false),200)}),
@@ -670,7 +674,7 @@ function Tab2({claim,up}){
       ),
       diags.length===0&&div({key:"empty",style:{color:"#5B7A99",fontSize:"0.82rem",marginTop:10}},"No conditions added. Search above."),
     ]),
-    div({key:"cap",style:S.card},[
+    dSubTab===0&&div({key:"cap",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:6}},"Physical capacity assessment"),
       div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Select capacity for each function. Auto-populates the Certificate of Capacity."),
       div({key:"hdr",style:{display:"grid",gridTemplateColumns:"1fr 90px 90px 90px",gap:6,marginBottom:8}},[
@@ -686,7 +690,7 @@ function Tab2({claim,up}){
       ])),
       e(Ta,{key:"pn",label:"Physical function notes",value:claim.physicalNotes,onChange:v=>up("physicalNotes",v),placeholder:"Additional notes..."}),
     ]),
-    div({key:"mental",style:S.card},[
+    dSubTab===0&&div({key:"mental",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:14}},"Mental function"),
       div({key:"tog",style:{display:"flex",gap:10,marginBottom:16}},[
         ["Not affected","Affected"].map(o=>btn({key:o,onClick:()=>up("mentalStatus",o),style:{...S.pill,...(claim.mentalStatus===o?S.pillT:S.pillM),fontSize:"0.85rem",padding:"10px 22px"}},o)),
@@ -704,7 +708,7 @@ function Tab2({claim,up}){
         e(Ta,{key:"mn",label:"Mental function notes",value:claim.mentalNotes,onChange:v=>up("mentalNotes",v),placeholder:"Additional mental function notes..."}),
       ]),
     ]),
-    e(Collapsible,{key:"psych",title:"Psychosocial flags",icon:"🚩"},
+    dSubTab===1&&e(Collapsible,{key:"psych",title:"Psychosocial flags",icon:"🚩",defaultOpen:true},
       div({},[
         div({key:"s",style:{fontSize:"0.83rem",color:"#5B7A99",marginBottom:14}},"Identify barriers to recovery that inform the RTW plan."),
         ...PSYCH_FLAGS.map(({key,label,color,desc,items})=>div({key},[
@@ -720,7 +724,7 @@ function Tab2({claim,up}){
         e(Ta,{key:"pn",label:"Psychosocial notes",value:claim.psychosocialNotes,onChange:v=>up("psychosocialNotes",v),placeholder:"Additional observations..."}),
       ])
     ),
-    e(Collapsible,{key:"clin",title:"Clinical assessment (allied health)",icon:"🩺"},
+    dSubTab===2&&div({key:"clin"},[div({key:"h",style:{fontWeight:700,marginBottom:14}},"Clinical assessment"),e(Collapsible,{key:"clin-inner",title:"Allied health clinical findings",icon:"🩺",defaultOpen:true},
       div({},[
         e(Ta,{key:"cp",label:"Clinical presentation",value:claim.clinicalPresentation,onChange:v=>up("clinicalPresentation",v),placeholder:"Describe clinical presentation...",rows:4}),
         e(Ta,{key:"ot",label:"Orthopaedic test results",value:claim.orthoTests,onChange:v=>up("orthoTests",v),placeholder:"e.g. Positive Spurlings, SLR 45 degrees..."}),
@@ -729,11 +733,7 @@ function Tab2({claim,up}){
         e(Ta,{key:"pf",label:"Passive ROM findings",value:claim.prom,onChange:v=>up("prom",v),placeholder:"Passive ROM findings..."}),
       ])
     ),
-    div({key:"wr",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Work & activity restrictions"),
-      e(Ta,{key:"wr",label:"Work restrictions",value:claim.workRestrictions,onChange:v=>up("workRestrictions",v),placeholder:"e.g. No lifting >5kg, avoid prolonged sitting..."}),
-      e(Ta,{key:"ar",label:"Activity restrictions",value:claim.activityRestrictions,onChange:v=>up("activityRestrictions",v),placeholder:"e.g. No driving, avoid stairs..."}),
-    ]),
+    // Work & activity restrictions moved to Treatment Plan tab
   ]);
 }
 
@@ -796,7 +796,7 @@ function Tab3({claim,up}){
 // ── TAB 4: TREATMENT PLAN ─────────────────────────────────────────────────────
 function Tab4({claim,up}){
   const[subTab,setSubTab]=useState(0);
-  const SUB=["Goals & Management","Referrals","Medication & Investigations"];
+  const SUB=["Goals & Management","Referrals","Work & Activity","Medication & Investigations"];
   const isPrescriber=PRESCRIBING.includes(claim.practitionerProfession);
   const isAlliedHealth=!PRESCRIBING.includes(claim.practitionerProfession)&&claim.practitionerProfession!=="General Practitioner"&&claim.practitionerProfession!=="";
   const subStyle=i=>({padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:subTab===i?"rgba(0,201,167,0.1)":"transparent",color:subTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:subTab===i?"2px solid #00C9A7":"none"});
@@ -892,7 +892,17 @@ function Tab4({claim,up}){
       ]),
     ]),
 
-    subTab===2&&div({key:"medinv"},[
+    subTab===2&&div({key:"work"},[
+      div({key:"card",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:6}},"Work & activity restrictions"),
+        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:14}},"Restrictions auto-populate into the Certificate of Capacity."),
+        e(Ta,{key:"wr",label:"Work restrictions",value:claim.workRestrictions,onChange:v=>up("workRestrictions",v),placeholder:"e.g. No lifting >5kg, avoid prolonged sitting >30 min, no overhead work..."}),
+        e(Ta,{key:"ar",label:"Activity restrictions",value:claim.activityRestrictions,onChange:v=>up("activityRestrictions",v),placeholder:"e.g. No driving, avoid stairs, limit walking to 20 min..."}),
+        e(Ta,{key:"we",label:"Work environment considerations",value:claim.workEnvironment,onChange:v=>up("workEnvironment",v),placeholder:"e.g. Temperature, noise, space, lighting considerations..."}),
+      ]),
+    ]),
+
+    subTab===3&&div({key:"medinv"},[
       e(Collapsible,{key:"meds",title:isPrescriber?"Medication recommendations":"Medication (prescribing practitioners only)",icon:"💊",defaultOpen:isPrescriber},
         e(MedSection,{claim,up})
       ),
