@@ -3,888 +3,1336 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ClaimBridge App</title>
+<title>ClaimBridge</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-#root { min-height: 100vh; }
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#07101E;color:#EFF6FF;font-size:16px;min-height:100vh;}
+#root{min-height:100vh;}
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:rgba(255,255,255,0.03);}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12);border-radius:3px;}
+input,select,textarea{font-family:inherit;font-size:16px;}
+button{font-family:inherit;cursor:pointer;}
 </style>
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel">
-const { useState, useMemo, useEffect, useRef } = React;
+<script>
+const{useState,useEffect,useRef,useMemo}=React;
 
+async function sget(k){try{const r=localStorage.getItem('cb9_'+k);return r?JSON.parse(r):null;}catch{return null;}}
+async function sset(k,v){try{localStorage.setItem('cb9_'+k,JSON.stringify(v));}catch{}}
+async function sdel(k){try{localStorage.removeItem('cb9_'+k);}catch{}}
 
-
-// ─── PERSISTENT STORAGE HELPERS (localStorage) ───────────────────────────────
-async function sget(key) { try { const r = localStorage.getItem('cb_' + key); return r ? JSON.parse(r) : null; } catch { return null; } }
-async function sset(key, val) { try { localStorage.setItem('cb_' + key, JSON.stringify(val)); } catch {} }
-async function sdel(key) { try { localStorage.removeItem('cb_' + key); } catch {} }
-
-// ─── DEMO CLINIC ACCOUNTS (in production: server-side auth) ──────────────────
-const DEMO_CLINICS = [
-  { id:"clinic_001", name:"Bayside Medical Centre", email:"admin@baysidemedical.com.au", password:"demo1234", plan:"Professional", practitioners:["Dr. Sarah Chen","Dr. Marcus Webb","Dr. Priya Sharma"], scheme:"WorkCover", abn:"12 345 678 901" },
-  { id:"clinic_002", name:"TAC Rehab Specialists", email:"reception@tacrehab.com.au", password:"demo1234", plan:"Enterprise", practitioners:["Dr. James Okafor","Dr. Lily Nguyen"], scheme:"TAC", abn:"98 765 432 109" },
-  { id:"clinic_003", name:"Allied Health Group", email:"info@alliedgroup.com.au", password:"demo1234", plan:"Starter", practitioners:["Dr. Tom Brennan"], scheme:"WorkCover", abn:"55 123 456 789" },
+const DEMO_CLINICS=[
+  {id:'c001',name:'Bayside Medical Centre',email:'admin@baysidemedical.com.au',password:'demo1234',plan:'Professional',abn:'12 345 678 901'},
+  {id:'c002',name:'TAC Rehab Specialists',email:'reception@tacrehab.com.au',password:'demo1234',plan:'Growth',abn:'98 765 432 109'},
+  {id:'c003',name:'Allied Health Group',email:'info@alliedgroup.com.au',password:'demo1234',plan:'Starter',abn:'55 123 456 789'},
 ];
 
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const SCHEME_COLORS = { WorkCover:{ primary:"#0057A8", accent:"#00B4D8" }, TAC:{ primary:"#C0392B", accent:"#E67E22" } };
-const INJURY_TYPES = { WorkCover:["Musculoskeletal","Psychological / Mental health","Laceration / Wound","Burns","Fracture","Hearing loss","Respiratory","Other"], TAC:["Whiplash","Fracture","Spinal injury","Head / Brain injury","Psychological","Soft tissue","Burns","Other"] };
-const REFERRAL_TYPES = ["Physiotherapy","Occupational Therapy","Psychology / Counselling","Neuropsychology","Osteopathy","Chiropractic","Specialist consultation","Radiology / Imaging","Exercise physiology","Pain management","Vocational rehabilitation","Hand therapy","Respiratory physician","Social work","Household Help / ADL Support"];
-const URGENCIES = ["Routine (within 4 weeks)","Soon (within 2 weeks)","Urgent (within 48 hours)","Emergency"];
-const WORK_TYPES = ["Sedentary (desk)","Light duties","Medium duties","Heavy / manual"];
-const WORK_KEYS = ["sedentary","light","medium","heavy"];
-
-const IMAGING_TYPES = [
-  { id:"mri", label:"MRI", icon:"🧲", color:"#6366F1", desc:"Magnetic Resonance Imaging" },
-  { id:"ct", label:"CT Scan", icon:"🔄", color:"#3B82F6", desc:"Computed Tomography" },
-  { id:"xray", label:"X-Ray", icon:"⚡", color:"#F59E0B", desc:"Plain Radiograph" },
-  { id:"ultrasound", label:"Ultrasound", icon:"🔊", color:"#10B981", desc:"Diagnostic Ultrasound" },
-  { id:"bone_scan", label:"Bone Scan", icon:"🦴", color:"#EC4899", desc:"Nuclear Medicine Bone Scan" },
-  { id:"dexa", label:"DEXA Scan", icon:"📊", color:"#8B5CF6", desc:"Bone Density Scan" },
-  { id:"pet", label:"PET Scan", icon:"🔬", color:"#F97316", desc:"Positron Emission Tomography" },
-  { id:"other", label:"Other", icon:"📋", color:"#9CA3AF", desc:"Other Imaging / Report" },
-];
-
-const BODY_REGIONS = ["Cervical spine (neck)","Thoracic spine","Lumbar spine","Shoulder","Elbow","Wrist / Hand","Hip","Knee","Ankle / Foot","Head / Brain","Chest / Thorax","Abdomen","Pelvis","Full body / Whole spine","Other"];
-const REPORT_FINDINGS = ["Normal / No significant findings","Mild degenerative changes","Moderate degenerative changes","Disc bulge / protrusion","Disc herniation / extrusion","Fracture (acute)","Fracture (old / healed)","Soft tissue tear (partial)","Soft tissue tear (full thickness)","Ligament injury","Tendinopathy","Oedema / Bruising","Nerve compression","Joint effusion","Calcification","Mass / Lesion","Post-surgical changes","Other — see report"];
-
-// ─── PSYCHOSOCIAL FLAGS ───────────────────────────────────────────────────────
-const PSYCH_FLAGS = {
-  yellow:{ label:"Yellow Flags", color:"#F59E0B", bg:"rgba(245,158,11,0.08)", border:"rgba(245,158,11,0.25)", description:"Individual psychological & attitudinal barriers", source:"Kendall et al. 1997",
-    items:[{id:"y1",label:"Pain catastrophising",detail:"Patient believes pain = serious damage",rtwImpact:2.5,weeks:"+2–4 wks"},{id:"y2",label:"Fear-avoidance beliefs",detail:"Avoids activity believing it worsens injury",rtwImpact:2.5,weeks:"+2–6 wks"},{id:"y3",label:"Low self-efficacy",detail:"Low confidence in ability to recover",rtwImpact:1.5,weeks:"+1–3 wks"},{id:"y4",label:"High pain anxiety / hypervigilance",detail:"Excessive focus on pain signals",rtwImpact:2.0,weeks:"+2–4 wks"},{id:"y5",label:"Passive coping style",detail:"Relies on others rather than self-managed recovery",rtwImpact:1.5,weeks:"+1–3 wks"},{id:"y6",label:"History of depression / anxiety",detail:"Pre-existing or concurrent mental health condition",rtwImpact:2.0,weeks:"+2–6 wks"},{id:"y7",label:"Sleep disturbance",detail:"Significant insomnia affecting daily function",rtwImpact:1.0,weeks:"+1–2 wks"},{id:"y8",label:"Unhelpful beliefs about injury",detail:"e.g. 'My back is broken', 'I'll never recover'",rtwImpact:1.5,weeks:"+1–3 wks"}] },
-  blue:{ label:"Blue Flags", color:"#3B82F6", bg:"rgba(59,130,246,0.08)", border:"rgba(59,130,246,0.25)", description:"Work-related perceptions & occupational factors", source:"Main & Burton 2000",
-    items:[{id:"b1",label:"Poor relationship with employer",detail:"Perceived lack of support or conflict at work",rtwImpact:2.0,weeks:"+2–4 wks"},{id:"b2",label:"Low job satisfaction pre-injury",detail:"Did not enjoy role before injury",rtwImpact:1.5,weeks:"+1–4 wks"},{id:"b3",label:"High physical job demands",detail:"Perception that return to work will re-injure",rtwImpact:1.5,weeks:"+1–3 wks"},{id:"b4",label:"Belief that work caused/worsens injury",detail:"Strong attribution of injury to workplace",rtwImpact:1.5,weeks:"+2–4 wks"},{id:"b5",label:"Lack of modified duties",detail:"Employer unable or unwilling to offer graded RTW",rtwImpact:2.5,weeks:"+2–6 wks"},{id:"b6",label:"No RTW coordinator",detail:"No formal RTW support plan in place",rtwImpact:1.5,weeks:"+1–3 wks"}] },
-  black:{ label:"Black Flags", color:"#9CA3AF", bg:"rgba(156,163,175,0.07)", border:"rgba(156,163,175,0.2)", description:"Systemic / contextual barriers", source:"Shaw et al. 2002",
-    items:[{id:"k1",label:"Medicolegal proceedings active",detail:"Compensation dispute or legal action underway",rtwImpact:3.0,weeks:"+4–12 wks"},{id:"k2",label:"Claim processing delays",detail:"Long delays causing uncertainty",rtwImpact:2.0,weeks:"+2–6 wks"},{id:"k3",label:"Financial hardship",detail:"Significant income replacement or financial stress",rtwImpact:2.0,weeks:"+2–6 wks"},{id:"k4",label:"Cultural / language barriers",detail:"Limited English; health literacy concerns",rtwImpact:1.5,weeks:"+1–4 wks"},{id:"k5",label:"Housing or family instability",detail:"Significant social stressors outside of work",rtwImpact:1.5,weeks:"+1–3 wks"},{id:"k6",label:"Previous claim history",detail:"Prior workers compensation claims",rtwImpact:1.0,weeks:"+1–2 wks"}] },
-  orange:{ label:"Orange Flags", color:"#F97316", bg:"rgba(249,115,22,0.08)", border:"rgba(249,115,22,0.25)", description:"Psychiatric conditions requiring specialist input", source:"Nicholas et al. 2011",
-    items:[{id:"o1",label:"Major depressive disorder (active)",detail:"DSM-5 criteria met; functional impairment",rtwImpact:4.0,weeks:"+4–12 wks"},{id:"o2",label:"PTSD (active)",detail:"Trauma-related symptoms significantly impacting function",rtwImpact:4.0,weeks:"+6–16 wks"},{id:"o3",label:"Substance use disorder",detail:"Alcohol/drug use affecting capacity and recovery",rtwImpact:3.0,weeks:"+4–12 wks"},{id:"o4",label:"Active suicidal ideation",detail:"Requires immediate safety planning",rtwImpact:5.0,weeks:"Defer RTW"}] },
+const DEMO_PRACTITIONERS={
+  c001:[
+    {id:'p1',name:'Dr. Sarah Chen',profession:'General Practitioner',providerNo:'123456A',email:'sarah.chen@bayside.com.au',phone:'03 9XXX XXXX'},
+    {id:'p2',name:'Dr. Marcus Webb',profession:'Physiotherapist',providerNo:'234567B',email:'marcus.webb@bayside.com.au',phone:'03 9XXX XXXX'},
+    {id:'p3',name:'Dr. Priya Sharma',profession:'Osteopath',providerNo:'345678C',email:'priya.sharma@bayside.com.au',phone:'03 9XXX XXXX'},
+  ],
+  c002:[
+    {id:'p4',name:'Dr. James Okafor',profession:'Pain Specialist',providerNo:'456789D',email:'james.okafor@tacrehab.com.au',phone:'03 9XXX XXXX'},
+    {id:'p5',name:'Dr. Lily Nguyen',profession:'Physiotherapist',providerNo:'567890E',email:'lily.nguyen@tacrehab.com.au',phone:'03 9XXX XXXX'},
+  ],
+  c003:[{id:'p6',name:'Dr. Tom Brennan',profession:'General Practitioner',providerNo:'678901F',email:'tom.brennan@allied.com.au',phone:'03 9XXX XXXX'}],
 };
-const PSYCH_INTERVENTIONS = { yellow:["Psychoeducation – normalise recovery expectations","CBT-based pain management","STarT Back Tool formal screening","Address catastrophising: explain pain neuroscience","Sleep hygiene program"], blue:["RTW coordinator case conference with employer","OT workplace assessment & modified duties negotiation","Job demands analysis","Vocational rehabilitation referral"], black:["Social work referral","Interpreter services / cultural liaison","Legal team liaison","Insurer case conference request"], orange:["Urgent psychology / psychiatry referral","Mental Health Treatment Plan","Crisis assessment if active suicidal ideation","Defer graduated RTW until psychiatric stability"] };
 
-// ─── DIAGNOSIS DB ─────────────────────────────────────────────────────────────
-const DIAGNOSES = [
-  { icd10:"M54.5", icd10Label:"Low back pain", toocs:"332", toocLabel:"Back problems", category:"Musculoskeletal", rtwWeeks:{sedentary:"1–2",light:"2–4",medium:"4–8",heavy:"8–16"}, rehabPlan:{ p1:{label:"Acute (Wk 1–2)",goals:"Pain management, avoid bed rest, gentle movement",interventions:["Reassurance & education","NSAIDs / analgesia","Heat/cold therapy","Remain active"]}, p2:{label:"Sub-acute (Wk 2–6)",goals:"Restore ROM, core activation",interventions:["Physiotherapy 2–3x/week","McKenzie / motor control exercises","Ergonomic workstation assessment"]}, p3:{label:"RTW (Wk 4–16)",goals:"Full functional capacity",interventions:["Exercise physiology","Graduated RTW","OT workplace assessment"]} }, redFlags:["Bladder/bowel dysfunction","Bilateral leg weakness","Saddle anaesthesia","Fever + back pain"], evidence:"NICE NG59, WorkCover QLD Guidelines." },
-  { icd10:"S13.4", icd10Label:"Whiplash injury (cervical)", toocs:"331", toocLabel:"Neck problems", category:"Musculoskeletal", rtwWeeks:{sedentary:"1–2",light:"2–4",medium:"4–8",heavy:"6–12"}, rehabPlan:{ p1:{label:"Acute (Wk 1–2)",goals:"Pain control, reassurance, early mobility",interventions:["Reassurance – good prognosis WAD I–II","Avoid collar","Gentle cervical ROM","NSAIDs"]}, p2:{label:"Sub-acute (Wk 2–8)",goals:"Restore ROM, strength",interventions:["Physiotherapy – active exercise","Cervical stabilisation","Address yellow flags"]}, p3:{label:"RTW (Wk 4–12)",goals:"Return to full duties",interventions:["Graded activity","Graduated RTW","Multidisciplinary review if >8 weeks"]} }, redFlags:["Upper motor neuron signs","Dysphagia","Vertebral artery symptoms"], evidence:"WAD Qld Clinical Guidelines 2022." },
-  { icd10:"M75.1", icd10Label:"Rotator cuff syndrome / tear", toocs:"213", toocLabel:"Sprains & strains – shoulder", category:"Musculoskeletal", rtwWeeks:{sedentary:"1–4",light:"4–8",medium:"8–16",heavy:"16–26"}, rehabPlan:{ p1:{label:"Acute (Wk 1–4)",goals:"Pain relief, protect healing tissue",interventions:["Avoid overhead loading","NSAIDs","Corticosteroid injection if indicated","Gentle pendular exercises"]}, p2:{label:"Rehab (Wk 4–16)",goals:"Restore rotator cuff strength",interventions:["Physiotherapy 2–3x/week","Scapular stabilisation","Hydrotherapy"]}, p3:{label:"RTW (Wk 8–26)",goals:"Return to occupational duties",interventions:["FCE if overhead work","Graduated RTW","Ergonomic assessment","Surgical review if needed"]} }, redFlags:["Full thickness tear with deficit","Cervical radiculopathy","Axillary nerve injury"], evidence:"Cochrane Review 2019, NHMRC Guidelines." },
-  { icd10:"S52.5", icd10Label:"Fracture of distal radius", toocs:"110", toocLabel:"Fractures – upper extremity", category:"Fracture", rtwWeeks:{sedentary:"4–6",light:"6–10",medium:"10–16",heavy:"16–24"}, rehabPlan:{ p1:{label:"Immobilisation (Wk 0–6)",goals:"Fracture healing, oedema control",interventions:["Cast / splint","Oedema management","Shoulder & elbow ROM maintenance"]}, p2:{label:"Mobilisation (Wk 6–12)",goals:"Restore wrist ROM and grip strength",interventions:["Hand therapy 2–3x/week","Progressive ROM exercises","Grip strength training"]}, p3:{label:"RTW (Wk 8–24)",goals:"Functional hand use",interventions:["OT worksite assessment","Graduated RTW","FCE at 12–16 weeks"]} }, redFlags:["Signs of CRPS","Median nerve symptoms","Non-union on imaging"], evidence:"BSSH Guidelines, AusCAPRS 2021." },
-  { icd10:"F32.1", icd10Label:"Moderate depressive episode", toocs:"730", toocLabel:"Mental health – depressive disorders", category:"Psychological", rtwWeeks:{sedentary:"4–8",light:"6–12",medium:"8–16",heavy:"12–26"}, rehabPlan:{ p1:{label:"Acute (Wk 1–4)",goals:"Safety, stabilisation",interventions:["GP Management Plan + MHTP","Psychology referral (CBT)","Antidepressants if indicated","Safety planning"]}, p2:{label:"Active treatment (Wk 4–12)",goals:"Symptom reduction",interventions:["Psychology – 6–10 sessions CBT/ACT","Graded activity & exercise","Workplace liaison"]}, p3:{label:"RTW (Wk 8–26)",goals:"Graduated RTW",interventions:["OT vocational rehabilitation","Graduated hours/duties","Ongoing psychological support"]} }, redFlags:["Suicidal ideation","Psychotic features","Substance misuse","Failure to respond at 4–6 weeks"], evidence:"beyondblue Guidelines, NICE CG90." },
-  { icd10:"F43.1", icd10Label:"Post-traumatic stress disorder", toocs:"740", toocLabel:"Mental health – PTSD", category:"Psychological", rtwWeeks:{sedentary:"8–16",light:"12–20",medium:"16–26",heavy:"20–52"}, rehabPlan:{ p1:{label:"Stabilisation (Wk 1–6)",goals:"Safety, psychoeducation",interventions:["Trauma-informed psychologist","Psychoeducation","Safety & grounding techniques"]}, p2:{label:"Trauma processing (Wk 4–20)",goals:"Process trauma, reduce avoidance",interventions:["TF-CBT or EMDR – 10–20 sessions","Psychiatry review if needed"]}, p3:{label:"RTW (Wk 16–52)",goals:"Sustainable return",interventions:["OT vocational rehabilitation","Phased RTW","RTW coordinator case conferencing"]} }, redFlags:["Active suicidal ideation","Severe functional impairment","Substance dependency"], evidence:"Phoenix Australia PTSD Guidelines 2020." },
-  { icd10:"G54.2", icd10Label:"Cervical radiculopathy", toocs:"331", toocLabel:"Neck – nerve involvement", category:"Musculoskeletal", rtwWeeks:{sedentary:"2–6",light:"4–8",medium:"6–12",heavy:"12–24"}, rehabPlan:{ p1:{label:"Acute (Wk 1–4)",goals:"Pain and neurological symptom management",interventions:["Analgesia / gabapentin","Physiotherapy – neural mobilisation","MRI cervical spine"]}, p2:{label:"Sub-acute (Wk 4–12)",goals:"Reduce radicular symptoms",interventions:["Physiotherapy – stabilisation","Epidural CSI if indicated","Ergonomic workstation review"]}, p3:{label:"RTW (Wk 6–24)",goals:"Return with accommodations",interventions:["Graduated RTW – limit neck positions","OT workstation modification","Surgical review if progressive neurology"]} }, redFlags:["Progressive weakness","Bilateral symptoms","Myelopathy signs"], evidence:"NASS Clinical Guidelines 2020." },
-  { icd10:"S93.4", icd10Label:"Sprain of ankle", toocs:"220", toocLabel:"Sprains – lower extremity", category:"Musculoskeletal", rtwWeeks:{sedentary:"1",light:"1–2",medium:"2–4",heavy:"4–8"}, rehabPlan:{ p1:{label:"Acute (Day 1–5)",goals:"Reduce swelling, protect joint",interventions:["RICE protocol","Weight-bearing as tolerated","Exclude fracture (Ottawa Rules)"]}, p2:{label:"Sub-acute (Wk 1–4)",goals:"Restore strength, proprioception",interventions:["Physiotherapy","Balance training","Taping / bracing"]}, p3:{label:"RTW (Wk 2–8)",goals:"Return to pre-injury activity",interventions:["Functional capacity assessment","Graduated RTW","Work-specific rehabilitation"]} }, redFlags:["Bony tenderness at malleolus","Unable to weight bear 4 steps","Neurovascular compromise"], evidence:"KNGF Guidelines." },
+const INSURERS={
+  WorkCover:[
+    {id:'allianz',name:'Allianz Workers Compensation',phone:'1300 130 664',address:'2 Market St, Sydney NSW 2000'},
+    {id:'eml',name:'EML VIC Pty Ltd',phone:'1300 365 435',address:'Level 3, 60 City Rd, Southbank VIC 3006'},
+    {id:'gallagher',name:'Gallagher Bassett Services',phone:'1300 362 217',address:'Level 7, 535 Bourke St, Melbourne VIC 3000'},
+    {id:'dxc',name:'DXC Claims Management Services',phone:'1300 369 388',address:'Level 12, 360 Collins St, Melbourne VIC 3000'},
+    {id:'other',name:'Other / Not listed',phone:'',address:''},
+  ],
+  TAC:[
+    {id:'tac',name:'Transport Accident Commission (TAC)',phone:'1300 654 329',address:'60 Brougham St, Geelong VIC 3220'},
+    {id:'other',name:'Other / Not listed',phone:'',address:''},
+  ],
+};
+
+const DIAGNOSES_DB=[
+  // ── SPINE ──────────────────────────────────────────────────────────────────
+  {icd10:'M54.5',label:'Low back pain',category:'Spine'},
+  {icd10:'M54.4',label:'Lumbago with sciatica',category:'Spine'},
+  {icd10:'M54.3',label:'Sciatica',category:'Spine'},
+  {icd10:'M51.1',label:'Lumbar disc herniation with radiculopathy',category:'Spine'},
+  {icd10:'M51.0',label:'Lumbar disc herniation with myelopathy',category:'Spine'},
+  {icd10:'M51.2',label:'Lumbar disc degeneration',category:'Spine'},
+  {icd10:'M47.8',label:'Lumbar spondylosis',category:'Spine'},
+  {icd10:'M47.2',label:'Spondylosis with radiculopathy — lumbar',category:'Spine'},
+  {icd10:'M48.0',label:'Spinal stenosis',category:'Spine'},
+  {icd10:'M43.1',label:'Spondylolisthesis',category:'Spine'},
+  {icd10:'M43.0',label:'Spondylolysis',category:'Spine'},
+  {icd10:'M54.6',label:'Thoracic pain',category:'Spine'},
+  {icd10:'M54.2',label:'Cervicalgia / Neck pain',category:'Spine'},
+  {icd10:'S13.4',label:'Whiplash associated disorder (WAD)',category:'Spine'},
+  {icd10:'M50.1',label:'Cervical disc herniation with radiculopathy',category:'Spine'},
+  {icd10:'M50.0',label:'Cervical disc herniation with myelopathy',category:'Spine'},
+  {icd10:'M50.3',label:'Cervical disc degeneration',category:'Spine'},
+  {icd10:'M47.8',label:'Cervical spondylosis',category:'Spine'},
+  {icd10:'M54.1',label:'Radiculopathy — cervical',category:'Spine'},
+  {icd10:'M48.8',label:'Facet joint syndrome',category:'Spine'},
+  {icd10:'M53.3',label:'Sacrococcygeal disorders',category:'Spine'},
+  {icd10:'M46.4',label:'Discitis',category:'Spine'},
+  {icd10:'S22.0',label:'Fracture of thoracic vertebra',category:'Spine'},
+  {icd10:'S32.0',label:'Fracture of lumbar vertebra',category:'Spine'},
+  {icd10:'S12.9',label:'Fracture of cervical vertebra',category:'Spine'},
+  // ── SHOULDER ──────────────────────────────────────────────────────────────
+  {icd10:'M75.1',label:'Rotator cuff syndrome / tear',category:'Shoulder'},
+  {icd10:'M75.0',label:'Adhesive capsulitis (frozen shoulder)',category:'Shoulder'},
+  {icd10:'M75.5',label:'Subacromial bursitis',category:'Shoulder'},
+  {icd10:'M75.2',label:'Bicipital tendinitis',category:'Shoulder'},
+  {icd10:'M75.3',label:'Calcific tendinitis of shoulder',category:'Shoulder'},
+  {icd10:'S46.0',label:'Rotator cuff strain',category:'Shoulder'},
+  {icd10:'S43.0',label:'Glenohumeral dislocation',category:'Shoulder'},
+  {icd10:'S43.1',label:'Acromioclavicular joint sprain / dislocation',category:'Shoulder'},
+  {icd10:'M75.8',label:'SLAP tear (superior labral tear)',category:'Shoulder'},
+  {icd10:'S40.0',label:'Shoulder contusion',category:'Shoulder'},
+  {icd10:'S42.2',label:'Fracture of proximal humerus',category:'Shoulder'},
+  {icd10:'M89.3',label:'Shoulder impingement syndrome',category:'Shoulder'},
+  // ── ELBOW ─────────────────────────────────────────────────────────────────
+  {icd10:'M77.1',label:'Lateral epicondylalgia (tennis elbow)',category:'Elbow'},
+  {icd10:'M77.0',label:"Medial epicondylalgia (golfer's elbow)",category:'Elbow'},
+  {icd10:'M70.2',label:'Olecranon bursitis',category:'Elbow'},
+  {icd10:'G56.2',label:'Cubital tunnel syndrome (ulnar nerve)',category:'Elbow'},
+  {icd10:'S53.1',label:'Elbow dislocation',category:'Elbow'},
+  {icd10:'S52.0',label:'Fracture of olecranon',category:'Elbow'},
+  {icd10:'M77.8',label:'Distal biceps tendon tear',category:'Elbow'},
+  // ── WRIST & HAND ──────────────────────────────────────────────────────────
+  {icd10:'G56.0',label:'Carpal tunnel syndrome',category:'Wrist/Hand'},
+  {icd10:'M65.3',label:"De Quervain's tenosynovitis",category:'Wrist/Hand'},
+  {icd10:'M65.9',label:'Trigger finger / flexor tenosynovitis',category:'Wrist/Hand'},
+  {icd10:'S62.5',label:'Fracture of metacarpal',category:'Wrist/Hand'},
+  {icd10:'S52.5',label:'Fracture of distal radius',category:'Wrist/Hand'},
+  {icd10:'S62.0',label:'Fracture of scaphoid',category:'Wrist/Hand'},
+  {icd10:'S63.0',label:'Wrist sprain / TFCC injury',category:'Wrist/Hand'},
+  {icd10:'M71.3',label:'Ganglion cyst — wrist',category:'Wrist/Hand'},
+  {icd10:'M79.4',label:'Hypothenar hammer syndrome',category:'Wrist/Hand'},
+  {icd10:'S63.6',label:'Finger sprain / ligament injury',category:'Wrist/Hand'},
+  {icd10:'S62.6',label:'Fracture of phalanx — finger',category:'Wrist/Hand'},
+  // ── HIP ───────────────────────────────────────────────────────────────────
+  {icd10:'M16.1',label:'Osteoarthritis of hip',category:'Hip'},
+  {icd10:'M70.6',label:'Trochanteric bursitis',category:'Hip'},
+  {icd10:'M76.0',label:'Gluteal tendinopathy / tendinitis',category:'Hip'},
+  {icd10:'M76.1',label:'Psoas tendinitis / iliopsoas bursitis',category:'Hip'},
+  {icd10:'S70.0',label:'Hip contusion',category:'Hip'},
+  {icd10:'S72.0',label:'Fracture of neck of femur',category:'Hip'},
+  {icd10:'S73.0',label:'Hip dislocation',category:'Hip'},
+  {icd10:'M24.8',label:'Femoroacetabular impingement (FAI)',category:'Hip'},
+  {icd10:'S76.0',label:'Hip labral tear',category:'Hip'},
+  {icd10:'M79.1',label:'Piriformis syndrome',category:'Hip'},
+  // ── KNEE ──────────────────────────────────────────────────────────────────
+  {icd10:'M17.1',label:'Osteoarthritis of knee',category:'Knee'},
+  {icd10:'M23.2',label:'Meniscal tear',category:'Knee'},
+  {icd10:'S83.5',label:'ACL sprain / tear',category:'Knee'},
+  {icd10:'S83.4',label:'Collateral ligament sprain (MCL/LCL)',category:'Knee'},
+  {icd10:'S83.6',label:'PCL sprain / tear',category:'Knee'},
+  {icd10:'M76.5',label:'Patellar tendinopathy (jumper's knee)',category:'Knee'},
+  {icd10:'M22.2',label:'Patellofemoral pain syndrome',category:'Knee'},
+  {icd10:'M70.4',label:'Prepatellar bursitis',category:'Knee'},
+  {icd10:'M70.5',label:'Infrapatellar bursitis',category:'Knee'},
+  {icd10:'S83.0',label:'Patellar dislocation',category:'Knee'},
+  {icd10:'S82.0',label:'Fracture of patella',category:'Knee'},
+  {icd10:'M23.4',label:'Plica syndrome',category:'Knee'},
+  {icd10:'M25.3',label:'Knee effusion',category:'Knee'},
+  // ── ANKLE & FOOT ──────────────────────────────────────────────────────────
+  {icd10:'M76.6',label:'Achilles tendinopathy',category:'Ankle/Foot'},
+  {icd10:'S86.0',label:'Achilles tendon tear / rupture',category:'Ankle/Foot'},
+  {icd10:'S93.4',label:'Ankle sprain (lateral)',category:'Ankle/Foot'},
+  {icd10:'S93.3',label:'Ankle sprain (medial / deltoid)',category:'Ankle/Foot'},
+  {icd10:'M79.3',label:'Plantar fasciitis',category:'Ankle/Foot'},
+  {icd10:'M77.5',label:'Heel spur',category:'Ankle/Foot'},
+  {icd10:'M70.8',label:'Retrocalcaneal bursitis',category:'Ankle/Foot'},
+  {icd10:'S82.6',label:'Fracture of lateral malleolus',category:'Ankle/Foot'},
+  {icd10:'S82.5',label:'Fracture of medial malleolus',category:'Ankle/Foot'},
+  {icd10:'S92.3',label:'Fracture of metatarsal',category:'Ankle/Foot'},
+  {icd10:'M76.7',label:'Peroneal tendinopathy',category:'Ankle/Foot'},
+  {icd10:'G57.5',label:'Tarsal tunnel syndrome',category:'Ankle/Foot'},
+  {icd10:'M77.4',label:'Metatarsalgia',category:'Ankle/Foot'},
+  // ── NERVE & VASCULAR ──────────────────────────────────────────────────────
+  {icd10:'G54.2',label:'Thoracic outlet syndrome',category:'Nerve/Vascular'},
+  {icd10:'G54.3',label:'Thoracic nerve root disorders',category:'Nerve/Vascular'},
+  {icd10:'G56.1',label:'Median nerve lesion',category:'Nerve/Vascular'},
+  {icd10:'G56.3',label:'Radial nerve lesion',category:'Nerve/Vascular'},
+  {icd10:'G57.0',label:'Sciatic nerve lesion',category:'Nerve/Vascular'},
+  {icd10:'G57.1',label:'Meralgia paraesthetica',category:'Nerve/Vascular'},
+  {icd10:'G57.3',label:'Lateral cutaneous nerve of thigh',category:'Nerve/Vascular'},
+  {icd10:'M89.0',label:'Complex regional pain syndrome (CRPS)',category:'Nerve/Vascular'},
+  // ── SOFT TISSUE & OVERUSE ─────────────────────────────────────────────────
+  {icd10:'M70.0',label:'Occupational tenosynovitis — wrist',category:'Soft Tissue'},
+  {icd10:'M65.2',label:'Calcific tendinitis — general',category:'Soft Tissue'},
+  {icd10:'M79.1',label:'Myofascial pain syndrome',category:'Soft Tissue'},
+  {icd10:'M79.7',label:'Fibromyalgia',category:'Soft Tissue'},
+  {icd10:'M62.4',label:'Muscle contracture',category:'Soft Tissue'},
+  {icd10:'M62.6',label:'Muscle strain — general',category:'Soft Tissue'},
+  {icd10:'T14.3',label:'Contusion — unspecified body region',category:'Soft Tissue'},
+  {icd10:'M72.2',label:'Plantar fibromatosis',category:'Soft Tissue'},
+  {icd10:'M79.2',label:'Neuralgia / neuritis',category:'Soft Tissue'},
+  // ── FRACTURES & TRAUMA ────────────────────────────────────────────────────
+  {icd10:'S20.0',label:'Rib contusion / fracture',category:'Fracture/Trauma'},
+  {icd10:'S22.3',label:'Fracture of rib',category:'Fracture/Trauma'},
+  {icd10:'S29.0',label:'Thoracic muscle / tendon injury',category:'Fracture/Trauma'},
+  {icd10:'S39.0',label:'Abdominal / lumbar muscle strain',category:'Fracture/Trauma'},
+  {icd10:'S40.1',label:'Strain of shoulder muscles',category:'Fracture/Trauma'},
+  {icd10:'S49.9',label:'Shoulder / upper arm injury unspecified',category:'Fracture/Trauma'},
+  {icd10:'T08',label:'Fracture of spine — unspecified',category:'Fracture/Trauma'},
+  {icd10:'T14.0',label:'Superficial injury — unspecified',category:'Fracture/Trauma'},
+  {icd10:'T14.1',label:'Wound / laceration — unspecified',category:'Fracture/Trauma'},
+  // ── OSTEOARTHRITIS & JOINT ────────────────────────────────────────────────
+  {icd10:'M15.0',label:'Polyosteoarthritis',category:'Osteoarthritis'},
+  {icd10:'M16.0',label:'Primary osteoarthritis of hip',category:'Osteoarthritis'},
+  {icd10:'M17.0',label:'Primary osteoarthritis of knee',category:'Osteoarthritis'},
+  {icd10:'M18.0',label:'Osteoarthritis of first carpometacarpal joint',category:'Osteoarthritis'},
+  {icd10:'M19.0',label:'Primary osteoarthritis — other joints',category:'Osteoarthritis'},
+  {icd10:'M05.9',label:'Rheumatoid arthritis — seropositive',category:'Osteoarthritis'},
+  {icd10:'M06.9',label:'Rheumatoid arthritis — unspecified',category:'Osteoarthritis'},
+  {icd10:'M10.0',label:'Gout',category:'Osteoarthritis'},
+  // ── OCCUPATIONAL / OVERUSE ────────────────────────────────────────────────
+  {icd10:'M77.9',label:'Enthesopathy — unspecified',category:'Occupational'},
+  {icd10:'M70.1',label:'Bursitis of hand',category:'Occupational'},
+  {icd10:'M70.3',label:'Other bursitis of elbow',category:'Occupational'},
+  {icd10:'M70.9',label:'Soft tissue disorder related to use / overuse',category:'Occupational'},
+  {icd10:'Z57.5',label:'Occupational exposure — vibration',category:'Occupational'},
+  {icd10:'Z57.1',label:'Occupational exposure — radiation',category:'Occupational'},
+  {icd10:'Z57.0',label:'Occupational noise exposure / hearing loss',category:'Occupational'},
+  {icd10:'J68.0',label:'Occupational lung disease — chemical inhalation',category:'Occupational'},
+  // ── PSYCHOLOGICAL ─────────────────────────────────────────────────────────
+  {icd10:'F32.0',label:'Mild depressive episode',category:'Psychological'},
+  {icd10:'F32.1',label:'Moderate depressive episode',category:'Psychological'},
+  {icd10:'F32.2',label:'Severe depressive episode without psychosis',category:'Psychological'},
+  {icd10:'F33.1',label:'Recurrent depressive disorder — moderate',category:'Psychological'},
+  {icd10:'F41.0',label:'Panic disorder',category:'Psychological'},
+  {icd10:'F41.1',label:'Generalised anxiety disorder',category:'Psychological'},
+  {icd10:'F41.2',label:'Mixed anxiety and depressive disorder',category:'Psychological'},
+  {icd10:'F43.0',label:'Acute stress reaction',category:'Psychological'},
+  {icd10:'F43.1',label:'Post-traumatic stress disorder (PTSD)',category:'Psychological'},
+  {icd10:'F43.2',label:'Adjustment disorder',category:'Psychological'},
+  {icd10:'F48.0',label:'Neurasthenia / burnout',category:'Psychological'},
+  {icd10:'F45.4',label:'Persistent somatoform pain disorder',category:'Psychological'},
+  // ── HEAD & NEUROLOGICAL ───────────────────────────────────────────────────
+  {icd10:'S09.9',label:'Head injury / concussion',category:'Head/Neurological'},
+  {icd10:'S06.0',label:'Concussion',category:'Head/Neurological'},
+  {icd10:'S06.3',label:'Diffuse traumatic brain injury',category:'Head/Neurological'},
+  {icd10:'G44.3',label:'Post-traumatic headache',category:'Head/Neurological'},
+  {icd10:'R41.3',label:'Cognitive difficulties post-injury',category:'Head/Neurological'},
+  {icd10:'H83.3',label:'Noise-induced hearing loss',category:'Head/Neurological'},
+  // ── DSM-5 PSYCHOLOGICAL & PSYCHIATRIC ────────────────────────────────────
+  // Depressive Disorders
+  {icd10:'F32.0',dsm5:'296.21',label:'Major Depressive Disorder — single episode, mild',category:'DSM-5 / Psychological'},
+  {icd10:'F32.1',dsm5:'296.22',label:'Major Depressive Disorder — single episode, moderate',category:'DSM-5 / Psychological'},
+  {icd10:'F32.2',dsm5:'296.23',label:'Major Depressive Disorder — single episode, severe',category:'DSM-5 / Psychological'},
+  {icd10:'F33.0',dsm5:'296.31',label:'Major Depressive Disorder — recurrent, mild',category:'DSM-5 / Psychological'},
+  {icd10:'F33.1',dsm5:'296.32',label:'Major Depressive Disorder — recurrent, moderate',category:'DSM-5 / Psychological'},
+  {icd10:'F33.2',dsm5:'296.33',label:'Major Depressive Disorder — recurrent, severe',category:'DSM-5 / Psychological'},
+  {icd10:'F34.1',dsm5:'300.4',label:'Persistent Depressive Disorder (Dysthymia)',category:'DSM-5 / Psychological'},
+  {icd10:'F31.0',dsm5:'296.40',label:'Bipolar I Disorder — manic episode',category:'DSM-5 / Psychological'},
+  {icd10:'F31.8',dsm5:'296.89',label:'Bipolar II Disorder',category:'DSM-5 / Psychological'},
+  // Anxiety Disorders
+  {icd10:'F41.1',dsm5:'300.02',label:'Generalised Anxiety Disorder (GAD)',category:'DSM-5 / Psychological'},
+  {icd10:'F41.0',dsm5:'300.01',label:'Panic Disorder',category:'DSM-5 / Psychological'},
+  {icd10:'F40.1',dsm5:'300.23',label:'Social Anxiety Disorder (Social Phobia)',category:'DSM-5 / Psychological'},
+  {icd10:'F40.0',dsm5:'300.22',label:'Agoraphobia',category:'DSM-5 / Psychological'},
+  {icd10:'F40.2',dsm5:'300.29',label:'Specific Phobia',category:'DSM-5 / Psychological'},
+  {icd10:'F41.2',dsm5:'309.28',label:'Adjustment Disorder with Mixed Anxiety and Depressed Mood',category:'DSM-5 / Psychological'},
+  // Trauma & Stressor-Related
+  {icd10:'F43.1',dsm5:'309.81',label:'Post-Traumatic Stress Disorder (PTSD)',category:'DSM-5 / Psychological'},
+  {icd10:'F43.0',dsm5:'308.3',label:'Acute Stress Disorder',category:'DSM-5 / Psychological'},
+  {icd10:'F43.20',dsm5:'309.0',label:'Adjustment Disorder with Depressed Mood',category:'DSM-5 / Psychological'},
+  {icd10:'F43.21',dsm5:'309.24',label:'Adjustment Disorder with Anxiety',category:'DSM-5 / Psychological'},
+  {icd10:'F43.22',dsm5:'309.28',label:'Adjustment Disorder with Mixed Anxiety and Depression',category:'DSM-5 / Psychological'},
+  {icd10:'F43.23',dsm5:'309.3',label:'Adjustment Disorder with Disturbance of Conduct',category:'DSM-5 / Psychological'},
+  {icd10:'F43.25',dsm5:'309.9',label:'Adjustment Disorder unspecified',category:'DSM-5 / Psychological'},
+  {icd10:'F94.1',dsm5:'313.89',label:'Reactive Attachment Disorder',category:'DSM-5 / Psychological'},
+  // OCD & Related
+  {icd10:'F42',dsm5:'300.3',label:'Obsessive-Compulsive Disorder (OCD)',category:'DSM-5 / Psychological'},
+  {icd10:'F45.2',dsm5:'300.7',label:'Illness Anxiety Disorder (Health Anxiety)',category:'DSM-5 / Psychological'},
+  {icd10:'F45.1',dsm5:'300.82',label:'Somatic Symptom Disorder',category:'DSM-5 / Psychological'},
+  {icd10:'F45.4',dsm5:'307.89',label:'Persistent Somatoform Pain Disorder',category:'DSM-5 / Psychological'},
+  // Substance Use
+  {icd10:'F10.1',dsm5:'305.00',label:'Alcohol Use Disorder — mild',category:'DSM-5 / Psychological'},
+  {icd10:'F10.2',dsm5:'303.90',label:'Alcohol Use Disorder — moderate to severe',category:'DSM-5 / Psychological'},
+  {icd10:'F11.1',dsm5:'305.50',label:'Opioid Use Disorder — mild',category:'DSM-5 / Psychological'},
+  {icd10:'F11.2',dsm5:'304.00',label:'Opioid Use Disorder — moderate to severe',category:'DSM-5 / Psychological'},
+  {icd10:'F14.1',dsm5:'305.60',label:'Cocaine Use Disorder — mild',category:'DSM-5 / Psychological'},
+  {icd10:'F15.1',dsm5:'305.70',label:'Stimulant Use Disorder — mild',category:'DSM-5 / Psychological'},
+  {icd10:'F12.1',dsm5:'305.20',label:'Cannabis Use Disorder — mild',category:'DSM-5 / Psychological'},
+  // Sleep Disorders
+  {icd10:'G47.0',dsm5:'780.52',label:'Insomnia Disorder',category:'DSM-5 / Psychological'},
+  {icd10:'G47.4',dsm5:'347.00',label:'Narcolepsy',category:'DSM-5 / Psychological'},
+  {icd10:'F51.5',dsm5:'307.46',label:'Non-Rapid Eye Movement Sleep Arousal Disorder',category:'DSM-5 / Psychological'},
+  // Neurodevelopmental
+  {icd10:'F90.0',dsm5:'314.00',label:'ADHD — predominantly inattentive presentation',category:'DSM-5 / Psychological'},
+  {icd10:'F90.1',dsm5:'314.01',label:'ADHD — predominantly hyperactive-impulsive',category:'DSM-5 / Psychological'},
+  {icd10:'F90.2',dsm5:'314.01',label:'ADHD — combined presentation',category:'DSM-5 / Psychological'},
+  {icd10:'F84.0',dsm5:'299.00',label:'Autism Spectrum Disorder',category:'DSM-5 / Psychological'},
+  // Psychotic
+  {icd10:'F20.9',dsm5:'295.90',label:'Schizophrenia',category:'DSM-5 / Psychological'},
+  {icd10:'F25.0',dsm5:'295.70',label:'Schizoaffective Disorder — bipolar type',category:'DSM-5 / Psychological'},
+  {icd10:'F22',dsm5:'297.1',label:'Delusional Disorder',category:'DSM-5 / Psychological'},
+  // Personality
+  {icd10:'F60.3',dsm5:'301.83',label:'Borderline Personality Disorder',category:'DSM-5 / Psychological'},
+  {icd10:'F60.2',dsm5:'301.7',label:'Antisocial Personality Disorder',category:'DSM-5 / Psychological'},
+  {icd10:'F60.0',dsm5:'301.0',label:'Paranoid Personality Disorder',category:'DSM-5 / Psychological'},
+  {icd10:'F60.4',dsm5:'301.50',label:'Histrionic Personality Disorder',category:'DSM-5 / Psychological'},
+  {icd10:'F60.5',dsm5:'301.4',label:'Obsessive-Compulsive Personality Disorder',category:'DSM-5 / Psychological'},
+  {icd10:'F60.6',dsm5:'301.82',label:'Avoidant Personality Disorder',category:'DSM-5 / Psychological'},
+  // Dissociative
+  {icd10:'F44.81',dsm5:'300.14',label:'Dissociative Identity Disorder',category:'DSM-5 / Psychological'},
+  {icd10:'F44.0',dsm5:'300.12',label:'Dissociative Amnesia',category:'DSM-5 / Psychological'},
+  {icd10:'F48.1',dsm5:'300.6',label:'Depersonalisation / Derealisation Disorder',category:'DSM-5 / Psychological'},
+  // Eating
+  {icd10:'F50.0',dsm5:'307.1',label:'Anorexia Nervosa',category:'DSM-5 / Psychological'},
+  {icd10:'F50.2',dsm5:'307.51',label:'Bulimia Nervosa',category:'DSM-5 / Psychological'},
+  {icd10:'F50.8',dsm5:'307.51',label:'Binge-Eating Disorder',category:'DSM-5 / Psychological'},
+  // Neurocognitive
+  {icd10:'F06.7',dsm5:'331.83',label:'Mild Neurocognitive Disorder',category:'DSM-5 / Psychological'},
+  {icd10:'F02.8',dsm5:'294.1',label:'Major Neurocognitive Disorder (Dementia)',category:'DSM-5 / Psychological'},
+  {icd10:'F07.0',dsm5:'310.1',label:'Personality change due to TBI',category:'DSM-5 / Psychological'},
+  {icd10:'F07.81',dsm5:'310.1',label:'Post-concussion syndrome',category:'DSM-5 / Psychological'},
 ];
 
-// ─── STYLE HELPERS ────────────────────────────────────────────────────────────
-const IS = { width:"100%", padding:"9px 12px", borderRadius:"7px", border:"1px solid rgba(255,255,255,0.1)", background:"rgba(255,255,255,0.04)", color:"#e8eaf0", fontSize:"13px", fontFamily:"inherit", outline:"none", boxSizing:"border-box" };
-const LS = { fontSize:"10px", letterSpacing:"1.5px", textTransform:"uppercase", color:"#6b7280" };
-function Badge({text,color,bg}){ return <span style={{padding:"3px 9px",borderRadius:"20px",background:bg||`${color}18`,color:color||"#9ca3af",fontSize:"11px",fontWeight:"600",whiteSpace:"nowrap"}}>{text}</span>; }
-function SecHead({num,title,color}){ return <div style={{display:"flex",alignItems:"center",gap:"12px",marginBottom:"20px"}}><div style={{width:"26px",height:"26px",borderRadius:"50%",background:`${color}22`,border:`1.5px solid ${color}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px",fontWeight:"700",color,flexShrink:0}}>{num}</div><div style={{fontSize:"16px",fontWeight:"700",color:"#f1f5f9"}}>{title}</div><div style={{flex:1,height:"1px",background:"rgba(255,255,255,0.06)"}}/></div>; }
-function Field({label,value,onChange,placeholder,type="text",options=[],span=1,rows=3}){
-  const s={...IS,marginTop:"7px"};
-  return <div style={{gridColumn:`span ${span}`}}><label style={LS}>{label}</label>
-    {type==="select"?<select value={value} onChange={e=>onChange(e.target.value)} style={s}><option value="">Select…</option>{options.map(o=><option key={o} value={o}>{o}</option>)}</select>
-    :type==="textarea"?<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{...s,resize:"vertical"}}/>
-    :<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={s}/>}</div>;
-}
+const PHYSICAL_FUNCTIONS=[
+  {id:'sit',label:'Sit'},{id:'stand',label:'Stand'},{id:'walk',label:'Walk'},
+  {id:'bend',label:'Bend / stoop'},{id:'kneel',label:'Kneel / squat'},{id:'stairs',label:'Climb stairs'},
+  {id:'lift_light',label:'Lift / carry (light <5kg)'},{id:'lift_mod',label:'Lift / carry (moderate 5–15kg)'},
+  {id:'lift_heavy',label:'Lift / carry (heavy >15kg)'},{id:'push_pull',label:'Push / pull'},
+  {id:'overhead',label:'Reach overhead'},{id:'fine_motor',label:'Fine motor / keyboard use'},
+  {id:'drive',label:'Drive'},{id:'heights',label:'Work at heights'},
+];
 
-// ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────
+const MENTAL_FUNCTIONS=[
+  {id:'concentration',label:'Concentration & attention'},{id:'memory',label:'Memory'},
+  {id:'stress',label:'Stress tolerance'},{id:'social',label:'Social interaction'},
+  {id:'mood',label:'Mood / behaviour'},{id:'motivation',label:'Motivation'},
+];
+
+const SEVERITY_OPTIONS=['Mildly affected','Moderately affected','Significantly affected'];
+
+const css={
+  appShell:{display:'flex',minHeight:'100vh'},
+  sidebar:{width:220,background:'#0C1A2E',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',transition:'width 0.25s',flexShrink:0},
+  sidebarCollapsed:{width:60},
+  mainContent:{flex:1,overflow:'auto'},
+  topBar:{background:'rgba(12,26,46,0.97)',borderBottom:'1px solid rgba(255,255,255,0.07)',padding:'0 28px',height:60,display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:50},
+  page:{padding:'28px',maxWidth:960,margin:'0 auto'},
+  card:{background:'#0C1A2E',border:'1px solid rgba(255,255,255,0.07)',borderRadius:16,padding:'24px',marginBottom:20},
+  cardSm:{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:12,padding:'14px 18px'},
+  label:{display:'block',fontSize:'0.74rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.08em',color:'#5B7A99',marginBottom:7},
+  inp:{width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:10,padding:'12px 14px',color:'#EFF6FF',fontSize:'0.95rem',outline:'none'},
+  sel:{width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:10,padding:'12px 14px',color:'#EFF6FF',fontSize:'0.95rem',outline:'none',cursor:'pointer'},
+  ta:{width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:10,padding:'12px 14px',color:'#EFF6FF',fontSize:'0.95rem',outline:'none',resize:'vertical',lineHeight:1.6},
+  btnP:{background:'#00C9A7',color:'#07101E',border:'none',borderRadius:10,padding:'12px 22px',fontWeight:700,fontSize:'0.9rem',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:8},
+  btnS:{background:'transparent',color:'#EFF6FF',border:'1px solid rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 22px',fontWeight:500,fontSize:'0.9rem',cursor:'pointer'},
+  btnD:{background:'transparent',color:'#FF4D6D',border:'1px solid rgba(255,77,109,0.25)',borderRadius:10,padding:'9px 16px',fontWeight:500,fontSize:'0.85rem',cursor:'pointer'},
+  pill:{display:'inline-flex',alignItems:'center',padding:'5px 14px',borderRadius:100,fontSize:'0.75rem',fontWeight:600,border:'1px solid',cursor:'pointer'},
+  pillT:{background:'rgba(0,201,167,0.12)',borderColor:'rgba(0,201,167,0.3)',color:'#00C9A7'},
+  pillM:{background:'rgba(255,255,255,0.04)',borderColor:'rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.5)'},
+  pillA:{background:'rgba(255,184,48,0.1)',borderColor:'rgba(255,184,48,0.25)',color:'#FFB830'},
+  pillR:{background:'rgba(255,77,109,0.1)',borderColor:'rgba(255,77,109,0.25)',color:'#FF4D6D'},
+  g2:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16},
+  g3:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12},
+  fb:{display:'flex',alignItems:'center',justifyContent:'space-between'},
+  fr:{display:'flex',alignItems:'center',gap:12},
+  tabBar:{display:'flex',gap:4,borderBottom:'1px solid rgba(255,255,255,0.07)',marginBottom:28,flexWrap:'wrap'},
+  tab:{padding:'10px 16px',borderRadius:'8px 8px 0 0',border:'none',background:'transparent',color:'rgba(255,255,255,0.45)',fontSize:'0.82rem',fontWeight:500,cursor:'pointer',whiteSpace:'nowrap'},
+  tabA:{background:'rgba(0,201,167,0.1)',color:'#00C9A7',borderBottom:'2px solid #00C9A7'},
+  ok:{background:'rgba(0,201,167,0.1)',border:'1px solid rgba(0,201,167,0.25)',borderRadius:12,padding:'12px 16px',color:'#00C9A7',fontSize:'0.85rem',display:'flex',alignItems:'center',gap:10,marginBottom:16},
+  warn:{background:'rgba(255,184,48,0.08)',border:'1px solid rgba(255,184,48,0.2)',borderRadius:12,padding:'12px 16px',color:'#FFB830',fontSize:'0.85rem',display:'flex',alignItems:'center',gap:10,marginBottom:16},
+};
+
+const Inp=({label,value,onChange,placeholder,type='text',required})=>(
+  <div style={{marginBottom:16}}>
+    {label&&<label style={css.label}>{label}{required&&<span style={{color:'#FF4D6D',marginLeft:3}}>*</span>}</label>}
+    <input style={css.inp} type={type} value={value||''} onChange={e=>onChange(e.target.value)} placeholder={placeholder||''}/>
+  </div>
+);
+
+const Sel=({label,value,onChange,options,required})=>(
+  <div style={{marginBottom:16}}>
+    {label&&<label style={css.label}>{label}{required&&<span style={{color:'#FF4D6D',marginLeft:3}}>*</span>}</label>}
+    <select style={css.sel} value={value||''} onChange={e=>onChange(e.target.value)}>
+      <option value=''>Select...</option>
+      {options.map(o=>typeof o==='string'?<option key={o} value={o}>{o}</option>:<option key={o.value||o.id} value={o.value||o.id}>{o.label||o.name}</option>)}
+    </select>
+  </div>
+);
+
+const Ta=({label,value,onChange,placeholder,rows=3})=>(
+  <div style={{marginBottom:16}}>
+    {label&&<label style={css.label}>{label}</label>}
+    <textarea style={{...css.ta,minHeight:rows*36}} value={value||''} onChange={e=>onChange(e.target.value)} placeholder={placeholder||''}/>
+  </div>
+);
+
+const Collapsible=({title,children,icon,defaultOpen=false})=>{
+  const[open,setOpen]=useState(defaultOpen);
+  return(
+    <div style={{border:'1px solid rgba(255,255,255,0.07)',borderRadius:12,overflow:'hidden',marginBottom:16}}>
+      <button onClick={()=>setOpen(!open)} style={{width:'100%',background:'rgba(255,255,255,0.03)',border:'none',padding:'14px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',color:'#EFF6FF'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,fontWeight:600,fontSize:'0.9rem'}}>{icon&&<span>{icon}</span>}{title}</div>
+        <span style={{color:'rgba(255,255,255,0.4)',transition:'transform 0.2s',display:'inline-block',transform:open?'rotate(180deg)':'none'}}>▾</span>
+      </button>
+      {open&&<div style={{padding:'18px',borderTop:'1px solid rgba(255,255,255,0.07)'}}>{children}</div>}
+    </div>
+  );
+};
+
+const Modal=({msg,onClose,onConfirm})=>(
+  <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
+    <div style={{...css.card,maxWidth:380,width:'90%',textAlign:'center',marginBottom:0}}>
+      <div style={{fontSize:'1.8rem',marginBottom:14}}>✅</div>
+      <div style={{fontWeight:600,marginBottom:6}}>{msg}</div>
+      <div style={{display:'flex',gap:10,justifyContent:'center',marginTop:20}}>
+        <button style={css.btnS} onClick={onClose}>Close</button>
+        {onConfirm&&<button style={css.btnP} onClick={onConfirm}>Continue</button>}
+      </div>
+    </div>
+  </div>
+);
+</script>
+<script type="text/babel">
+const{useState,useEffect,useRef,useMemo}=React;
 function LoginScreen({onLogin}){
-  const [email,setEmail]=useState("");
-  const [password,setPassword]=useState("");
-  const [error,setError]=useState("");
-  const [loading,setLoading]=useState(false);
-  const [showDemo,setShowDemo]=useState(false);
+  const[email,setEmail]=useState('');
+  const[pw,setPw]=useState('');
+  const[err,setErr]=useState('');
+  const[loading,setLoading]=useState(false);
 
-  const handleLogin=async(e)=>{
-    e.preventDefault();
-    setLoading(true); setError("");
-    await new Promise(r=>setTimeout(r,700));
-    const clinic=DEMO_CLINICS.find(c=>c.email===email&&c.password===password);
-    if(clinic){ onLogin(clinic); }
-    else { setError("Invalid email or password. Try a demo account below."); }
+  const go=async()=>{
+    setErr('');setLoading(true);
+    await new Promise(r=>setTimeout(r,500));
+    const c=DEMO_CLINICS.find(x=>x.email.toLowerCase()===email.toLowerCase()&&x.password===pw);
+    if(c){
+      const prac=DEMO_PRACTITIONERS[c.id]||[];
+      const existing=await sget('practitioners:'+c.id);
+      if(!existing)await sset('practitioners:'+c.id,prac);
+      onLogin(c);
+    }else{
+      setErr('Invalid credentials. Try admin@baysidemedical.com.au / demo1234');
+    }
     setLoading(false);
   };
 
-  return <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#060b15 0%,#0e1620 55%,#07101c 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px",fontFamily:"'Georgia','Times New Roman',serif"}}>
-    <div style={{width:"100%",maxWidth:"420px"}}>
-      {/* Logo */}
-      <div style={{textAlign:"center",marginBottom:"36px"}}>
-        <div style={{fontSize:"11px",letterSpacing:"4px",color:"#374151",textTransform:"uppercase",marginBottom:"8px"}}>Clinical Admin Platform</div>
-        <div style={{fontSize:"32px",fontWeight:"700",color:"#f1f5f9",letterSpacing:"-1px"}}>Work<span style={{color:"#00B4D8"}}>Claim</span></div>
-        <div style={{fontSize:"13px",color:"#6b7280",marginTop:"6px"}}>Secure clinic login · WorkCover & TAC referral platform</div>
-      </div>
-
-      {/* Login card */}
-      <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"16px",padding:"32px",backdropFilter:"blur(20px)"}}>
-        <div style={{fontSize:"16px",fontWeight:"700",color:"#f1f5f9",marginBottom:"22px"}}>Sign in to your clinic</div>
-        <form onSubmit={handleLogin}>
-          <div style={{marginBottom:"14px"}}>
-            <label style={{...LS,display:"block",marginBottom:"6px"}}>Clinic email address</label>
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="admin@yourclinic.com.au" required style={{...IS,padding:"12px 14px"}}/>
-          </div>
-          <div style={{marginBottom:"20px"}}>
-            <label style={{...LS,display:"block",marginBottom:"6px"}}>Password</label>
-            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" required style={{...IS,padding:"12px 14px"}}/>
-          </div>
-          {error&&<div style={{marginBottom:"14px",padding:"10px 13px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:"8px",fontSize:"12px",color:"#fca5a5"}}>{error}</div>}
-          <button type="submit" disabled={loading} style={{width:"100%",padding:"13px",borderRadius:"9px",border:"none",background:loading?"#1f2937":"linear-gradient(135deg,#0057A8,#00B4D8)",color:"#fff",fontSize:"14px",fontWeight:"700",cursor:loading?"default":"pointer",fontFamily:"inherit",letterSpacing:"0.3px"}}>
-            {loading?"Signing in…":"Sign In →"}
-          </button>
-        </form>
-        <div style={{marginTop:"16px",textAlign:"center",fontSize:"12px",color:"#4b5563"}}>
-          Don't have an account? <span style={{color:"#00B4D8",cursor:"pointer"}}>Contact WorkClaim →</span>
+  return(
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#07101E',padding:24}}>
+      <div style={{width:'100%',maxWidth:400}}>
+        <div style={{textAlign:'center',marginBottom:36}}>
+          <div style={{fontWeight:800,fontSize:'1.9rem',letterSpacing:'-0.03em',marginBottom:8}}>Claim<span style={{color:'#00C9A7'}}>Bridge</span></div>
+          <div style={{fontSize:'0.88rem',color:'#5B7A99'}}>WorkCover & TAC Documentation Platform</div>
+        </div>
+        <div style={css.card}>
+          <div style={{fontWeight:700,fontSize:'1rem',marginBottom:20}}>Sign in to your clinic</div>
+          <Inp label='Email address' value={email} onChange={setEmail} type='email' placeholder='clinic@example.com.au'/>
+          <Inp label='Password' value={pw} onChange={setPw} type='password' placeholder='••••••••'/>
+          {err&&<div style={css.warn}>⚠️ {err}</div>}
+          <button style={{...css.btnP,width:'100%',justifyContent:'center',padding:'14px'}} onClick={go} disabled={loading}>{loading?'Signing in…':'Sign in →'}</button>
+          <div style={{textAlign:'center',marginTop:14,fontSize:'0.75rem',color:'#5B7A99'}}>Demo: admin@baysidemedical.com.au / demo1234</div>
         </div>
       </div>
-
-      {/* Demo accounts */}
-      <div style={{marginTop:"20px"}}>
-        <button onClick={()=>setShowDemo(d=>!d)} style={{width:"100%",padding:"10px",borderRadius:"8px",border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.02)",color:"#6b7280",fontSize:"12px",cursor:"pointer",fontFamily:"inherit"}}>
-          {showDemo?"▲ Hide":"▼ Show"} demo accounts
-        </button>
-        {showDemo&&<div style={{marginTop:"10px",display:"flex",flexDirection:"column",gap:"8px"}}>
-          {DEMO_CLINICS.map(c=><div key={c.id} onClick={()=>{setEmail(c.email);setPassword(c.password);}} style={{padding:"11px 14px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:"9px",cursor:"pointer",transition:"all 0.2s"}}>
-            <div style={{fontSize:"13px",fontWeight:"600",color:"#d1d5db"}}>{c.name}</div>
-            <div style={{fontSize:"11px",color:"#6b7280",marginTop:"2px"}}>{c.email} · Plan: {c.plan} · {c.scheme}</div>
-          </div>)}
-          <div style={{fontSize:"11px",color:"#374151",textAlign:"center",marginTop:"4px"}}>Password for all demo accounts: <span style={{fontFamily:"monospace",color:"#6b7280"}}>demo1234</span></div>
-        </div>}
-      </div>
-
-      {/* Compliance note */}
-      <div style={{marginTop:"20px",textAlign:"center",fontSize:"10px",color:"#1f2937",lineHeight:"1.7"}}>
-        🔒 Australian Privacy Act compliant · Data stored on Australian servers<br/>AHPRA & RACGP aligned · TLS 1.3 encrypted
-      </div>
     </div>
-  </div>;
-}
-
-// ─── CLINIC DASHBOARD (claim list) ────────────────────────────────────────────
-function ClinicDashboard({clinic,claims,onNewClaim,onOpenClaim,onLogout,colors}){
-  const [search,setSearch]=useState("");
-  const filtered=claims.filter(c=>
-    c.patientName?.toLowerCase().includes(search.toLowerCase())||
-    c.claimNumber?.toLowerCase().includes(search.toLowerCase())||
-    c.injuryType?.toLowerCase().includes(search.toLowerCase())
   );
-
-  return <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#060b15 0%,#0e1620 55%,#07101c 100%)",fontFamily:"'Georgia','Times New Roman',serif",color:"#e8eaf0"}}>
-    {/* Top bar */}
-    <div style={{padding:"14px 28px",borderBottom:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(0,0,0,0.25)"}}>
-      <div>
-        <div style={{fontSize:"10px",letterSpacing:"3px",color:"#374151",textTransform:"uppercase"}}>WorkClaim Platform</div>
-        <div style={{fontSize:"18px",fontWeight:"700",color:"#f1f5f9",marginTop:"1px"}}>Work<span style={{color:colors.accent}}>Claim</span></div>
-      </div>
-      <div style={{display:"flex",alignItems:"center",gap:"14px"}}>
-        <div style={{textAlign:"right"}}>
-          <div style={{fontSize:"13px",fontWeight:"600",color:"#f1f5f9"}}>{clinic.name}</div>
-          <div style={{fontSize:"11px",color:"#6b7280"}}>{clinic.plan} · {clinic.scheme}</div>
-        </div>
-        <div style={{width:"36px",height:"36px",borderRadius:"50%",background:`${colors.primary}44`,border:`1.5px solid ${colors.primary}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"14px",fontWeight:"700",color:colors.accent}}>
-          {clinic.name[0]}
-        </div>
-        <button onClick={onLogout} style={{padding:"7px 14px",borderRadius:"6px",border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#6b7280",fontSize:"12px",cursor:"pointer",fontFamily:"inherit"}}>Sign out</button>
-      </div>
-    </div>
-
-    <div style={{maxWidth:"980px",margin:"0 auto",padding:"28px 20px"}}>
-      {/* Stats */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"12px",marginBottom:"26px"}}>
-        {[
-          {label:"Active Claims",value:claims.filter(c=>c.status==="active").length,color:colors.accent},
-          {label:"Total Claims",value:claims.length,color:"#f1f5f9"},
-          {label:"This Month",value:claims.filter(c=>{ const d=new Date(c.createdAt||Date.now()); const n=new Date(); return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear(); }).length,color:"#34D399"},
-          {label:"Practitioners",value:clinic.practitioners.length,color:"#A78BFA"},
-        ].map((s,i)=><div key={i} style={{padding:"14px 16px",background:"rgba(255,255,255,0.03)",borderRadius:"10px",border:"1px solid rgba(255,255,255,0.07)"}}>
-          <div style={{fontSize:"10px",color:"#6b7280",letterSpacing:"1px",textTransform:"uppercase"}}>{s.label}</div>
-          <div style={{fontSize:"26px",fontWeight:"700",color:s.color,marginTop:"4px"}}>{s.value}</div>
-        </div>)}
-      </div>
-
-      {/* Claims list */}
-      <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:"14px",padding:"24px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"18px",gap:"14px"}}>
-          <div style={{fontSize:"15px",fontWeight:"700",color:"#f1f5f9"}}>Patient Claims</div>
-          <div style={{display:"flex",gap:"10px",flex:1,maxWidth:"400px"}}>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by patient, claim no., injury…" style={{...IS,flex:1,fontSize:"12px",padding:"9px 12px"}}/>
-          </div>
-          <button onClick={onNewClaim} style={{padding:"10px 18px",borderRadius:"8px",border:"none",background:`linear-gradient(135deg,${colors.primary},${colors.accent})`,color:"#fff",fontSize:"13px",fontWeight:"700",cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>+ New Claim</button>
-        </div>
-
-        {filtered.length===0?<div style={{textAlign:"center",padding:"40px",color:"#4b5563"}}>
-          <div style={{fontSize:"28px",marginBottom:"10px"}}>📋</div>
-          <div style={{fontSize:"14px",marginBottom:"6px",color:"#6b7280"}}>{search?"No claims match your search.":"No claims yet."}</div>
-          {!search&&<button onClick={onNewClaim} style={{marginTop:"8px",padding:"10px 20px",borderRadius:"8px",border:`1px solid ${colors.accent}44`,background:`${colors.accent}12`,color:colors.accent,fontSize:"13px",cursor:"pointer",fontFamily:"inherit"}}>Create your first claim</button>}
-        </div>
-        :<div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
-          {filtered.map((claim,i)=>{
-            const imgCount=(claim.imagingReports||[]).length;
-            return <div key={claim.id} onClick={()=>onOpenClaim(claim)} style={{display:"flex",alignItems:"center",gap:"14px",padding:"14px 16px",background:"rgba(255,255,255,0.02)",borderRadius:"10px",border:"1px solid rgba(255,255,255,0.07)",cursor:"pointer",transition:"all 0.2s"}}>
-              <div style={{width:"38px",height:"38px",borderRadius:"50%",background:`${colors.primary}22`,border:`1px solid ${colors.primary}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"13px",fontWeight:"700",color:colors.accent,flexShrink:0}}>
-                {(claim.patientName||"?")[0]}
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:"14px",fontWeight:"600",color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{claim.patientName||"Unnamed patient"}</div>
-                <div style={{fontSize:"11px",color:"#6b7280",marginTop:"2px"}}>{claim.claimNumber||"No claim number"} · {claim.injuryType||"Injury type not set"} · {claim.gpName?"Dr. "+claim.gpName:clinic.practitioners[0]}</div>
-              </div>
-              <div style={{display:"flex",gap:"7px",flexWrap:"wrap",justifyContent:"flex-end",alignItems:"center"}}>
-                {imgCount>0&&<Badge text={`🔬 ${imgCount} image${imgCount>1?"s":""}`} color="#6366F1" bg="rgba(99,102,241,0.1)"/>}
-                {claim.selDiag&&<Badge text={claim.selDiag.icd10} color={colors.accent} bg={`${colors.accent}15`}/>}
-                <Badge text={claim.status==="active"?"Active":"Complete"} color={claim.status==="active"?"#34D399":"#6b7280"} bg={claim.status==="active"?"rgba(52,211,153,0.1)":"rgba(107,114,128,0.1)"}/>
-                <div style={{fontSize:"11px",color:"#4b5563"}}>{claim.createdAt?new Date(claim.createdAt).toLocaleDateString("en-AU",{day:"numeric",month:"short"}):"Today"}</div>
-              </div>
-            </div>;
-          })}
-        </div>}
-      </div>
-    </div>
-  </div>;
 }
 
-// ─── IMAGING REPORTS STEP ─────────────────────────────────────────────────────
-function ImagingReportsStep({reports,setReports,claimNumber,colors}){
-  const [addMode,setAddMode]=useState(false);
-  const [viewing,setViewing]=useState(null);
-  const [newReport,setNewReport]=useState({ type:"", bodyRegion:"", date:"", requestedBy:"", reportingRadiologist:"", facility:"", findings:[], impression:"", recommendation:"", urgency:"Routine", file:null, fileName:"", fileData:"" });
-  const fileRef=useRef();
-
-  const handleFile=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>setNewReport(p=>({...p,fileName:f.name,fileData:ev.target.result,fileType:f.type})); r.readAsDataURL(f); };
-  const toggleFinding=f=>setNewReport(p=>({...p,findings:p.findings.includes(f)?p.findings.filter(x=>x!==f):[...p.findings,f]}));
-  const saveReport=async()=>{
-    if(!newReport.type||!newReport.bodyRegion)return;
-    const entry={...newReport,id:`img_${Date.now()}`,addedAt:new Date().toISOString()};
-    const updated=[...reports,entry];
-    setReports(updated);
-    if(claimNumber) await sset(`imaging:${claimNumber}`,updated);
-    setAddMode(false);
-    setNewReport({type:"",bodyRegion:"",date:"",requestedBy:"",reportingRadiologist:"",facility:"",findings:[],impression:"",recommendation:"",urgency:"Routine",file:null,fileName:"",fileData:""});
-  };
-  const deleteReport=async(id)=>{
-    const updated=reports.filter(r=>r.id!==id);
-    setReports(updated);
-    if(claimNumber) await sset(`imaging:${claimNumber}`,updated);
-  };
-
-  const imgType=t=>IMAGING_TYPES.find(x=>x.id===t);
-
-  return <div>
-    <SecHead num="6" title="Radiological & Imaging Reports" color={colors.accent}/>
-
-    {/* Summary strip */}
-    {reports.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:"7px",marginBottom:"16px"}}>
-      {IMAGING_TYPES.filter(t=>reports.some(r=>r.type===t.id)).map(t=>{
-        const cnt=reports.filter(r=>r.type===t.id).length;
-        return <Badge key={t.id} text={`${t.icon} ${t.label} (${cnt})`} color={t.color} bg={`${t.color}15`}/>;
-      })}
-    </div>}
-
-    {/* Report cards */}
-    {reports.length>0&&<div style={{display:"flex",flexDirection:"column",gap:"10px",marginBottom:"16px"}}>
-      {reports.map(rep=>{
-        const it=imgType(rep.type);
-        return <div key={rep.id} style={{padding:"14px 16px",background:"rgba(255,255,255,0.03)",borderRadius:"11px",border:`1px solid ${it?.color||colors.accent}33`}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"12px"}}>
-            <div style={{flex:1}}>
-              <div style={{display:"flex",alignItems:"center",gap:"9px",marginBottom:"5px",flexWrap:"wrap"}}>
-                <span style={{fontSize:"16px"}}>{it?.icon}</span>
-                <span style={{fontSize:"14px",fontWeight:"700",color:it?.color||colors.accent}}>{it?.label}</span>
-                <Badge text={rep.bodyRegion} color="#9ca3af" bg="rgba(255,255,255,0.06)"/>
-                {rep.urgency==="Urgent"&&<Badge text="⚠ Urgent" color="#EF4444" bg="rgba(239,68,68,0.1)"/>}
-              </div>
-              <div style={{fontSize:"12px",color:"#9ca3af",marginBottom:"4px"}}>{rep.date&&`Date: ${new Date(rep.date).toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})} · `}{rep.facility&&`${rep.facility} · `}{rep.reportingRadiologist&&`Dr. ${rep.reportingRadiologist}`}</div>
-              {rep.findings?.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:"5px",marginTop:"6px"}}>{rep.findings.map(f=><Badge key={f} text={f} color="#d1d5db" bg="rgba(255,255,255,0.05)"/>)}</div>}
-              {rep.impression&&<div style={{marginTop:"7px",fontSize:"12px",color:"#d1d5db",lineHeight:"1.6"}}><span style={{color:"#6b7280",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase"}}>Impression: </span>{rep.impression}</div>}
-            </div>
-            <div style={{display:"flex",gap:"8px",flexShrink:0,alignItems:"flex-start"}}>
-              {rep.fileData&&<button onClick={()=>setViewing(rep)} style={{padding:"6px 12px",borderRadius:"6px",border:`1px solid ${it?.color||colors.accent}44`,background:`${it?.color||colors.accent}12`,color:it?.color||colors.accent,fontSize:"11px",cursor:"pointer",fontFamily:"inherit",fontWeight:"600"}}>View File</button>}
-              <button onClick={()=>deleteReport(rep.id)} style={{padding:"6px 12px",borderRadius:"6px",border:"1px solid rgba(239,68,68,0.25)",background:"rgba(239,68,68,0.06)",color:"#fca5a5",fontSize:"11px",cursor:"pointer",fontFamily:"inherit"}}>Remove</button>
-            </div>
-          </div>
-        </div>;
-      })}
-    </div>}
-
-    {/* Add new report */}
-    {!addMode&&<button onClick={()=>setAddMode(true)} style={{width:"100%",padding:"13px",borderRadius:"10px",border:`1.5px dashed ${colors.accent}44`,background:`${colors.accent}08`,color:colors.accent,fontSize:"13px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}}>
-      + Add Imaging Report / Radiological Finding
-    </button>}
-
-    {addMode&&<div style={{padding:"20px",background:"rgba(255,255,255,0.03)",borderRadius:"12px",border:"1px solid rgba(255,255,255,0.1)"}}>
-      <div style={{fontSize:"14px",fontWeight:"700",color:"#f1f5f9",marginBottom:"18px"}}>Add Imaging Report</div>
-
-      {/* Imaging type selector */}
-      <div style={{marginBottom:"16px"}}>
-        <label style={LS}>Imaging Type</label>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"7px",marginTop:"8px"}}>
-          {IMAGING_TYPES.map(t=><button key={t.id} onClick={()=>setNewReport(p=>({...p,type:t.id}))} style={{padding:"10px 6px",borderRadius:"8px",border:`1.5px solid ${newReport.type===t.id?t.color:"rgba(255,255,255,0.08)"}`,background:newReport.type===t.id?`${t.color}18`:"rgba(255,255,255,0.02)",color:newReport.type===t.id?"#f1f5f9":"#9ca3af",fontSize:"11px",fontWeight:newReport.type===t.id?"700":"400",cursor:"pointer",fontFamily:"inherit",textAlign:"center",transition:"all 0.2s"}}>
-            <div style={{fontSize:"18px",marginBottom:"3px"}}>{t.icon}</div>
-            <div style={{color:newReport.type===t.id?t.color:"inherit"}}>{t.label}</div>
-          </button>)}
-        </div>
+function Sidebar({nav,onNav,clinic,onLogout,collapsed,onToggle}){
+  const items=[
+    {id:'dashboard',icon:'🏠',label:'Dashboard'},
+    {id:'claims',icon:'📋',label:'Claims'},
+    {id:'new_claim',icon:'➕',label:'New Claim'},
+    {id:'practitioners',icon:'👥',label:'Practitioners'},
+    {id:'invoicing',icon:'🧾',label:'Invoicing'},
+    {id:'settings',icon:'⚙️',label:'Settings'},
+    {id:'help',icon:'❓',label:'Help'},
+  ];
+  return(
+    <div style={{...css.sidebar,...(collapsed?css.sidebarCollapsed:{})}}>
+      <div style={{padding:'18px 14px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        {!collapsed&&<div style={{fontWeight:800,fontSize:'1.05rem',letterSpacing:'-0.02em'}}>Claim<span style={{color:'#00C9A7'}}>Bridge</span></div>}
+        {collapsed&&<div style={{fontWeight:800,fontSize:'0.95rem',color:'#00C9A7'}}>CB</div>}
+        <button onClick={onToggle} style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.35)',cursor:'pointer',padding:'4px',fontSize:'1.1rem'}}>{collapsed?'›':'‹'}</button>
       </div>
-
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"13px",marginBottom:"14px"}}>
-        <div><label style={LS}>Body Region</label><select value={newReport.bodyRegion} onChange={e=>setNewReport(p=>({...p,bodyRegion:e.target.value}))} style={{...IS,marginTop:"7px"}}><option value="">Select region…</option>{BODY_REGIONS.map(r=><option key={r} value={r}>{r}</option>)}</select></div>
-        <div><label style={LS}>Date of Imaging</label><input type="date" value={newReport.date} onChange={e=>setNewReport(p=>({...p,date:e.target.value}))} style={{...IS,marginTop:"7px"}}/></div>
-        <div><label style={LS}>Requesting GP / Specialist</label><input value={newReport.requestedBy} onChange={e=>setNewReport(p=>({...p,requestedBy:e.target.value}))} placeholder="Dr. Smith" style={{...IS,marginTop:"7px"}}/></div>
-        <div><label style={LS}>Reporting Radiologist</label><input value={newReport.reportingRadiologist} onChange={e=>setNewReport(p=>({...p,reportingRadiologist:e.target.value}))} placeholder="Dr. Jones" style={{...IS,marginTop:"7px"}}/></div>
-        <div><label style={LS}>Radiology Facility / Practice</label><input value={newReport.facility} onChange={e=>setNewReport(p=>({...p,facility:e.target.value}))} placeholder="e.g. Melbourne Radiology" style={{...IS,marginTop:"7px"}}/></div>
-        <div><label style={LS}>Clinical Urgency</label><select value={newReport.urgency} onChange={e=>setNewReport(p=>({...p,urgency:e.target.value}))} style={{...IS,marginTop:"7px"}}>{["Routine","Soon","Urgent","Emergency"].map(u=><option key={u}>{u}</option>)}</select></div>
+      <div style={{padding:'8px 0',flex:1}}>
+        {items.map(item=>(
+          <button key={item.id} onClick={()=>onNav(item.id)} title={collapsed?item.label:''} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 14px',cursor:'pointer',borderRadius:8,margin:'2px 8px',border:'1px solid '+(nav===item.id?'rgba(0,201,167,0.2)':'transparent'),background:nav===item.id?'rgba(0,201,167,0.12)':'transparent',color:nav===item.id?'#00C9A7':'rgba(255,255,255,0.5)',fontSize:'0.87rem',fontWeight:500,width:'calc(100% - 16px)',textAlign:'left',transition:'all 0.15s'}}>
+            <span style={{fontSize:'1.05rem',flexShrink:0,width:20,textAlign:'center'}}>{item.icon}</span>
+            {!collapsed&&<span style={{whiteSpace:'nowrap'}}>{item.label}</span>}
+          </button>
+        ))}
       </div>
-
-      {/* Findings checkboxes */}
-      <div style={{marginBottom:"14px"}}>
-        <label style={LS}>Key Findings (select all that apply)</label>
-        <div style={{display:"flex",flexWrap:"wrap",gap:"6px",marginTop:"8px"}}>
-          {REPORT_FINDINGS.map(f=>{
-            const sel=newReport.findings.includes(f);
-            const t=imgType(newReport.type);
-            return <button key={f} onClick={()=>toggleFinding(f)} style={{padding:"6px 11px",borderRadius:"20px",border:`1px solid ${sel?(t?.color||colors.accent):"rgba(255,255,255,0.1)"}`,background:sel?`${t?.color||colors.accent}18`:"rgba(255,255,255,0.02)",color:sel?"#f1f5f9":"#9ca3af",fontSize:"11px",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s",fontWeight:sel?"600":"400"}}>
-              {sel&&"✓ "}{f}
-            </button>;
-          })}
-        </div>
-      </div>
-
-      {/* Impression & recommendation */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"13px",marginBottom:"14px"}}>
-        <div style={{gridColumn:"span 2"}}><label style={LS}>Radiologist's Impression / Summary</label><textarea value={newReport.impression} onChange={e=>setNewReport(p=>({...p,impression:e.target.value}))} placeholder="e.g. Moderate posterior disc bulge at L4/5 with mild right-sided nerve root compromise…" rows={3} style={{...IS,marginTop:"7px",resize:"vertical"}}/></div>
-        <div style={{gridColumn:"span 2"}}><label style={LS}>Clinical Recommendation / Follow-up</label><textarea value={newReport.recommendation} onChange={e=>setNewReport(p=>({...p,recommendation:e.target.value}))} placeholder="e.g. Recommend neurosurgical review. Correlate with clinical findings. Follow-up MRI in 6 weeks if symptoms persist…" rows={2} style={{...IS,marginTop:"7px",resize:"vertical"}}/></div>
-      </div>
-
-      {/* File upload */}
-      <div style={{marginBottom:"16px"}}>
-        <label style={LS}>Upload Report File (optional)</label>
-        <div onClick={()=>fileRef.current?.click()} style={{marginTop:"7px",border:"2px dashed rgba(255,255,255,0.12)",borderRadius:"9px",padding:"20px",textAlign:"center",cursor:"pointer",background:"rgba(255,255,255,0.01)"}}>
-          {newReport.fileData
-            ? <div>
-                {newReport.fileType?.startsWith("image")
-                  ? <img src={newReport.fileData} alt="Report" style={{maxHeight:"160px",borderRadius:"6px",objectFit:"contain",background:"#000",width:"100%"}}/>
-                  : <div style={{fontSize:"13px",color:"#9ca3af"}}>📄 {newReport.fileName}</div>}
-                <div style={{fontSize:"11px",color:"#34D399",marginTop:"6px"}}>✓ File attached</div>
-              </div>
-            : <div>
-                <div style={{fontSize:"24px",marginBottom:"6px"}}>📎</div>
-                <div style={{fontSize:"13px",color:"#9ca3af"}}>Click to upload report image or PDF</div>
-                <div style={{fontSize:"11px",color:"#4b5563",marginTop:"3px"}}>JPG · PNG · PDF · DICOM screenshot</div>
-              </div>}
-          <input ref={fileRef} type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={handleFile}/>
-        </div>
-      </div>
-
-      <div style={{display:"flex",gap:"10px"}}>
-        <button onClick={saveReport} disabled={!newReport.type||!newReport.bodyRegion} style={{flex:1,padding:"12px",borderRadius:"8px",border:"none",background:(!newReport.type||!newReport.bodyRegion)?"#1f2937":`linear-gradient(135deg,${colors.primary},${colors.accent})`,color:"#fff",fontSize:"13px",fontWeight:"700",cursor:(!newReport.type||!newReport.bodyRegion)?"default":"pointer",fontFamily:"inherit"}}>
-          ✓ Save Imaging Report
+      <div style={{padding:'14px',borderTop:'1px solid rgba(255,255,255,0.07)',marginTop:'auto'}}>
+        {!collapsed&&<div style={{fontSize:'0.72rem',color:'#5B7A99',marginBottom:8,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{clinic.name}</div>}
+        <button onClick={onLogout} title={collapsed?'Sign out':''} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 10px',cursor:'pointer',borderRadius:8,border:'none',background:'transparent',color:'#FF4D6D',fontSize:'0.85rem',width:'100%',textAlign:'left'}}>
+          <span style={{fontSize:'1rem',width:20,textAlign:'center',flexShrink:0}}>🚪</span>
+          {!collapsed&&'Sign out'}
         </button>
-        <button onClick={()=>{setAddMode(false);}} style={{padding:"12px 20px",borderRadius:"8px",border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#9ca3af",fontSize:"13px",cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
       </div>
-    </div>}
-
-    {/* File viewer modal */}
-    {viewing&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
-      <div style={{background:"#0b1420",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"16px",width:"100%",maxWidth:"720px",maxHeight:"90vh",overflow:"auto",padding:"24px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}>
-          <div style={{fontWeight:"700",color:"#f1f5f9",fontSize:"15px"}}>{imgType(viewing.type)?.icon} {imgType(viewing.type)?.label} — {viewing.bodyRegion}</div>
-          <button onClick={()=>setViewing(null)} style={{background:"rgba(255,255,255,0.07)",border:"none",color:"#9ca3af",fontSize:"18px",cursor:"pointer",borderRadius:"6px",width:"32px",height:"32px",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
-        </div>
-        {viewing.fileType?.startsWith("image")
-          ? <img src={viewing.fileData} alt="Imaging report" style={{width:"100%",borderRadius:"8px",objectFit:"contain",background:"#000"}}/>
-          : <iframe src={viewing.fileData} title="PDF report" style={{width:"100%",height:"500px",borderRadius:"8px",border:"none"}}/>}
-        {viewing.impression&&<div style={{marginTop:"14px",padding:"12px",background:"rgba(255,255,255,0.03)",borderRadius:"8px",fontSize:"12px",color:"#d1d5db",lineHeight:"1.7"}}><strong style={{color:"#9ca3af"}}>Impression:</strong> {viewing.impression}</div>}
-      </div>
-    </div>}
-  </div>;
+    </div>
+  );
 }
 
-// ─── TREATMENT PLAN STEP ─────────────────────────────────────────────────────
-const MED_SUGGESTIONS = ["Paracetamol","Ibuprofen","Naproxen","Diclofenac (topical)","Celecoxib","Tramadol","Oxycodone","Pregabalin","Gabapentin","Amitriptyline","Duloxetine","Diazepam","Baclofen","Methocarbamol","Prednisone","Methylprednisolone"];
-const FREQ_OPTIONS = ["Once daily","Twice daily","Three times daily","Four times daily","As needed (PRN)","At night","With food","Every 4–6 hours","Weekly","Fortnightly"];
-const DURATION_OPTIONS = ["3 days","5 days","1 week","2 weeks","4 weeks","6 weeks","8 weeks","3 months","6 months","Ongoing – review"];
-const REFERRAL_TO_OPTIONS = ["Pain specialist / pain management clinic","Orthopaedic surgeon","Neurosurgeon","Neurologist","Rheumatologist","Psychiatrist","Psychologist","Physiotherapist","Occupational therapist","Exercise physiologist","Osteopath","Chiropractor","Hand therapist","Vocational rehabilitation","Social worker","Dietitian","Sleep physician","Respiratory physician","Cardiologist","Other specialist"];
-const PROCEDURE_SUGGESTIONS = ["Corticosteroid injection","Hyaluronic acid injection","Trigger point injection","Dry needling","Platelet-rich plasma (PRP) injection","Nerve root block","Epidural steroid injection","Facet joint injection","Prolotherapy","Acupuncture","TENS therapy","Ultrasound-guided aspiration","Surgical review"];
-const INVESTIGATION_SUGGESTIONS = ["Full blood count (FBC)","ESR / CRP (inflammatory markers)","Uric acid","HbA1c","Thyroid function tests (TFT)","Vitamin D","Calcium / Phosphate","Nerve conduction study (NCS)","EMG","Sleep study","Spirometry","Bone densitometry (DEXA)","Urine drug screen","Pathology – other"];
-const RESTRICTION_SUGGESTIONS = ["No lifting > 5 kg","No overhead activities","No prolonged sitting > 30 min","No prolonged standing > 30 min","No driving heavy vehicles","No repetitive bending / twisting","No kneeling / squatting","Light duties only","Seated duties only","Reduced hours – 4 hrs/day","Reduced hours – 6 hrs/day","No return to work until review","Graduated return to work plan required"];
-
-function TreatmentPlanStep({treatmentPlan,setTreatmentPlan,colors,selDiag}){
-  const upd=(f,v)=>setTreatmentPlan(p=>({...p,[f]:v}));
-  // Medications
-  const [newMed,setNewMed]=useState({name:"",dose:"",frequency:"",duration:""});
-  const [medSearch,setMedSearch]=useState("");
-  const [showMedSug,setShowMedSug]=useState(false);
-  const addMed=()=>{ if(!newMed.name)return; upd("medications",[...treatmentPlan.medications,{...newMed,id:Date.now()}]); setNewMed({name:"",dose:"",frequency:"",duration:""}); setMedSearch(""); };
-  const removeMed=id=>upd("medications",treatmentPlan.medications.filter(m=>m.id!==id));
-  // Referrals
-  const [newRef,setNewRef]=useState({to:"",reason:"",urgency:"Routine"});
-  const addRef=()=>{ if(!newRef.to)return; upd("referrals",[...treatmentPlan.referrals,{...newRef,id:Date.now()}]); setNewRef({to:"",reason:"",urgency:"Routine"}); };
-  const removeRef=id=>upd("referrals",treatmentPlan.referrals.filter(r=>r.id!==id));
-  // Chips helper
-  const toggleChip=(field,val)=>upd(field,treatmentPlan[field].includes(val)?treatmentPlan[field].filter(x=>x!==val):[...treatmentPlan[field],val]);
-
-  const medSuggestions=medSearch.length>1?MED_SUGGESTIONS.filter(m=>m.toLowerCase().includes(medSearch.toLowerCase())):[];
-
-  return <div>
-    <SecHead num="6" title="GP Treatment Plan" color={colors.accent}/>
-    <div style={{fontSize:"12px",color:"#6b7280",marginBottom:"18px",lineHeight:"1.6"}}>
-      Document the GP's recommended treatment plan. This will appear in the referral letter and patient file under a structured treatment plan section.
-    </div>
-
-    {/* ── MEDICATIONS ── */}
-    <div style={{marginBottom:"20px",padding:"16px",background:"rgba(255,255,255,0.03)",borderRadius:"11px",border:"1px solid rgba(255,255,255,0.08)"}}>
-      <div style={{fontSize:"12px",fontWeight:"700",color:"#f1f5f9",marginBottom:"13px",display:"flex",alignItems:"center",gap:"8px"}}>
-        <span style={{fontSize:"16px"}}>💊</span> Medications Prescribed
-      </div>
-      {treatmentPlan.medications.length>0&&<div style={{display:"flex",flexDirection:"column",gap:"7px",marginBottom:"12px"}}>
-        {treatmentPlan.medications.map(m=><div key={m.id} style={{display:"flex",alignItems:"center",gap:"10px",padding:"9px 12px",background:"rgba(255,255,255,0.03)",borderRadius:"8px",border:"1px solid rgba(255,255,255,0.07)"}}>
-          <div style={{flex:1}}>
-            <span style={{fontSize:"13px",fontWeight:"600",color:"#f1f5f9"}}>{m.name}</span>
-            {m.dose&&<span style={{fontSize:"12px",color:"#9ca3af"}}> · {m.dose}</span>}
-            {m.frequency&&<span style={{fontSize:"12px",color:"#9ca3af"}}> · {m.frequency}</span>}
-            {m.duration&&<span style={{fontSize:"12px",color:"#6b7280"}}> for {m.duration}</span>}
-          </div>
-          <button onClick={()=>removeMed(m.id)} style={{padding:"3px 9px",borderRadius:"5px",border:"1px solid rgba(239,68,68,0.2)",background:"rgba(239,68,68,0.06)",color:"#fca5a5",fontSize:"11px",cursor:"pointer",fontFamily:"inherit"}}>Remove</button>
-        </div>)}
-      </div>}
-      {/* Add medication row */}
-      <div style={{position:"relative"}}>
-        <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr auto",gap:"8px",alignItems:"end"}}>
-          <div>
-            <label style={{...LS,display:"block",marginBottom:"5px"}}>Medication name</label>
-            <input value={medSearch||newMed.name} onChange={e=>{ setMedSearch(e.target.value); setNewMed(p=>({...p,name:e.target.value})); setShowMedSug(true); }} onFocus={()=>setShowMedSug(true)} onBlur={()=>setTimeout(()=>setShowMedSug(false),150)} placeholder="Type or search…" style={{...IS,fontSize:"12px"}}/>
-            {showMedSug&&medSuggestions.length>0&&<div style={{position:"absolute",top:"100%",left:0,zIndex:50,background:"#0d1520",border:"1px solid rgba(255,255,255,0.12)",borderRadius:"8px",maxHeight:"160px",overflowY:"auto",width:"100%",boxShadow:"0 8px 24px rgba(0,0,0,0.5)"}}>
-              {medSuggestions.map(s=><div key={s} onMouseDown={()=>{ setNewMed(p=>({...p,name:s})); setMedSearch(""); setShowMedSug(false); }} style={{padding:"9px 13px",fontSize:"13px",color:"#d1d5db",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>{s}</div>)}
-            </div>}
-          </div>
-          <div>
-            <label style={{...LS,display:"block",marginBottom:"5px"}}>Dose</label>
-            <input value={newMed.dose} onChange={e=>setNewMed(p=>({...p,dose:e.target.value}))} placeholder="e.g. 500mg" style={{...IS,fontSize:"12px"}}/>
-          </div>
-          <div>
-            <label style={{...LS,display:"block",marginBottom:"5px"}}>Frequency</label>
-            <select value={newMed.frequency} onChange={e=>setNewMed(p=>({...p,frequency:e.target.value}))} style={{...IS,fontSize:"12px"}}>
-              <option value="">Select…</option>
-              {FREQ_OPTIONS.map(f=><option key={f}>{f}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{...LS,display:"block",marginBottom:"5px"}}>Duration</label>
-            <select value={newMed.duration} onChange={e=>setNewMed(p=>({...p,duration:e.target.value}))} style={{...IS,fontSize:"12px"}}>
-              <option value="">Select…</option>
-              {DURATION_OPTIONS.map(d=><option key={d}>{d}</option>)}
-            </select>
-          </div>
-          <button onClick={addMed} disabled={!newMed.name} style={{padding:"9px 14px",borderRadius:"7px",border:"none",background:newMed.name?`linear-gradient(135deg,${colors.primary},${colors.accent})`:"#1f2937",color:"#fff",fontSize:"13px",fontWeight:"700",cursor:newMed.name?"pointer":"default",fontFamily:"inherit",alignSelf:"flex-end"}}>+ Add</button>
-        </div>
+function TopBar({clinic,nav,claim}){
+  const titles={dashboard:'Dashboard',claims:'Claims',new_claim:'New Claim',practitioners:'Practitioners',invoicing:'Invoicing',settings:'Settings',help:'Help & Support',claim:'Claim'};
+  return(
+    <div style={css.topBar}>
+      <div style={{fontWeight:700,fontSize:'0.95rem'}}>{nav==='claim'?(claim?.patientName||'New Claim'):titles[nav]||'ClaimBridge'}</div>
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <div style={{fontSize:'0.78rem',color:'#5B7A99'}}>{clinic.name}</div>
+        <div style={{...css.pill,...css.pillT,fontSize:'0.68rem',padding:'3px 10px',cursor:'default'}}>{clinic.plan}</div>
       </div>
     </div>
-
-    {/* ── REFERRALS ── */}
-    <div style={{marginBottom:"20px",padding:"16px",background:"rgba(255,255,255,0.03)",borderRadius:"11px",border:"1px solid rgba(255,255,255,0.08)"}}>
-      <div style={{fontSize:"12px",fontWeight:"700",color:"#f1f5f9",marginBottom:"13px",display:"flex",alignItems:"center",gap:"8px"}}>
-        <span style={{fontSize:"16px"}}>📋</span> Specialist Referrals & Allied Health
-      </div>
-      {treatmentPlan.referrals.length>0&&<div style={{display:"flex",flexDirection:"column",gap:"7px",marginBottom:"12px"}}>
-        {treatmentPlan.referrals.map(r=><div key={r.id} style={{display:"flex",alignItems:"flex-start",gap:"10px",padding:"10px 13px",background:"rgba(255,255,255,0.03)",borderRadius:"8px",border:`1px solid ${r.urgency==="Urgent"?"rgba(239,68,68,0.2)":r.urgency==="Soon"?"rgba(245,158,11,0.2)":"rgba(255,255,255,0.07)"}`}}>
-          <div style={{flex:1}}>
-            <div style={{fontSize:"13px",fontWeight:"600",color:"#f1f5f9"}}>{r.to}</div>
-            {r.reason&&<div style={{fontSize:"12px",color:"#9ca3af",marginTop:"2px"}}>{r.reason}</div>}
-          </div>
-          <div style={{display:"flex",gap:"7px",alignItems:"center",flexShrink:0}}>
-            <span style={{padding:"2px 8px",borderRadius:"10px",fontSize:"10px",fontWeight:"600",background:r.urgency==="Urgent"?"rgba(239,68,68,0.1)":r.urgency==="Soon"?"rgba(245,158,11,0.1)":"rgba(52,211,153,0.1)",color:r.urgency==="Urgent"?"#EF4444":r.urgency==="Soon"?"#F59E0B":"#34D399"}}>{r.urgency}</span>
-            <button onClick={()=>removeRef(r.id)} style={{padding:"3px 9px",borderRadius:"5px",border:"1px solid rgba(239,68,68,0.2)",background:"rgba(239,68,68,0.06)",color:"#fca5a5",fontSize:"11px",cursor:"pointer",fontFamily:"inherit"}}>Remove</button>
-          </div>
-        </div>)}
-      </div>}
-      <div style={{display:"grid",gridTemplateColumns:"2fr 2fr 1fr auto",gap:"8px",alignItems:"end"}}>
-        <div>
-          <label style={{...LS,display:"block",marginBottom:"5px"}}>Refer to</label>
-          <select value={newRef.to} onChange={e=>setNewRef(p=>({...p,to:e.target.value}))} style={{...IS,fontSize:"12px"}}>
-            <option value="">Select…</option>
-            {REFERRAL_TO_OPTIONS.map(r=><option key={r}>{r}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={{...LS,display:"block",marginBottom:"5px"}}>Clinical reason</label>
-          <input value={newRef.reason} onChange={e=>setNewRef(p=>({...p,reason:e.target.value}))} placeholder="e.g. Pain management, surgical review…" style={{...IS,fontSize:"12px"}}/>
-        </div>
-        <div>
-          <label style={{...LS,display:"block",marginBottom:"5px"}}>Urgency</label>
-          <select value={newRef.urgency} onChange={e=>setNewRef(p=>({...p,urgency:e.target.value}))} style={{...IS,fontSize:"12px"}}>
-            {["Routine","Soon","Urgent","Emergency"].map(u=><option key={u}>{u}</option>)}
-          </select>
-        </div>
-        <button onClick={addRef} disabled={!newRef.to} style={{padding:"9px 14px",borderRadius:"7px",border:"none",background:newRef.to?`linear-gradient(135deg,${colors.primary},${colors.accent})`:"#1f2937",color:"#fff",fontSize:"13px",fontWeight:"700",cursor:newRef.to?"pointer":"default",fontFamily:"inherit",alignSelf:"flex-end"}}>+ Add</button>
-      </div>
-    </div>
-
-    {/* ── PROCEDURES / INTERVENTIONS ── */}
-    <div style={{marginBottom:"20px",padding:"16px",background:"rgba(255,255,255,0.03)",borderRadius:"11px",border:"1px solid rgba(255,255,255,0.08)"}}>
-      <div style={{fontSize:"12px",fontWeight:"700",color:"#f1f5f9",marginBottom:"11px",display:"flex",alignItems:"center",gap:"8px"}}><span style={{fontSize:"16px"}}>💉</span> Procedures & Interventions</div>
-      <div style={{display:"flex",flexWrap:"wrap",gap:"6px",marginBottom:"10px"}}>
-        {PROCEDURE_SUGGESTIONS.map(p=>{
-          const sel=treatmentPlan.procedures.includes(p);
-          return <button key={p} onClick={()=>toggleChip("procedures",p)} style={{padding:"6px 11px",borderRadius:"20px",border:`1px solid ${sel?colors.accent:"rgba(255,255,255,0.1)"}`,background:sel?`${colors.accent}18`:"rgba(255,255,255,0.02)",color:sel?"#f1f5f9":"#9ca3af",fontSize:"11px",cursor:"pointer",fontFamily:"inherit",fontWeight:sel?"600":"400",transition:"all 0.15s"}}>{sel&&"✓ "}{p}</button>;
-        })}
-      </div>
-      <input value={treatmentPlan.customProcedure||""} onChange={e=>upd("customProcedure",e.target.value)} placeholder="Type any additional procedure not listed above…" style={{...IS,fontSize:"12px"}}/>
-    </div>
-
-    {/* ── INVESTIGATIONS ── */}
-    <div style={{marginBottom:"20px",padding:"16px",background:"rgba(255,255,255,0.03)",borderRadius:"11px",border:"1px solid rgba(255,255,255,0.08)"}}>
-      <div style={{fontSize:"12px",fontWeight:"700",color:"#f1f5f9",marginBottom:"11px",display:"flex",alignItems:"center",gap:"8px"}}><span style={{fontSize:"16px"}}>🔬</span> Investigations Ordered</div>
-      <div style={{display:"flex",flexWrap:"wrap",gap:"6px",marginBottom:"10px"}}>
-        {INVESTIGATION_SUGGESTIONS.map(inv=>{
-          const sel=treatmentPlan.investigations.includes(inv);
-          return <button key={inv} onClick={()=>toggleChip("investigations",inv)} style={{padding:"6px 11px",borderRadius:"20px",border:`1px solid ${sel?colors.accent:"rgba(255,255,255,0.1)"}`,background:sel?`${colors.accent}18`:"rgba(255,255,255,0.02)",color:sel?"#f1f5f9":"#9ca3af",fontSize:"11px",cursor:"pointer",fontFamily:"inherit",fontWeight:sel?"600":"400",transition:"all 0.15s"}}>{sel&&"✓ "}{inv}</button>;
-        })}
-      </div>
-    </div>
-
-    {/* ── RESTRICTIONS ── */}
-    <div style={{marginBottom:"20px",padding:"16px",background:"rgba(255,255,255,0.03)",borderRadius:"11px",border:"1px solid rgba(255,255,255,0.08)"}}>
-      <div style={{fontSize:"12px",fontWeight:"700",color:"#f1f5f9",marginBottom:"11px",display:"flex",alignItems:"center",gap:"8px"}}><span style={{fontSize:"16px"}}>⚠️</span> Work & Activity Restrictions</div>
-      <div style={{display:"flex",flexWrap:"wrap",gap:"6px",marginBottom:"10px"}}>
-        {RESTRICTION_SUGGESTIONS.map(r=>{
-          const sel=treatmentPlan.restrictions.includes(r);
-          return <button key={r} onClick={()=>toggleChip("restrictions",r)} style={{padding:"6px 11px",borderRadius:"20px",border:`1px solid ${sel?"#F59E0B":"rgba(255,255,255,0.1)"}`,background:sel?"rgba(245,158,11,0.12)":"rgba(255,255,255,0.02)",color:sel?"#FCD34D":"#9ca3af",fontSize:"11px",cursor:"pointer",fontFamily:"inherit",fontWeight:sel?"600":"400",transition:"all 0.15s"}}>{sel&&"✓ "}{r}</button>;
-        })}
-      </div>
-    </div>
-
-    {/* ── REVIEW DATE & GP NOTES ── */}
-    <div style={{padding:"16px",background:"rgba(255,255,255,0.03)",borderRadius:"11px",border:"1px solid rgba(255,255,255,0.08)"}}>
-      <div style={{fontSize:"12px",fontWeight:"700",color:"#f1f5f9",marginBottom:"13px",display:"flex",alignItems:"center",gap:"8px"}}><span style={{fontSize:"16px"}}>📅</span> Review & Clinical Notes</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:"13px"}}>
-        <div>
-          <label style={{...LS,display:"block",marginBottom:"5px"}}>Next review date</label>
-          <input type="date" value={treatmentPlan.reviewDate} onChange={e=>upd("reviewDate",e.target.value)} style={{...IS,fontSize:"12px"}}/>
-        </div>
-        <div>
-          <label style={{...LS,display:"block",marginBottom:"5px"}}>GP clinical notes / treatment rationale</label>
-          <textarea value={treatmentPlan.gpNotes} onChange={e=>upd("gpNotes",e.target.value)} rows={3} placeholder="e.g. Patient commenced on pain relief medication with referral to pain specialist for ongoing pain management. Modified duties recommended for 4 weeks. Review in 2 weeks to assess response to treatment and progress RTW plan…" style={{...IS,fontSize:"12px",resize:"vertical"}}/>
-        </div>
-      </div>
-    </div>
-
-    {/* Summary */}
-    {(treatmentPlan.medications.length>0||treatmentPlan.referrals.length>0||treatmentPlan.procedures.length>0)&&<div style={{marginTop:"14px",padding:"12px 14px",background:"rgba(52,211,153,0.06)",borderRadius:"9px",border:"1px solid rgba(52,211,153,0.15)",fontSize:"12px",color:"#34D399",lineHeight:"1.7"}}>
-      ✓ Treatment plan recorded: {[
-        treatmentPlan.medications.length>0&&`${treatmentPlan.medications.length} medication${treatmentPlan.medications.length>1?"s":""}`,
-        treatmentPlan.referrals.length>0&&`${treatmentPlan.referrals.length} referral${treatmentPlan.referrals.length>1?"s":""}`,
-        treatmentPlan.procedures.length>0&&`${treatmentPlan.procedures.length} procedure${treatmentPlan.procedures.length>1?"s":""}`,
-        treatmentPlan.investigations.length>0&&`${treatmentPlan.investigations.length} investigation${treatmentPlan.investigations.length>1?"s":""}`,
-        treatmentPlan.restrictions.length>0&&`${treatmentPlan.restrictions.length} restriction${treatmentPlan.restrictions.length>1?"s":""}`,
-      ].filter(Boolean).join(" · ")}
-    </div>}
-  </div>;
+  );
 }
 
-// ─── MAIN CLAIM FORM ──────────────────────────────────────────────────────────
-function ClaimForm({clinic,claimData,onSave,onBack,colors}){
-  const [step,setStep]=useState(1);
-  const [form,setForm]=useState(claimData?.form||{patientName:"",dob:"",claimNumber:"",employer:"",injuryDate:"",injuryType:"",injuryDescription:"",gpName:clinic.practitioners[0]?.replace("Dr. ","")||"",providerNumber:"",practice:clinic.name,referralType:"",urgency:"Routine (within 4 weeks)",additionalNotes:"",date:new Date().toISOString().split("T")[0]});
-  const [diagSearch,setDiagSearch]=useState("");
-  const [selDiag,setSelDiag]=useState(claimData?.selDiag||null);
-  const [workType,setWorkType]=useState(claimData?.workType||"");
-  const [showRedFlags,setShowRedFlags]=useState(false);
-  const [selFlags,setSelFlags]=useState(claimData?.selFlags||[]);
-  const [psychoNotes,setPsychoNotes]=useState(claimData?.psychoNotes||"");
-  const [expandedFlag,setExpandedFlag]=useState(null);
-  const [imagingReports,setImagingReports]=useState(claimData?.imagingReports||[]);
-  const [treatmentPlan,setTreatmentPlan]=useState(claimData?.treatmentPlan||{ medications:[], referrals:[], procedures:[], investigations:[], restrictions:[], reviewDate:"", gpNotes:"" });
-  const [copied,setCopied]=useState(false);
-  const scheme=clinic.scheme;
-
-  const upd=(f,v)=>setForm(p=>({...p,[f]:v}));
-  const filteredDiag=useMemo(()=>{ if(!diagSearch||diagSearch.length<2)return DIAGNOSES; const q=diagSearch.toLowerCase(); return DIAGNOSES.filter(d=>d.icd10.toLowerCase().includes(q)||d.icd10Label.toLowerCase().includes(q)||d.category.toLowerCase().includes(q)); },[diagSearch]);
-  const workKey=WORK_KEYS[WORK_TYPES.indexOf(workType)]||"light";
-  const rtwRange=selDiag?selDiag.rtwWeeks[workKey]:null;
-  const impact=useMemo(()=>{ if(selFlags.length===0)return{addedWeeks:0,riskLevel:"Low",riskColor:"#34D399"}; const total=selFlags.reduce((s,f)=>s+f.rtwImpact,0); const addedWeeks=Math.round(total*0.8); const hasOrange=selFlags.some(f=>f.id.startsWith("o")); return{addedWeeks,riskLevel:hasOrange||total>=10?"High":total>=5?"Moderate":"Low–Moderate",riskColor:hasOrange||total>=10?"#EF4444":total>=5?"#F59E0B":"#34D399"}; },[selFlags]);
-  const activeCategories=useMemo(()=>{ const c=new Set(); selFlags.forEach(f=>{ if(f.id.startsWith("y"))c.add("yellow"); if(f.id.startsWith("b"))c.add("blue"); if(f.id.startsWith("k"))c.add("black"); if(f.id.startsWith("o"))c.add("orange"); }); return[...c]; },[selFlags]);
-  const toggleFlag=f=>setSelFlags(p=>p.find(x=>x.id===f.id)?p.filter(x=>x.id!==f.id):[...p,f]);
-
-  const handleSave=async(status="active")=>{
-    const claimObj={id:claimData?.id||`claim_${Date.now()}`,clinicId:clinic.id,status,form,selDiag,workType,selFlags,psychoNotes,imagingReports,treatmentPlan,createdAt:claimData?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString(),...form};
-    onSave(claimObj);
+function Dashboard({clinic,claims,onNew,onOpen}){
+  const active=claims.filter(c=>c.status==='Active').length;
+  const pending=claims.filter(c=>c.status==='Pending Approval').length;
+  const now=new Date();
+  const thisMonth=claims.filter(c=>c.createdAt&&new Date(c.createdAt).getMonth()===now.getMonth()).length;
+  const statusPill=(s)=>{
+    if(s==='Active')return css.pillT;
+    if(s==='Pending Approval')return css.pillA;
+    return css.pillM;
   };
-
-  const referralText=selDiag?`
-${scheme.toUpperCase()} CLINICAL REFERRAL
-${"═".repeat(52)}
-Date: ${form.date}   Claim No: ${form.claimNumber||"___"}   Scheme: ${scheme}
-Clinic: ${clinic.name}   ABN: ${clinic.abn}
-
-──── PATIENT ────────────────────────────────────────
-Name:        ${form.patientName||"___"}
-DOB:         ${form.dob||"___"}
-Employer:    ${form.employer||"___"}
-Injury Date: ${form.injuryDate||"___"}
-Injury:      ${form.injuryType||"___"}
-${form.injuryDescription?`Description: ${form.injuryDescription}\n`:""}
-──── DIAGNOSIS ──────────────────────────────────────
-ICD-10:      ${selDiag.icd10}  –  ${selDiag.icd10Label}
-TOOCS:       ${selDiag.toocs}  –  ${selDiag.toocLabel}
-Category:    ${selDiag.category}
-
-──── RTW PROGNOSIS ──────────────────────────────────
-Work Type:   ${workType||"Not specified"}
-Clinical RTW:${rtwRange||"___"} weeks
-${selFlags.length>0?`Psychosocial: +${impact.addedWeeks} weeks · Risk: ${impact.riskLevel}`:"No psychosocial barriers identified."}
-
-──── GP TREATMENT PLAN ──────────────────────────────
-${treatmentPlan.medications.length>0?`Medications:\n${treatmentPlan.medications.map(m=>`  • ${m.name}${m.dose?" – "+m.dose:""}${m.frequency?" ("+m.frequency+")":""}${m.duration?" for "+m.duration:""}`).join("\n")}`:"Medications: Nil prescribed."}
-
-${treatmentPlan.referrals.length>0?`Referrals:\n${treatmentPlan.referrals.map(r=>`  • ${r.to}${r.reason?" – "+r.reason:""}${r.urgency?" ["+r.urgency+"]":""}`).join("\n")}`:"Referrals: Nil at this time."}
-
-${treatmentPlan.procedures.length>0?`Procedures / Interventions:\n${treatmentPlan.procedures.map(p=>`  • ${p}`).join("\n")}`:""}
-${treatmentPlan.investigations.length>0?`Investigations Ordered:\n${treatmentPlan.investigations.map(i=>`  • ${i}`).join("\n")}`:""}
-${treatmentPlan.restrictions.length>0?`Work / Activity Restrictions:\n${treatmentPlan.restrictions.map(r=>`  • ${r}`).join("\n")}`:""}
-${treatmentPlan.reviewDate?`Next Review: ${new Date(treatmentPlan.reviewDate).toLocaleDateString("en-AU",{day:"numeric",month:"long",year:"numeric"})}`:""}
-${treatmentPlan.gpNotes?`GP Clinical Notes:\n  ${treatmentPlan.gpNotes}`:""}
-──── IMAGING / RADIOLOGY ────────────────────────────
-${imagingReports.length===0?"No imaging reports on file."
-: imagingReports.map(r=>{const it=IMAGING_TYPES.find(t=>t.id===r.type); return `${it?.label||r.type} – ${r.bodyRegion}${r.date?" ("+new Date(r.date).toLocaleDateString("en-AU")+")":" "}${r.facility?" · "+r.facility:""}${r.reportingRadiologist?" · Dr. "+r.reportingRadiologist:""}\n  Findings: ${r.findings?.join(", ")||"See report"}\n  Impression: ${r.impression||"See attached report"}`;}).join("\n\n")}
-
-──── REHABILITATION PLAN ────────────────────────────
-${Object.values(selDiag.rehabPlan).map(p=>`${p.label}: ${p.interventions.slice(0,3).join(", ")}`).join("\n")}
-
-──── PSYCHOSOCIAL BARRIERS ──────────────────────────
-${selFlags.length===0?"None identified.":`${selFlags.map(f=>"  • "+f.label).join("\n")}\n${activeCategories.flatMap(c=>PSYCH_INTERVENTIONS[c]).map(i=>"  → "+i).join("\n")}`}
-${psychoNotes?`\nNotes: ${psychoNotes}`:""}
-──── REFERRAL ───────────────────────────────────────
-To:          ${form.referralType||"___"}
-Urgency:     ${form.urgency}
-
-──── RED FLAGS ──────────────────────────────────────
-${selDiag.redFlags.map(f=>`  ⚠ ${f}`).join("\n")}
-
-──── ADDITIONAL NOTES ───────────────────────────────
-${form.additionalNotes||"Nil."}
-
-──── REFERRING PRACTITIONER ─────────────────────────
-Dr ${form.gpName||"___"}   Provider No: ${form.providerNumber||"___"}
-${form.practice||clinic.name}
-`.trim():"";
-
-  const steps=["Patient & Claim","Diagnosis","Rehab Plan","Psychosocial","Imaging Reports","Treatment Plan","Referral & Export"];
-
-  return <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#060b15 0%,#0e1620 55%,#07101c 100%)",fontFamily:"'Georgia','Times New Roman',serif",color:"#e8eaf0"}}>
-    {/* Header */}
-    <div style={{padding:"13px 26px",borderBottom:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(0,0,0,0.25)"}}>
-      <div style={{display:"flex",alignItems:"center",gap:"14px"}}>
-        <button onClick={onBack} style={{padding:"7px 13px",borderRadius:"6px",border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#9ca3af",fontSize:"12px",cursor:"pointer",fontFamily:"inherit"}}>← Claims</button>
+  return(
+    <div style={css.page}>
+      <div style={{...css.fb,marginBottom:28}}>
         <div>
-          <div style={{fontSize:"10px",color:"#374151",letterSpacing:"2px",textTransform:"uppercase"}}>WorkClaim · {clinic.name}</div>
-          <div style={{fontSize:"15px",fontWeight:"700",color:"#f1f5f9",marginTop:"1px"}}>{form.patientName||"New Claim"} {form.claimNumber&&<span style={{fontSize:"11px",color:"#6b7280",fontWeight:"400"}}>· {form.claimNumber}</span>}</div>
+          <div style={{fontSize:'0.7rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.1em',color:'#00C9A7',marginBottom:4}}>Welcome back</div>
+          <div style={{fontWeight:800,fontSize:'1.55rem',letterSpacing:'-0.03em'}}>{clinic.name}</div>
         </div>
+        <button style={css.btnP} onClick={onNew}>+ New Claim</button>
       </div>
-      <div style={{display:"flex",gap:"8px"}}>
-        <Badge text={scheme} color={colors.accent} bg={`${colors.accent}18`}/>
-        {imagingReports.length>0&&<Badge text={`🔬 ${imagingReports.length} image${imagingReports.length>1?"s":""}`} color="#6366F1" bg="rgba(99,102,241,0.1)"/>}
-        <button onClick={()=>handleSave("active")} style={{padding:"7px 14px",borderRadius:"6px",border:"none",background:`linear-gradient(135deg,${colors.primary},${colors.accent})`,color:"#fff",fontSize:"12px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}}>Save Claim</button>
+      <div style={{...css.g3,marginBottom:20}}>
+        {[{label:'Active Claims',val:active,c:'#00C9A7'},{label:'Pending Approval',val:pending,c:'#FFB830'},{label:'This Month',val:thisMonth,c:'#60A5FA'}].map(m=>(
+          <div key={m.label} style={{...css.card,textAlign:'center',padding:'20px',marginBottom:0}}>
+            <div style={{fontWeight:800,fontSize:'2.2rem',color:m.c,lineHeight:1,marginBottom:6}}>{m.val}</div>
+            <div style={{fontSize:'0.76rem',color:'#5B7A99'}}>{m.label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={css.card}>
+        <div style={{...css.fb,marginBottom:18}}>
+          <div style={{fontWeight:700}}>Recent Claims</div>
+          <div style={{fontSize:'0.76rem',color:'#5B7A99'}}>{claims.length} total</div>
+        </div>
+        {claims.length===0?(
+          <div style={{textAlign:'center',padding:'36px 20px'}}>
+            <div style={{fontSize:'2.5rem',marginBottom:12}}>📋</div>
+            <div style={{fontWeight:600,marginBottom:8}}>No claims yet</div>
+            <div style={{fontSize:'0.84rem',color:'#5B7A99',marginBottom:20}}>Create your first claim to get started</div>
+            <button style={css.btnP} onClick={onNew}>Create first claim</button>
+          </div>
+        ):(
+          claims.slice().reverse().slice(0,8).map(c=>(
+            <div key={c.id} onClick={()=>onOpen(c)} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 0',borderBottom:'1px solid rgba(255,255,255,0.05)',cursor:'pointer'}}>
+              <div>
+                <div style={{fontWeight:600,fontSize:'0.9rem',marginBottom:3}}>{c.patientName||'Unnamed patient'}</div>
+                <div style={{fontSize:'0.76rem',color:'#5B7A99'}}>{c.claimNumber||'No claim #'} · {c.scheme||'WorkCover'} · {c.practitionerName||'—'}</div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <span style={{...css.pill,...statusPill(c.status||'Active'),cursor:'default'}}>{c.status||'Active'}</span>
+                <span style={{fontSize:'0.76rem',color:'#5B7A99'}}>{c.createdAt?new Date(c.createdAt).toLocaleDateString('en-AU'):''}</span>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
+  );
+}
 
-    <div style={{maxWidth:"920px",margin:"0 auto",padding:"24px 20px"}}>
-      {/* Progress */}
-      <div style={{marginBottom:"24px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",marginBottom:"9px",gap:"3px"}}>
-          {steps.map((label,i)=><div key={i} onClick={()=>i+1<=step&&setStep(i+1)} style={{display:"flex",alignItems:"center",gap:"4px",cursor:i+1<=step?"pointer":"default",opacity:i+1>step?0.28:1,flex:1}}>
-            <div style={{width:"20px",height:"20px",borderRadius:"50%",background:i+1<step?colors.primary:i+1===step?colors.accent:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"10px",fontWeight:"700",color:i+1<=step?"#fff":"#4b5563",flexShrink:0,transition:"all 0.3s"}}>{i+1<step?"✓":i+1}</div>
-            <span style={{fontSize:"10px",color:i+1===step?"#f1f5f9":"#6b7280",lineHeight:1.2}}>{label}</span>
-          </div>)}
-        </div>
-        <div style={{height:"2px",background:"rgba(255,255,255,0.06)",borderRadius:"2px"}}><div style={{height:"100%",width:`${(step/7)*100}%`,background:`linear-gradient(90deg,${colors.primary},${colors.accent})`,borderRadius:"2px",transition:"width 0.4s"}}/></div>
+function ClaimsPage({claims,onOpen,onNew}){
+  const[q,setQ]=useState('');
+  const[sf,setSf]=useState('All');
+  const statusPill=(s)=>{if(s==='Active')return css.pillT;if(s==='Pending Approval')return css.pillA;return css.pillM;};
+  const filtered=claims.filter(c=>{
+    const ms=!q||(c.patientName||'').toLowerCase().includes(q.toLowerCase())||(c.claimNumber||'').toLowerCase().includes(q.toLowerCase());
+    const mf=sf==='All'||c.status===sf;
+    return ms&&mf;
+  });
+  return(
+    <div style={css.page}>
+      <div style={{...css.fb,marginBottom:20}}>
+        <div style={{fontWeight:700,fontSize:'1.1rem'}}>All Claims <span style={{fontSize:'0.8rem',color:'#5B7A99',fontWeight:400}}>({claims.length})</span></div>
+        <button style={css.btnP} onClick={onNew}>+ New Claim</button>
       </div>
-
-      <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:"14px",padding:"26px",backdropFilter:"blur(16px)"}}>
-
-        {/* STEP 1 */}
-        {step===1&&<div>
-          <SecHead num="1" title="Patient & Claim Details" color={colors.accent}/>
-          <div style={{marginBottom:"16px",padding:"13px 15px",background:"rgba(255,255,255,0.03)",borderRadius:"9px",border:"1px solid rgba(255,255,255,0.07)"}}>
-            <div style={{fontSize:"10px",color:colors.accent,letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:"11px"}}>Referring Practitioner</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
-              <div><label style={LS}>GP / Doctor</label><select value={form.gpName} onChange={e=>upd("gpName",e.target.value)} style={{...IS,marginTop:"7px"}}>{clinic.practitioners.map(p=><option key={p} value={p.replace("Dr. ","")}>{p}</option>)}</select></div>
-              <Field label="Provider Number" value={form.providerNumber} onChange={v=>upd("providerNumber",v)} placeholder="XXXXXXXX"/>
-              <Field label="Practice / Clinic" value={form.practice} onChange={v=>upd("practice",v)} placeholder="Clinic name" span={2}/>
-              <Field label="Referral Date" value={form.date} onChange={v=>upd("date",v)} type="date"/><div/>
-            </div>
-          </div>
-          <div style={{padding:"13px 15px",background:"rgba(255,255,255,0.03)",borderRadius:"9px",border:"1px solid rgba(255,255,255,0.07)"}}>
-            <div style={{fontSize:"10px",color:colors.accent,letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:"11px"}}>Patient & Claim</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
-              <Field label="Patient Full Name" value={form.patientName} onChange={v=>upd("patientName",v)} placeholder="Last, First"/>
-              <Field label="Date of Birth" value={form.dob} onChange={v=>upd("dob",v)} type="date"/>
-              <Field label="Claim Number" value={form.claimNumber} onChange={v=>upd("claimNumber",v)} placeholder={scheme==="WorkCover"?"WC-2024-XXXXXX":"TAC-XXXXXXXX"}/>
-              <Field label="Employer / Insurer" value={form.employer} onChange={v=>upd("employer",v)} placeholder="Company name"/>
-              <Field label="Date of Injury" value={form.injuryDate} onChange={v=>upd("injuryDate",v)} type="date"/>
-              <Field label="Injury Type" value={form.injuryType} onChange={v=>upd("injuryType",v)} type="select" options={INJURY_TYPES[scheme]}/>
-              <Field label="Injury Description" value={form.injuryDescription} onChange={v=>upd("injuryDescription",v)} type="textarea" placeholder="How the injury occurred and presenting symptoms…" span={2} rows={2}/>
-            </div>
-          </div>
-        </div>}
-
-        {/* STEP 2 */}
-        {step===2&&<div>
-          <SecHead num="2" title="Diagnosis — ICD-10 & TOOCS" color={colors.accent}/>
-          <div style={{marginBottom:"13px"}}><label style={LS}>Search condition, ICD-10, or TOOCS</label><input value={diagSearch} onChange={e=>setDiagSearch(e.target.value)} placeholder="e.g. back pain, M54.5, whiplash, F32…" style={{...IS,marginTop:"7px",padding:"12px",fontSize:"14px"}}/></div>
-          <div style={{display:"flex",flexDirection:"column",gap:"8px",maxHeight:"320px",overflowY:"auto"}}>
-            {filteredDiag.map(d=><div key={d.icd10} onClick={()=>setSelDiag(d)} style={{padding:"11px 14px",borderRadius:"9px",border:`1.5px solid ${selDiag?.icd10===d.icd10?colors.accent:"rgba(255,255,255,0.07)"}`,background:selDiag?.icd10===d.icd10?`${colors.accent}12`:"rgba(255,255,255,0.02)",cursor:"pointer",transition:"all 0.2s"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"10px"}}>
-                <div style={{flex:1}}><div style={{display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap",marginBottom:"4px"}}><span style={{fontSize:"13px",fontWeight:"700",color:colors.accent,fontFamily:"monospace"}}>{d.icd10}</span><span style={{color:"#6b7280",fontSize:"11px"}}>→</span><span style={{fontSize:"13px",fontWeight:"600",color:"#f1f5f9"}}>{d.icd10Label}</span></div><div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}><Badge text={`TOOCS ${d.toocs}`} color="#9ca3af" bg="rgba(255,255,255,0.06)"/><Badge text={d.category} color={d.category==="Psychological"?"#a78bfa":d.category==="Fracture"?"#fbbf24":"#34d399"}/></div></div>
-                {selDiag?.icd10===d.icd10&&<span style={{color:colors.accent}}>✓</span>}
+      <div style={{display:'flex',gap:12,marginBottom:20}}>
+        <div style={{flex:1,position:'relative'}}>
+          <input style={{...css.inp,paddingLeft:36}} placeholder='Search patient or claim number...' value={q} onChange={e=>setQ(e.target.value)}/>
+          <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}>🔍</span>
+        </div>
+        <select style={{...css.sel,width:'auto',minWidth:160}} value={sf} onChange={e=>setSf(e.target.value)}>
+          {['All','Active','Pending Approval','Approved','Closed','Disputed'].map(s=><option key={s}>{s}</option>)}
+        </select>
+      </div>
+      <div style={css.card}>
+        {filtered.length===0?<div style={{textAlign:'center',padding:'32px',color:'#5B7A99'}}>{claims.length===0?'No claims yet.':'No matches.'}</div>:
+          filtered.slice().reverse().map(c=>(
+            <div key={c.id} onClick={()=>onOpen(c)} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 0',borderBottom:'1px solid rgba(255,255,255,0.05)',cursor:'pointer'}}>
+              <div>
+                <div style={{fontWeight:600,fontSize:'0.9rem',marginBottom:3}}>{c.patientName||'Unnamed patient'}</div>
+                <div style={{fontSize:'0.76rem',color:'#5B7A99'}}>{c.claimNumber||'—'} · {c.scheme||'WorkCover'} · {(c.diagnoses||[]).map(d=>d.label).join(', ')||'No diagnosis'}</div>
               </div>
-            </div>)}
-          </div>
-        </div>}
-
-        {/* STEP 3 */}
-        {step===3&&<div>
-          <SecHead num="3" title="Evidence-Based Rehabilitation Plan" color={colors.accent}/>
-          {!selDiag?<div style={{textAlign:"center",padding:"40px",color:"#6b7280"}}>Go back and select a diagnosis first.</div>:<>
-            <div style={{display:"flex",gap:"7px",flexWrap:"wrap",marginBottom:"16px"}}><Badge text={`${selDiag.icd10} – ${selDiag.icd10Label}`} color={colors.accent} bg={`${colors.accent}15`}/><Badge text={`TOOCS ${selDiag.toocs}`} color="#fbbf24" bg="rgba(251,191,36,0.1)"/></div>
-            <div style={{padding:"13px",background:"rgba(255,255,255,0.03)",borderRadius:"9px",border:"1px solid rgba(255,255,255,0.07)",marginBottom:"16px"}}>
-              <div style={{fontSize:"10px",color:"#6b7280",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:"9px"}}>RTW Timeframe</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"7px"}}>
-                {WORK_TYPES.map((wt,i)=><button key={wt} onClick={()=>setWorkType(wt)} style={{padding:"9px 5px",borderRadius:"7px",border:`1.5px solid ${workType===wt?colors.accent:"rgba(255,255,255,0.08)"}`,background:workType===wt?`${colors.accent}15`:"rgba(255,255,255,0.02)",color:workType===wt?"#f1f5f9":"#9ca3af",fontSize:"11px",cursor:"pointer",fontFamily:"inherit",textAlign:"center"}}><div>{wt.split(" (")[0]}</div><div style={{fontSize:"12px",fontWeight:"700",color:workType===wt?colors.accent:"#6b7280",marginTop:"3px"}}>{selDiag.rtwWeeks[WORK_KEYS[i]]}w</div></button>)}
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <span style={{...css.pill,...statusPill(c.status||'Active'),cursor:'default'}}>{c.status||'Active'}</span>
+                <span style={{fontSize:'0.75rem',color:'#5B7A99'}}>{c.createdAt?new Date(c.createdAt).toLocaleDateString('en-AU'):''}</span>
               </div>
             </div>
-            {Object.values(selDiag.rehabPlan).map((ph,i)=><div key={i} style={{marginBottom:"9px",padding:"12px 14px",background:"rgba(255,255,255,0.02)",borderRadius:"9px",border:"1px solid rgba(255,255,255,0.07)"}}>
-              <div style={{display:"flex",gap:"9px",alignItems:"center",marginBottom:"6px"}}><div style={{width:"18px",height:"18px",borderRadius:"50%",background:colors.primary,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"10px",fontWeight:"700",color:"#fff",flexShrink:0}}>{i+1}</div><span style={{fontWeight:"700",color:"#f1f5f9",fontSize:"13px"}}>{ph.label}</span></div>
-              <div style={{fontSize:"11px",color:"#9ca3af",marginBottom:"6px",fontStyle:"italic"}}>Goals: {ph.goals}</div>
-              {ph.interventions.map((item,j)=><div key={j} style={{display:"flex",gap:"7px",fontSize:"12px",color:"#d1d5db",marginBottom:"3px"}}><span style={{color:colors.accent,flexShrink:0}}>→</span><span>{item}</span></div>)}
-            </div>)}
-            <button onClick={()=>setShowRedFlags(f=>!f)} style={{width:"100%",padding:"9px 13px",borderRadius:"7px",border:"1px solid rgba(239,68,68,0.25)",background:"rgba(239,68,68,0.05)",color:"#fca5a5",fontSize:"12px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",display:"flex",justifyContent:"space-between"}}><span>⚠ Red Flags ({selDiag.redFlags.length})</span><span>{showRedFlags?"▲":"▼"}</span></button>
-            {showRedFlags&&<div style={{padding:"11px 13px",background:"rgba(239,68,68,0.05)",borderRadius:"0 0 8px 8px",border:"1px solid rgba(239,68,68,0.15)",borderTop:"none"}}>{selDiag.redFlags.map((f,i)=><div key={i} style={{fontSize:"12px",color:"#fca5a5",padding:"2px 0"}}>⚠ {f}</div>)}</div>}
-          </>}
-        </div>}
+          ))
+        }
+      </div>
+    </div>
+  );
+}
 
-        {/* STEP 4 */}
-        {step===4&&<div>
-          <SecHead num="4" title="Psychosocial Barriers" color={colors.accent}/>
-          <div style={{padding:"13px 15px",borderRadius:"9px",background:"rgba(255,255,255,0.03)",border:`1px solid ${impact.riskColor}33`,marginBottom:"18px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"9px"}}>
-              <div><div style={{fontSize:"10px",color:"#6b7280",letterSpacing:"1.5px",textTransform:"uppercase"}}>Risk Level</div><div style={{fontSize:"20px",fontWeight:"700",color:impact.riskColor}}>{impact.riskLevel}</div></div>
-              <div style={{textAlign:"right"}}><div style={{fontSize:"10px",color:"#6b7280",letterSpacing:"1px",textTransform:"uppercase"}}>Estimated delay</div><div style={{fontSize:"22px",fontWeight:"700",color:impact.addedWeeks>0?"#F59E0B":"#34D399"}}>{impact.addedWeeks>0?`+${impact.addedWeeks} wks`:"None"}</div></div>
+function PractitionersPage({clinic}){
+  const[list,setList]=useState([]);
+  const[f,setF]=useState({name:'',profession:'',providerNo:'',email:'',phone:''});
+  const[saved,setSaved]=useState(false);
+  const PROFS=['General Practitioner','Physiotherapist','Osteopath','Chiropractor','Pain Specialist','Orthopaedic Surgeon','Occupational Therapist','Exercise Physiologist','Psychologist','Podiatrist','Other'];
+  useEffect(()=>{sget('practitioners:'+clinic.id).then(p=>setList(p||[]));},[clinic.id]);
+  const add=async()=>{
+    if(!f.name||!f.profession)return;
+    const up=[...list,{...f,id:'p'+Date.now()}];
+    setList(up);await sset('practitioners:'+clinic.id,up);
+    setF({name:'',profession:'',providerNo:'',email:'',phone:''});
+    setSaved(true);setTimeout(()=>setSaved(false),2000);
+  };
+  const remove=async(id)=>{const up=list.filter(p=>p.id!==id);setList(up);await sset('practitioners:'+clinic.id,up);};
+  return(
+    <div style={css.page}>
+      <div style={{fontWeight:800,fontSize:'1.2rem',marginBottom:4}}>👥 Practitioners</div>
+      <div style={{fontSize:'0.82rem',color:'#5B7A99',marginBottom:24}}>Provider numbers auto-populate when a practitioner is selected on a claim.</div>
+      {saved&&<div style={css.ok}>✅ Practitioner saved successfully</div>}
+      <div style={{...css.g2,alignItems:'start'}}>
+        <div style={css.card}>
+          <div style={{fontWeight:700,marginBottom:18}}>Add practitioner</div>
+          <Inp label='Full name' value={f.name} onChange={v=>setF({...f,name:v})} placeholder='Dr. Jane Smith' required/>
+          <Sel label='Profession' value={f.profession} onChange={v=>setF({...f,profession:v})} options={PROFS} required/>
+          <Inp label='Provider number' value={f.providerNo} onChange={v=>setF({...f,providerNo:v})} placeholder='123456A'/>
+          <Inp label='Email' value={f.email} onChange={v=>setF({...f,email:v})} type='email' placeholder='dr@clinic.com.au'/>
+          <Inp label='Phone' value={f.phone} onChange={v=>setF({...f,phone:v})} placeholder='03 9XXX XXXX'/>
+          <button style={css.btnP} onClick={add}>+ Add practitioner</button>
+        </div>
+        <div>
+          <div style={{fontWeight:600,marginBottom:12,fontSize:'0.88rem'}}>{list.length} practitioner{list.length!==1?'s':''}</div>
+          {list.map(p=>(
+            <div key={p.id} style={{...css.cardSm,marginBottom:10,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div>
+                <div style={{fontWeight:600,fontSize:'0.9rem'}}>{p.name}</div>
+                <div style={{fontSize:'0.76rem',color:'#5B7A99',marginTop:2}}>{p.profession}{p.providerNo?' · '+p.providerNo:''}</div>
+              </div>
+              <button style={css.btnD} onClick={()=>remove(p.id)}>Remove</button>
             </div>
-            <div style={{height:"5px",background:"rgba(255,255,255,0.07)",borderRadius:"3px",overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(100,(selFlags.length/8)*100)}%`,background:`linear-gradient(90deg,#34D399,${impact.riskColor})`,borderRadius:"3px",transition:"width 0.4s"}}/></div>
-          </div>
-          {Object.entries(PSYCH_FLAGS).map(([key,fg])=><div key={key} style={{marginBottom:"10px"}}>
-            <button onClick={()=>setExpandedFlag(expandedFlag===key?null:key)} style={{width:"100%",padding:"10px 13px",borderRadius:expandedFlag===key?"9px 9px 0 0":"9px",border:`1px solid ${fg.border}`,background:fg.bg,cursor:"pointer",fontFamily:"inherit",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{display:"flex",alignItems:"center",gap:"10px"}}><div style={{width:"8px",height:"8px",borderRadius:"50%",background:fg.color,flexShrink:0}}/><div style={{textAlign:"left"}}><div style={{fontSize:"12px",fontWeight:"700",color:fg.color}}>{fg.label}</div><div style={{fontSize:"11px",color:"#6b7280"}}>{fg.description}</div></div></div>
-              <div style={{display:"flex",alignItems:"center",gap:"7px"}}>{selFlags.filter(f=>f.id.startsWith(key[0])).length>0&&<Badge text={`${selFlags.filter(f=>f.id.startsWith(key[0])).length} selected`} color={fg.color} bg={`${fg.color}20`}/>}<span style={{color:"#6b7280",fontSize:"11px"}}>{expandedFlag===key?"▲":"▼"}</span></div>
+          ))}
+          {list.length===0&&<div style={{color:'#5B7A99',fontSize:'0.84rem',textAlign:'center',padding:'20px 0'}}>No practitioners added yet</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClaimForm({clinic,claimData,onSave,onBack}){
+  const TABS=['Patient & Claim','Diagnosis','Imaging','Treatment Plan','Certificate of Capacity','Allied Health Forms','RTW & Rehab Plan','Referral & Export'];
+  const[tab,setTab]=useState(0);
+  const[claim,setClaim]=useState(claimData||{id:'claim_'+Date.now(),scheme:'WorkCover',status:'Active',createdAt:new Date().toISOString(),clinicId:clinic.id});
+  const[practitioners,setPractitioners]=useState([]);
+  const[savedModal,setSavedModal]=useState(false);
+  const[draftModal,setDraftModal]=useState(false);
+  useEffect(()=>{sget('practitioners:'+clinic.id).then(p=>setPractitioners(p||[]));},[clinic.id]);
+  const up=(field,value)=>setClaim(prev=>({...prev,[field]:value}));
+  const save=async()=>{await onSave(claim);setSavedModal(true);};
+  const saveDraft=async()=>{await onSave(claim);setDraftModal(true);};
+  return(
+    <div style={css.page}>
+      {savedModal&&<Modal msg='Claim saved successfully!' onClose={()=>setSavedModal(false)}/>}
+      {draftModal&&<Modal msg='Draft saved! Continue editing from the Claims list.' onClose={()=>{setDraftModal(false);onBack();}} onConfirm={()=>{setDraftModal(false);onBack();}}/>}
+      <div style={{...css.fb,marginBottom:22}}>
+        <div style={css.fr}>
+          <button style={css.btnS} onClick={onBack}>← Back</button>
+          <div style={{fontWeight:700,fontSize:'0.95rem'}}>{claim.patientName||'New Claim'}</div>
+        </div>
+        <div style={{display:'flex',gap:10}}>
+          <button style={css.btnS} onClick={saveDraft}>💾 Save draft</button>
+          <button style={css.btnP} onClick={save}>Save claim</button>
+        </div>
+      </div>
+      <div style={css.tabBar}>
+        {TABS.map((t,i)=><button key={t} style={{...css.tab,...(tab===i?css.tabA:{})}} onClick={()=>setTab(i)}>{i+1}. {t}</button>)}
+      </div>
+      {tab===0&&<Tab1 claim={claim} up={up} practitioners={practitioners}/>}
+      {tab===1&&<Tab2 claim={claim} up={up}/>}
+      {tab===2&&<Tab3 claim={claim} up={up}/>}
+      {tab===3&&<Tab4 claim={claim} up={up}/>}
+      {tab===4&&<Tab6 claim={claim} up={up}/>}
+      {tab===5&&<Tab7 claim={claim} up={up}/>}
+      {tab===6&&<Tab8 claim={claim} up={up}/>}
+      {tab===7&&<Tab9 claim={claim} up={up} clinic={clinic} practitioners={practitioners}/>}
+      <div style={{...css.fb,marginTop:28,paddingTop:20,borderTop:'1px solid rgba(255,255,255,0.07)'}}>
+        <button style={{...css.btnS,...(tab===0?{opacity:0.3,pointerEvents:'none'}:{})}} onClick={()=>setTab(t=>Math.max(0,t-1))}>← Previous</button>
+        <span style={{fontSize:'0.76rem',color:'#5B7A99'}}>{tab+1} / {TABS.length}</span>
+        <button style={{...css.btnP,...(tab===TABS.length-1?{opacity:0.3,pointerEvents:'none'}:{})}} onClick={()=>setTab(t=>Math.min(TABS.length-1,t+1))}>Next →</button>
+      </div>
+    </div>
+  );
+}
+
+function Tab1({claim,up,practitioners}){
+  const sp=practitioners.find(p=>p.id===claim.practitionerId);
+  const si=(INSURERS[claim.scheme]||INSURERS.WorkCover).find(i=>i.id===claim.insurerId);
+  const selPrac=(id)=>{const p=practitioners.find(x=>x.id===id);up('practitionerId',id);up('practitionerName',p?.name||'');up('practitionerProviderNo',p?.providerNo||'');up('practitionerProfession',p?.profession||'');};
+  const selIns=(id)=>{const ins=(INSURERS[claim.scheme]||INSURERS.WorkCover).find(i=>i.id===id);up('insurerId',id);up('insurerName',ins?.name||'');up('insurerPhone',ins?.phone||'');up('insurerAddress',ins?.address||'');};
+  return(
+    <div>
+      <div style={{fontWeight:800,fontSize:'1.1rem',marginBottom:4}}>📋 Patient & Claim Details</div>
+      <div style={{fontSize:'0.82rem',color:'#5B7A99',marginBottom:20}}>Select the scheme first — this drives fee schedules, insurers and forms throughout the claim.</div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Jurisdiction</div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
+          {[
+            {id:'vic',label:'Victoria',active:true},
+            {id:'nsw',label:'NSW',active:false},
+            {id:'qld',label:'QLD',active:false},
+            {id:'sa',label:'SA',active:false},
+            {id:'wa',label:'WA',active:false},
+            {id:'act',label:'ACT',active:false},
+            {id:'tas',label:'TAS',active:false},
+            {id:'nt',label:'NT',active:false},
+            {id:'federal',label:'Federal (Comcare)',active:false},
+          ].map(j=>(
+            <button key={j.id} onClick={()=>{if(j.active)up('jurisdiction',j.id);else alert(j.label+' is coming soon. ClaimBridge currently supports Victoria. Other states will be added soon.');}}
+              style={{...css.pill,...(claim.jurisdiction===j.id||(!claim.jurisdiction&&j.id==='vic')?css.pillT:css.pillM),fontSize:'0.82rem',padding:'8px 16px',...(!j.active?{opacity:0.45}:{})}}>
+              {j.label}{!j.active&&' 🔜'}
             </button>
-            {expandedFlag===key&&<div style={{border:`1px solid ${fg.border}`,borderTop:"none",borderRadius:"0 0 9px 9px",background:"rgba(0,0,0,0.15)"}}>
-              {fg.items.map(item=>{ const active=!!selFlags.find(f=>f.id===item.id); return <div key={item.id} onClick={()=>toggleFlag(item)} style={{padding:"9px 13px",cursor:"pointer",display:"flex",alignItems:"flex-start",gap:"10px",borderBottom:"1px solid rgba(255,255,255,0.04)",background:active?`${fg.color}10`:"transparent"}}>
-                <div style={{width:"16px",height:"16px",borderRadius:"4px",border:`1.5px solid ${active?fg.color:"rgba(255,255,255,0.15)"}`,background:active?fg.color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:"2px"}}>{active&&<span style={{fontSize:"10px",color:"#fff",fontWeight:"700"}}>✓</span>}</div>
-                <div style={{flex:1}}><div style={{fontSize:"12px",color:active?"#f1f5f9":"#d1d5db",fontWeight:active?"600":"400"}}>{item.label}</div><div style={{fontSize:"11px",color:"#6b7280"}}>{item.detail}</div></div>
-                <div style={{fontSize:"11px",color:active?"#F59E0B":"#4b5563",fontWeight:"600",flexShrink:0}}>{item.weeks}</div>
-              </div>;})}
-            </div>}
-          </div>)}
-          {activeCategories.length>0&&<div style={{padding:"13px",background:"rgba(255,255,255,0.03)",borderRadius:"9px",border:"1px solid rgba(255,255,255,0.07)",marginTop:"4px"}}>
-            <div style={{fontSize:"10px",color:"#6b7280",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:"9px"}}>Recommended Interventions</div>
-            {activeCategories.map(cat=><div key={cat} style={{marginBottom:"8px"}}><div style={{fontSize:"11px",color:PSYCH_FLAGS[cat].color,fontWeight:"600",marginBottom:"4px"}}>{PSYCH_FLAGS[cat].label}</div>{PSYCH_INTERVENTIONS[cat].map((item,i)=><div key={i} style={{display:"flex",gap:"7px",fontSize:"12px",color:"#d1d5db",marginBottom:"2px"}}><span style={{color:PSYCH_FLAGS[cat].color,flexShrink:0}}>→</span><span>{item}</span></div>)}</div>)}
-          </div>}
-          <div style={{marginTop:"13px"}}><label style={LS}>Clinician notes (optional)</label><textarea value={psychoNotes} onChange={e=>setPsychoNotes(e.target.value)} rows={3} style={{...IS,marginTop:"7px",resize:"vertical"}} placeholder="e.g. Patient highly anxious, employer not offering modified duties…"/></div>
-        </div>}
-
-        {/* STEP 5 — IMAGING */}
-        {step===5&&<ImagingReportsStep reports={imagingReports} setReports={setImagingReports} claimNumber={form.claimNumber} colors={colors}/>}
-
-        {/* STEP 6 — TREATMENT PLAN */}
-        {step===6&&<TreatmentPlanStep treatmentPlan={treatmentPlan} setTreatmentPlan={setTreatmentPlan} colors={colors} selDiag={selDiag}/>}
-
-        {/* STEP 7 */}
-        {step===7&&<div>
-          <SecHead num="7" title="Referral & Export" color={colors.accent}/>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"13px",marginBottom:"16px"}}>
-            <Field label="Referred To" value={form.referralType} onChange={v=>upd("referralType",v)} type="select" options={REFERRAL_TYPES} span={2}/>
-            <Field label="Urgency" value={form.urgency} onChange={v=>upd("urgency",v)} type="select" options={URGENCIES} span={2}/>
-            <Field label="Additional Clinical Notes" value={form.additionalNotes} onChange={v=>upd("additionalNotes",v)} type="textarea" placeholder="Comorbidities, clinical context…" span={2}/>
-          </div>
-          {selDiag&&<div style={{display:"flex",gap:"7px",flexWrap:"wrap",marginBottom:"13px",padding:"10px 12px",background:"rgba(255,255,255,0.03)",borderRadius:"8px",border:"1px solid rgba(255,255,255,0.07)"}}>
-            <Badge text={`ICD-10: ${selDiag.icd10}`} color={colors.accent} bg={`${colors.accent}15`}/>
-            <Badge text={`TOOCS: ${selDiag.toocs}`} color="#fbbf24" bg="rgba(251,191,36,0.1)"/>
-            {workType&&<Badge text={`RTW: ${rtwRange}w`} color="#34D399" bg="rgba(52,211,153,0.1)"/>}
-            {selFlags.length>0&&<Badge text={`+${impact.addedWeeks}w psychosocial`} color="#F59E0B" bg="rgba(245,158,11,0.1)"/>}
-            {imagingReports.length>0&&<Badge text={`🔬 ${imagingReports.length} imaging report${imagingReports.length>1?"s":""}`} color="#6366F1" bg="rgba(99,102,241,0.1)"/>}
-            {(treatmentPlan.medications.length>0||treatmentPlan.referrals.length>0)&&<Badge text={`💊 Treatment plan`} color="#34D399" bg="rgba(52,211,153,0.1)"/>}
-          </div>}
-          {selDiag?<>
-            <div style={{background:"#060b14",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"9px",padding:"16px 18px",fontFamily:"'Courier New',monospace",fontSize:"11px",lineHeight:"1.9",color:"#b0bec5",whiteSpace:"pre-wrap",maxHeight:"360px",overflowY:"auto",marginBottom:"13px"}}>{referralText}</div>
-            <div style={{display:"flex",gap:"9px"}}>
-              <button onClick={()=>{ navigator.clipboard.writeText(referralText).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2200);}); }} style={{flex:1,padding:"12px",borderRadius:"8px",border:"none",background:copied?"#059669":`linear-gradient(135deg,${colors.primary},${colors.accent})`,color:"#fff",fontSize:"13px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit",transition:"background 0.3s"}}>{copied?"✓ Copied!":"Copy Full Referral"}</button>
-              <button onClick={()=>handleSave("complete")} style={{padding:"12px 16px",borderRadius:"8px",border:"none",background:"#059669",color:"#fff",fontSize:"13px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}}>✓ Mark Complete</button>
-            </div>
-          </>:<div style={{padding:"28px",textAlign:"center",color:"#6b7280"}}>Select a diagnosis first.</div>}
-        </div>}
-
-        {/* Nav */}
-        <div style={{display:"flex",justifyContent:"space-between",marginTop:"22px"}}>
-          {step>1?<button onClick={()=>setStep(s=>s-1)} style={{padding:"10px 18px",borderRadius:"7px",border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#9ca3af",fontSize:"13px",cursor:"pointer",fontFamily:"inherit"}}>← Back</button>:<div/>}
-          {step<7?<button onClick={()=>setStep(s=>s+1)} style={{padding:"10px 20px",borderRadius:"7px",border:"none",background:`linear-gradient(135deg,${colors.primary},${colors.accent})`,color:"#fff",fontSize:"13px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}}>Continue →</button>:null}
+          ))}
+        </div>
+        {(!claim.jurisdiction||claim.jurisdiction==='vic')&&<div style={css.ok}>✅ Victoria — WorkSafe Victoria and TAC schemes active</div>}
+      </div>
+      <div style={css.card}>
+        <label style={css.label}>Claim scheme *</label>
+        <div style={{display:'flex',gap:8,padding:'4px',background:'rgba(255,255,255,0.04)',borderRadius:12,border:'1px solid rgba(255,255,255,0.08)',width:'fit-content',marginBottom:12}}>
+          <button onClick={()=>up('scheme','WorkCover')} style={{padding:'10px 28px',borderRadius:9,border:'none',fontWeight:700,fontSize:'0.9rem',cursor:'pointer',background:claim.scheme==='WorkCover'?'#0057A8':'transparent',color:claim.scheme==='WorkCover'?'#fff':'rgba(255,255,255,0.4)',transition:'all 0.2s'}}>WorkCover</button>
+          <button onClick={()=>up('scheme','TAC')} style={{padding:'10px 28px',borderRadius:9,border:'none',fontWeight:700,fontSize:'0.9rem',cursor:'pointer',background:claim.scheme==='TAC'?'#C0392B':'transparent',color:claim.scheme==='TAC'?'#fff':'rgba(255,255,255,0.4)',transition:'all 0.2s'}}>TAC</button>
+        </div>
+        {claim.scheme==='WorkCover'&&<div style={css.warn}>⚡ WorkSafe Victoria — WorkSafe fee schedule and forms apply</div>}
+        {claim.scheme==='TAC'&&<div style={{background:'rgba(192,57,43,0.08)',border:'1px solid rgba(192,57,43,0.25)',borderRadius:12,padding:'12px 16px',color:'#E67E22',fontSize:'0.82rem',display:'flex',gap:8,marginBottom:16}}>🚗 Transport Accident Commission — TAC fees and forms apply</div>}
+      </div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Patient information</div>
+        <div style={css.g2}>
+          <Inp label='Full name' value={claim.patientName} onChange={v=>up('patientName',v)} placeholder='Jane Smith' required/>
+          <Inp label='Date of birth' value={claim.dob} onChange={v=>up('dob',v)} type='date' required/>
+        </div>
+        <Inp label='Address' value={claim.patientAddress} onChange={v=>up('patientAddress',v)} placeholder='123 Main St, Melbourne VIC 3000'/>
+        <div style={css.g2}>
+          <Inp label='Email' value={claim.patientEmail} onChange={v=>up('patientEmail',v)} type='email' placeholder='patient@email.com'/>
+          <Inp label='Phone' value={claim.patientPhone} onChange={v=>up('patientPhone',v)} placeholder='04XX XXX XXX'/>
         </div>
       </div>
-      <div style={{textAlign:"center",marginTop:"20px",fontSize:"10px",color:"#1f2937",letterSpacing:"2px"}}>WORKCLAIM · {clinic.name.toUpperCase()} · SECURE CLINIC SESSION</div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Claim information</div>
+        <div style={css.g2}>
+          <Inp label='Claim number' value={claim.claimNumber} onChange={v=>up('claimNumber',v)} placeholder='WC-2025-XXXXX'/>
+          <Inp label='Date of injury' value={claim.dateOfInjury} onChange={v=>up('dateOfInjury',v)} type='date' required/>
+        </div>
+        <div style={css.g2}>
+          <Sel label='Claim status' value={claim.status} onChange={v=>up('status',v)} options={['Active','Pending Approval','Approved','Closed','Disputed']}/>
+          <Sel label='Claim type' value={claim.claimType} onChange={v=>up('claimType',v)} options={['New claim','Existing claim','Review','Appeal']}/>
+        </div>
+        {claim.scheme==='WorkCover'&&<div style={css.g2}><Inp label='Employer name' value={claim.employerName} onChange={v=>up('employerName',v)} placeholder='ABC Company Pty Ltd'/><Inp label='Employer contact' value={claim.employerContact} onChange={v=>up('employerContact',v)} placeholder='HR Manager — 03 XXXX XXXX'/></div>}
+      </div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Injury details</div>
+        <div style={{fontSize:'0.82rem',color:'#5B7A99',marginBottom:16}}>These details are used to auto-populate referral letters and treatment plan templates.</div>
+        <Sel label='Mechanism of injury' value={claim.injuryMechanism} onChange={v=>up('injuryMechanism',v)} options={[
+          'Lifting / manual handling',
+          'Repetitive strain / overuse',
+          'Fall from height',
+          'Fall on same level / slip / trip',
+          'Struck by object',
+          'Struck against object',
+          'Motor vehicle accident',
+          'Pedestrian / cyclist accident',
+          'Crush injury',
+          'Cut / laceration',
+          'Burn / scald',
+          'Exposure to hazardous substance',
+          'Psychological — workplace stress',
+          'Psychological — workplace bullying / harassment',
+          'Psychological — traumatic event witnessed',
+          'Psychological — cumulative trauma',
+          'Noise exposure',
+          'Vibration exposure',
+          'Other — see notes',
+        ]}/>
+        <div style={css.g2}>
+          <Sel label='Body part injured (primary)' value={claim.injuryBodyPart} onChange={v=>up('injuryBodyPart',v)} options={[
+            'Head / skull','Face','Eye(s)','Ear(s)','Neck / cervical spine',
+            'Shoulder — left','Shoulder — right','Shoulder — bilateral',
+            'Upper arm — left','Upper arm — right',
+            'Elbow — left','Elbow — right',
+            'Forearm — left','Forearm — right',
+            'Wrist — left','Wrist — right',
+            'Hand — left','Hand — right','Finger(s) — left','Finger(s) — right',
+            'Thoracic spine / upper back','Lumbar spine / lower back','Sacrum / coccyx',
+            'Chest / ribs','Abdomen','Pelvis',
+            'Hip — left','Hip — right',
+            'Thigh — left','Thigh — right',
+            'Knee — left','Knee — right',
+            'Lower leg — left','Lower leg — right',
+            'Ankle — left','Ankle — right',
+            'Foot — left','Foot — right','Toe(s)',
+            'Multiple body parts','Psychological / mental health','Other',
+          ]}/>
+          <Sel label='Body part injured (secondary)' value={claim.injuryBodyPartSecondary} onChange={v=>up('injuryBodyPartSecondary',v)} options={[
+            'None',
+            'Head / skull','Face','Eye(s)','Ear(s)','Neck / cervical spine',
+            'Shoulder — left','Shoulder — right','Shoulder — bilateral',
+            'Upper arm — left','Upper arm — right',
+            'Elbow — left','Elbow — right',
+            'Forearm — left','Forearm — right',
+            'Wrist — left','Wrist — right',
+            'Hand — left','Hand — right','Finger(s) — left','Finger(s) — right',
+            'Thoracic spine / upper back','Lumbar spine / lower back','Sacrum / coccyx',
+            'Chest / ribs','Abdomen','Pelvis',
+            'Hip — left','Hip — right',
+            'Thigh — left','Thigh — right',
+            'Knee — left','Knee — right',
+            'Lower leg — left','Lower leg — right',
+            'Ankle — left','Ankle — right',
+            'Foot — left','Foot — right','Toe(s)',
+            'Multiple body parts','Psychological / mental health','Other',
+          ]}/>
+        </div>
+        <Ta label='Mechanism of injury — detailed description' value={claim.injuryDescription} onChange={v=>up('injuryDescription',v)} placeholder='Describe exactly how the injury occurred, what the patient was doing, position of body, forces involved...' rows={4}/>
+        <div style={css.g2}>
+          <Sel label='Injury type' value={claim.injuryType} onChange={v=>up('injuryType',v)} options={[
+            'Sprain / strain','Fracture','Dislocation','Soft tissue tear',
+            'Contusion / bruising','Laceration / wound','Nerve injury',
+            'Tendon injury','Ligament injury','Disc injury',
+            'Concussion / head injury','Burn','Crush injury',
+            'Psychological / psychiatric','Cumulative / gradual onset',
+            'Aggravation of pre-existing condition','Other',
+          ]}/>
+          <Sel label='Onset type' value={claim.injuryOnset} onChange={v=>up('injuryOnset',v)} options={[
+            'Sudden / acute — single incident',
+            'Gradual onset — over days',
+            'Gradual onset — over weeks',
+            'Gradual onset — over months (cumulative)',
+            'Aggravation of pre-existing condition',
+            'Recurrence of previous injury',
+          ]}/>
+        </div>
+        <div style={css.g2}>
+          <Inp label='Time of injury' value={claim.injuryTime} onChange={v=>up('injuryTime',v)} placeholder='e.g. 10:30am'/>
+          <Inp label='Location of injury' value={claim.injuryLocation} onChange={v=>up('injuryLocation',v)} placeholder='e.g. Warehouse floor, loading dock, office'/>
+        </div>
+        <Ta label='Immediate symptoms at time of injury' value={claim.injuryImmediateSymptoms} onChange={v=>up('injuryImmediateSymptoms',v)} placeholder='e.g. Immediate sharp pain in lower back, unable to stand upright, numbness down left leg...'/>
+        <Ta label='Causation / pathophysiology' value={claim.injuryCausation} onChange={v=>up('injuryCausation',v)} placeholder='Clinical opinion on causation — how did the mechanism cause this specific injury and diagnosis? Include pathophysiology and sequelae of the original injury...' rows={4}/>
+        <div style={css.g2}>
+          <Inp label='Was injury reported to employer?' value={claim.injuryReported} onChange={v=>up('injuryReported',v)} placeholder='e.g. Yes — reported same day'/>
+          <Inp label='Were witnesses present?' value={claim.injuryWitnesses} onChange={v=>up('injuryWitnesses',v)} placeholder='e.g. Yes — John Smith (supervisor)'/>
+        </div>
+        <Ta label='Previous injury / pre-existing condition history' value={claim.preExisting} onChange={v=>up('preExisting',v)} placeholder='Relevant prior injuries or pre-existing conditions and their relationship to the current claim...'/>
+      </div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Treating practitioner</div>
+        <Sel label='Select practitioner' value={claim.practitionerId} onChange={selPrac} options={practitioners.map(p=>({value:p.id,label:p.name+' — '+p.profession}))} required/>
+        {sp&&<div style={css.ok}>✅ Provider No: <strong>{sp.providerNo||'Not set'}</strong> · {sp.profession}</div>}
+        {practitioners.length===0&&<div style={css.warn}>⚠️ No practitioners added. Go to Practitioners in the sidebar.</div>}
+        <Inp label='Next review date' value={claim.nextReviewDate} onChange={v=>up('nextReviewDate',v)} type='date'/>
+      </div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Insurer</div>
+        <Sel label='Select insurer' value={claim.insurerId} onChange={selIns} options={(INSURERS[claim.scheme]||INSURERS.WorkCover).map(i=>({value:i.id,label:i.name}))} required/>
+        {si&&si.id!=='other'&&<div style={{...css.cardSm,marginTop:8}}><div style={{fontSize:'0.82rem',color:'#5B7A99'}}>📞 {si.phone}</div><div style={{fontSize:'0.82rem',color:'#5B7A99',marginTop:3}}>📍 {si.address}</div></div>}
+        {claim.insurerId==='other'&&<div style={{marginTop:12}}>
+          <Inp label='Insurer name' value={claim.insurerNameCustom} onChange={v=>up('insurerNameCustom',v)} placeholder='Enter insurer name'/>
+          <Inp label='Accounts payable email' value={claim.insurerEmail} onChange={v=>up('insurerEmail',v)} type='email' placeholder='ap@insurer.com.au'/>
+          <Inp label='Phone' value={claim.insurerPhoneCustom} onChange={v=>up('insurerPhoneCustom',v)} placeholder='1300 XXX XXX'/>
+          <button style={{...css.pill,...css.pillA,fontSize:'0.78rem'}} onClick={()=>alert('Request submitted! We\'ll add this insurer soon.')}>📬 Request to add this insurer to ClaimBridge</button>
+        </div>}
+      </div>
+      <div style={css.card}>
+        <div style={{display:'flex',alignItems:'center',gap:12,cursor:'pointer'}} onClick={()=>up('consent',!claim.consent)}>
+          <div style={{width:20,height:20,borderRadius:6,border:claim.consent?'none':'1.5px solid #5B7A99',background:claim.consent?'#00C9A7':'transparent',display:'flex',alignItems:'center',justifyContent:'center',color:'#07101E',fontWeight:700,fontSize:'0.75rem',flexShrink:0}}>{claim.consent?'✓':''}</div>
+          <div style={{fontSize:'0.88rem',lineHeight:1.5}}>The patient has consented to their information being shared with the insurer, referred practitioners and other treating providers involved in their care.</div>
+        </div>
+      </div>
     </div>
-  </div>;
+  );
 }
 
-// ─── ROOT APP ─────────────────────────────────────────────────────────────────
+function Tab2({claim,up}){
+  const[q,setQ]=useState('');
+  const[show,setShow]=useState(false);
+  const[diags,setDiags]=useState(claim.diagnoses||[]);
+  const sugg=useMemo(()=>q.length<2?[]:DIAGNOSES_DB.filter(d=>d.label.toLowerCase().includes(q.toLowerCase())||d.icd10.toLowerCase().includes(q.toLowerCase())).slice(0,8),[q]);
+  const add=(d)=>{if(diags.find(x=>x.icd10===d.icd10))return;const u=[...diags,d];setDiags(u);up('diagnoses',u);setQ('');setShow(false);};
+  const remove=(icd)=>{const u=diags.filter(d=>d.icd10!==icd);setDiags(u);up('diagnoses',u);};
+  const setCap=(fid,opt)=>up('capacity',{...(claim.capacity||{}),[fid]:opt});
+  const capCol={Can:'rgba(0,201,167,0.15)',Modified:'rgba(255,184,48,0.12)',Cannot:'rgba(255,77,109,0.12)'};
+  const capBdr={Can:'rgba(0,201,167,0.35)',Modified:'rgba(255,184,48,0.3)',Cannot:'rgba(255,77,109,0.3)'};
+  const capTxt={Can:'#00C9A7',Modified:'#FFB830',Cannot:'#FF4D6D'};
+  return(
+    <div>
+      <div style={{fontWeight:800,fontSize:'1.1rem',marginBottom:4}}>🔍 Diagnosis</div>
+      <div style={{fontSize:'0.82rem',color:'#5B7A99',marginBottom:20}}>Search and add conditions. Capacity limitations auto-populate the Certificate of Capacity.</div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Conditions / Diagnosis</div>
+        <div style={{position:'relative'}}>
+          <input style={{...css.inp,paddingLeft:38}} placeholder='Search musculoskeletal conditions...' value={q} onChange={e=>{setQ(e.target.value);setShow(true);}} onFocus={()=>setShow(true)}/>
+          <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}>🔍</span>
+          {show&&sugg.length>0&&(
+            <div style={{position:'absolute',top:'100%',left:0,right:0,background:'#112240',border:'1px solid rgba(255,255,255,0.1)',borderRadius:10,zIndex:100,marginTop:4,maxHeight:280,overflow:'auto',boxShadow:'0 8px 30px rgba(0,0,0,0.3)'}}>
+              {sugg.map(d=>(
+                <div key={d.icd10} onClick={()=>add(d)} style={{padding:'11px 16px',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                  <div><div style={{fontSize:'0.88rem',fontWeight:500}}>{d.label}</div><div style={{fontSize:'0.73rem',color:'#5B7A99',marginTop:1}}>{d.category}</div></div>
+                  <div style={{textAlign:'right'}}>
+                    {d.dsm5&&<div style={{fontSize:'0.68rem',fontFamily:'monospace',color:'#A78BFA',background:'rgba(167,139,250,0.08)',padding:'1px 6px',borderRadius:4,marginBottom:2}}>DSM-5: {d.dsm5}</div>}
+                    <div style={{fontSize:'0.72rem',fontFamily:'monospace',color:'#5B7A99',background:'rgba(255,255,255,0.05)',padding:'2px 7px',borderRadius:5}}>{d.icd10}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {diags.length>0&&<div style={{marginTop:12,display:'flex',flexWrap:'wrap',gap:7}}>{diags.map(d=><div key={d.icd10} style={{...css.pill,...css.pillT,gap:7}}><span>{d.label}</span><span style={{fontSize:'0.68rem',opacity:0.7}}>{d.icd10}</span><button onClick={()=>remove(d.icd10)} style={{background:'transparent',border:'none',color:'#00C9A7',cursor:'pointer',padding:'0 0 0 3px',fontSize:'0.9rem'}}>×</button></div>)}</div>}
+        {diags.length===0&&<div style={{color:'#5B7A99',fontSize:'0.82rem',marginTop:10}}>No conditions added. Search above.</div>}
+      </div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:6}}>Physical capacity assessment</div>
+        <div style={{fontSize:'0.82rem',color:'#5B7A99',marginBottom:16}}>Select capacity for each function. Auto-populates the Certificate of Capacity.</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 90px 90px 90px',gap:6,marginBottom:8}}>
+          <div style={{fontSize:'0.7rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em',color:'#5B7A99'}}>Function</div>
+          {['Can','Modified','Cannot'].map(o=><div key={o} style={{fontSize:'0.7rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em',color:'#5B7A99',textAlign:'center'}}>{o}</div>)}
+        </div>
+        {PHYSICAL_FUNCTIONS.map(f=>(
+          <div key={f.id} style={{display:'grid',gridTemplateColumns:'1fr 90px 90px 90px',gap:6,alignItems:'center',marginBottom:5}}>
+            <div style={{fontSize:'0.87rem'}}>{f.label}</div>
+            {['Can','Modified','Cannot'].map(o=>(
+              <div key={o} onClick={()=>setCap(f.id,o)} style={{padding:'7px 8px',borderRadius:7,border:'1px solid '+((claim.capacity||{})[f.id]===o?capBdr[o]:'rgba(255,255,255,0.07)'),background:(claim.capacity||{})[f.id]===o?capCol[o]:'rgba(255,255,255,0.02)',cursor:'pointer',fontSize:'0.75rem',fontWeight:600,textAlign:'center',color:(claim.capacity||{})[f.id]===o?capTxt[o]:'rgba(255,255,255,0.35)',transition:'all 0.15s',userSelect:'none'}}>{o}</div>
+            ))}
+          </div>
+        ))}
+        <Ta label='Physical function notes' value={claim.physicalNotes} onChange={v=>up('physicalNotes',v)} placeholder='Additional notes...'/>
+      </div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Mental function</div>
+        <div style={{display:'flex',gap:10,marginBottom:16}}>
+          {['Not affected','Affected'].map(o=><button key={o} onClick={()=>up('mentalStatus',o)} style={{...css.pill,...(claim.mentalStatus===o?css.pillT:css.pillM),fontSize:'0.85rem',padding:'10px 22px'}}>{o==='Not affected'?'✅ ':''}{o==='Affected'?'⚠️ ':''}{o}</button>)}
+        </div>
+        {claim.mentalStatus==='Affected'&&<div>
+          {MENTAL_FUNCTIONS.map(f=>(
+            <div key={f.id} style={{marginBottom:14}}>
+              <div style={{fontSize:'0.85rem',fontWeight:500,marginBottom:7}}>{f.label}</div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{SEVERITY_OPTIONS.map(s=><button key={s} onClick={()=>up('mentalSeverity',{...(claim.mentalSeverity||{}),[f.id]:s})} style={{...css.pill,...((claim.mentalSeverity||{})[f.id]===s?css.pillA:css.pillM),fontSize:'0.77rem'}}>{s}</button>)}</div>
+            </div>
+          ))}
+          <Ta label='Mental function notes' value={claim.mentalNotes} onChange={v=>up('mentalNotes',v)} placeholder='Additional mental function notes...'/>
+        </div>}
+      </div>
+      <Collapsible title='Psychosocial flags' icon='🚩'>
+        <div style={{fontSize:'0.83rem',color:'#5B7A99',marginBottom:14}}>Identify barriers to recovery that inform the RTW plan.</div>
+        {[['yellow','Yellow Flags','#F59E0B','Individual psychological barriers',['Pain catastrophising','Fear-avoidance beliefs','Low self-efficacy','High pain anxiety','Passive coping','History of depression/anxiety','Sleep disturbance','Unhelpful beliefs about injury']],['blue','Blue Flags','#3B82F6','Work-related perceptions',['Poor relationship with employer','Low job satisfaction','High physical job demands','Belief that work caused injury','Lack of modified duties','No RTW coordinator']],['black','Black Flags','#9CA3AF','Systemic barriers',['Medicolegal proceedings active','Claim processing delays','Financial hardship','Cultural / language barriers','Housing instability','Previous claim history']],['orange','Orange Flags','#F97316','Psychiatric conditions',['Major depressive disorder','PTSD (active)','Substance use disorder','Active suicidal ideation']]].map(([key,label,color,desc,items])=>(
+          <div key={key} style={{marginBottom:18}}>
+            <div style={{fontWeight:700,color,fontSize:'0.87rem',marginBottom:3}}>{label}</div>
+            <div style={{fontSize:'0.76rem',color:'#5B7A99',marginBottom:9}}>{desc}</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:7}}>{items.map(item=>{const sel=((claim.psychosocial||{})[key]||[]).includes(item);return<button key={item} onClick={()=>{const cur=(claim.psychosocial||{})[key]||[];const upd=sel?cur.filter(x=>x!==item):[...cur,item];up('psychosocial',{...(claim.psychosocial||{}),[key]:upd});}} style={{...css.pill,background:sel?color+'22':'rgba(255,255,255,0.03)',borderColor:sel?color+'55':'rgba(255,255,255,0.08)',color:sel?color:'rgba(255,255,255,0.5)',fontSize:'0.76rem'}}>{item}</button>;})}</div>
+          </div>
+        ))}
+        <Ta label='Psychosocial notes' value={claim.psychosocialNotes} onChange={v=>up('psychosocialNotes',v)} placeholder='Additional observations...'/>
+      </Collapsible>
+      <Collapsible title='Clinical assessment (allied health)' icon='🩺'>
+        <Ta label='Clinical presentation' value={claim.clinicalPresentation} onChange={v=>up('clinicalPresentation',v)} placeholder='Describe clinical presentation...' rows={4}/>
+        <Ta label='Orthopaedic test results' value={claim.orthoTests} onChange={v=>up('orthoTests',v)} placeholder='e.g. Positive Spurlings, SLR 45°...'/>
+        <Inp label='Body region assessed' value={claim.aromRegion} onChange={v=>up('aromRegion',v)} placeholder='e.g. Lumbar spine, Cervical spine'/>
+        <Ta label='Active ROM findings' value={claim.arom} onChange={v=>up('arom',v)} placeholder='Flexion 40°, Extension 15°...'/>
+        <Ta label='Passive ROM findings' value={claim.prom} onChange={v=>up('prom',v)} placeholder='Passive ROM findings...'/>
+      </Collapsible>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Work & activity restrictions</div>
+        <Ta label='Work restrictions' value={claim.workRestrictions} onChange={v=>up('workRestrictions',v)} placeholder='e.g. No lifting >5kg, avoid prolonged sitting >30min...'/>
+        <Ta label='Activity restrictions' value={claim.activityRestrictions} onChange={v=>up('activityRestrictions',v)} placeholder='e.g. No driving, avoid stairs...'/>
+      </div>
+    </div>
+  );
+}
+
+function Tab3({claim,up}){
+  const[uploading,setUploading]=useState(false);
+  const[generating,setGenerating]=useState(false);
+  const reports=claim.imagingReports||[];
+  const upload=async(e)=>{
+    const f=e.target.files[0];if(!f)return;
+    setUploading(true);await new Promise(r=>setTimeout(r,700));
+    const nr={id:'img_'+Date.now(),name:f.name,size:(f.size/1024).toFixed(0)+'KB',uploadedAt:new Date().toISOString(),summary:null};
+    up('imagingReports',[...reports,nr]);setUploading(false);
+  };
+  const genSummary=async(rid)=>{
+    setGenerating(rid);
+    try{
+      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:`Generate a realistic radiology report summary for a WorkCover patient. Return JSON only with fields: dateOfImaging, requestingPractitioner, reportingRadiologist, facility, clinicalSummary, keyFindings. Be concise and clinically appropriate.`}]})});
+      const data=await res.json();
+      let summary;try{summary=JSON.parse((data.content?.[0]?.text||'{}').replace(/```json|```/g,'').trim());}catch{summary={clinicalSummary:data.content?.[0]?.text||'See report',keyFindings:'Manual review required'};}
+      up('imagingReports',reports.map(r=>r.id===rid?{...r,summary}:r));
+    }catch{up('imagingReports',reports.map(r=>r.id===rid?{...r,summary:{clinicalSummary:'AI summary unavailable. Review manually.',keyFindings:'Manual review required'}}:r));}
+    setGenerating(false);
+  };
+  return(
+    <div>
+      <div style={{fontWeight:800,fontSize:'1.1rem',marginBottom:4}}>🩻 Imaging Reports</div>
+      <div style={{fontSize:'0.82rem',color:'#5B7A99',marginBottom:20}}>Upload reports — AI extracts key details and generates a clinical summary automatically.</div>
+      <div style={{...css.card,textAlign:'center',padding:'32px'}}>
+        <div style={{fontSize:'2.5rem',marginBottom:10}}>📄</div>
+        <div style={{fontWeight:600,marginBottom:6}}>Upload radiology report</div>
+        <div style={{fontSize:'0.82rem',color:'#5B7A99',marginBottom:18}}>PDF or image · AI summary generated automatically</div>
+        <label style={{...css.btnP,cursor:'pointer'}}>{uploading?'Uploading…':'📎 Choose file'}<input type='file' accept='.pdf,.jpg,.jpeg,.png' onChange={upload} style={{display:'none'}}/></label>
+      </div>
+      {reports.map(r=>(
+        <div key={r.id} style={css.card}>
+          <div style={{...css.fb,marginBottom:r.summary?14:0}}>
+            <div style={css.fr}>
+              <span style={{fontSize:'1.4rem'}}>📋</span>
+              <div><div style={{fontWeight:600,fontSize:'0.9rem'}}>{r.name}</div><div style={{fontSize:'0.74rem',color:'#5B7A99',marginTop:2}}>{r.size} · {new Date(r.uploadedAt).toLocaleDateString('en-AU')}</div></div>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              {!r.summary&&<button style={css.btnP} onClick={()=>genSummary(r.id)} disabled={generating===r.id}>{generating===r.id?'⚡ Generating…':'⚡ AI Summary'}</button>}
+              <button style={css.btnD} onClick={()=>up('imagingReports',reports.filter(x=>x.id!==r.id))}>Remove</button>
+            </div>
+          </div>
+          {r.summary&&<div style={{background:'rgba(0,201,167,0.06)',border:'1px solid rgba(0,201,167,0.2)',borderRadius:10,padding:'16px'}}>
+            <div style={{fontWeight:700,color:'#00C9A7',marginBottom:12,fontSize:'0.82rem',textTransform:'uppercase',letterSpacing:'0.08em'}}>AI Radiology Summary</div>
+            {[['Date of imaging',r.summary.dateOfImaging],['Requesting practitioner',r.summary.requestingPractitioner],['Reporting radiologist',r.summary.reportingRadiologist],['Facility',r.summary.facility],['Clinical summary',r.summary.clinicalSummary],['Key findings',r.summary.keyFindings]].map(([lbl,val])=>val?<div key={lbl} style={{fontSize:'0.84rem',marginBottom:6}}><span style={{color:'#5B7A99'}}>{lbl}:</span> {val}</div>:null)}
+          </div>}
+        </div>
+      ))}
+      {reports.length===0&&<div style={{textAlign:'center',color:'#5B7A99',fontSize:'0.84rem',padding:'16px 0'}}>No reports uploaded yet</div>}
+    </div>
+  );
+}
+
+const PRESCRIBING_PROFESSIONS=['General Practitioner','Pain Specialist','Orthopaedic Surgeon','Psychiatrist','Neurologist','Rehabilitation Physician','Rheumatologist','Other Specialist'];
+
+function MedicationSection({claim,up}){
+  const[meds,setMeds]=useState(claim.medications||[]);
+  const[nm,setNm]=useState({name:'',dosage:'',frequency:'',duration:'',review:''});
+  const isPrescriber=PRESCRIBING_PROFESSIONS.includes(claim.practitionerProfession);
+
+  const add=()=>{
+    if(!nm.name)return;
+    const u=[...meds,{...nm,id:'med_'+Date.now()}];
+    setMeds(u);up('medications',u);
+    setNm({name:'',dosage:'',frequency:'',duration:'',review:''});
+  };
+  const rem=(id)=>{const u=meds.filter(m=>m.id!==id);setMeds(u);up('medications',u);};
+
+  return(
+    <Collapsible
+      title={isPrescriber?'💊 Medication recommendations':'💊 Medication (prescribing practitioners only)'}
+      icon=''
+      defaultOpen={isPrescriber}
+    >
+      {!isPrescriber&&(
+        <div style={css.warn}>
+          ⚠️ This section is intended for prescribing practitioners — GPs, Specialists, Pain Specialists and Psychiatrists. Allied health practitioners can leave this section blank.
+        </div>
+      )}
+      <div style={{...css.g2}}>
+        <Inp label='Medication name' value={nm.name} onChange={v=>setNm({...nm,name:v})} placeholder='e.g. Ibuprofen, Amitriptyline, Pregabalin'/>
+        <Inp label='Dosage' value={nm.dosage} onChange={v=>setNm({...nm,dosage:v})} placeholder='e.g. 400mg, 25mg'/>
+        <Inp label='Frequency' value={nm.frequency} onChange={v=>setNm({...nm,frequency:v})} placeholder='e.g. TDS, BD, PRN, once daily'/>
+        <Inp label='Duration' value={nm.duration} onChange={v=>setNm({...nm,duration:v})} placeholder='e.g. 2 weeks, 1 month, ongoing'/>
+      </div>
+      <Inp label='Review notes' value={nm.review} onChange={v=>setNm({...nm,review:v})} placeholder='e.g. Review at 1 month, cease if symptom-free, wean slowly'/>
+      <button style={css.btnP} onClick={add}>+ Add medication</button>
+      {meds.length>0&&(
+        <div style={{marginTop:16}}>
+          <div style={{fontWeight:600,fontSize:'0.72rem',marginBottom:10,color:'#5B7A99',textTransform:'uppercase',letterSpacing:'0.06em'}}>Current medications</div>
+          {meds.map(m=>(
+            <div key={m.id} style={{...css.cardSm,marginBottom:9,display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+              <div>
+                <div style={{fontWeight:600,fontSize:'0.9rem'}}>{m.name}</div>
+                <div style={{fontSize:'0.8rem',color:'#5B7A99',marginTop:3}}>{m.dosage}{m.dosage&&m.frequency?' · ':''}{m.frequency}{m.duration?' · ':''}{m.duration}</div>
+                {m.review&&<div style={{fontSize:'0.76rem',color:'#5B7A99',marginTop:2}}>Review: {m.review}</div>}
+              </div>
+              <button style={css.btnD} onClick={()=>rem(m.id)}>Remove</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Collapsible>
+  );
+}
+
+function Tab4({claim,up}){
+  const[refs,setRefs]=useState(claim.referrals||[]);
+  const[nr,setNr]=useState({specialty:'',name:'',clinic:'',email:'',priority:'Routine (within 4 weeks)'});
+  const SPECS=['Orthopaedic Surgeon','Pain Specialist / Anaesthetist','Neurologist','Rheumatologist','Psychiatrist','Rehabilitation Physician','Physiotherapist','Osteopath','Chiropractor','Podiatrist','Exercise Physiologist ⚠️ GP referral required','Occupational Therapist ⚠️ GP referral required','Psychologist','Hand Therapist','Other Specialist'];
+  const addRef=()=>{
+    if(!nr.specialty)return;
+    const gpReq=nr.specialty.includes('GP referral required');
+    const u=[...refs,{...nr,id:'ref_'+Date.now(),gpRefRequired:gpReq}];
+    setRefs(u);up('referrals',u);setNr({specialty:'',name:'',clinic:'',email:'',priority:'Routine (within 4 weeks)'});
+  };
+  const remRef=(id)=>{const u=refs.filter(r=>r.id!==id);setRefs(u);up('referrals',u);};
+  return(
+    <div>
+      <div style={{fontWeight:800,fontSize:'1.1rem',marginBottom:4}}>📝 Treatment Plan</div>
+      <div style={{fontSize:'0.82rem',color:'#5B7A99',marginBottom:20}}>Document treatment goals, referrals and management approach.</div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Specialist & Allied Health Referrals</div>
+        <div style={css.g2}>
+          <Sel label='Specialty / profession' value={nr.specialty} onChange={v=>setNr({...nr,specialty:v})} options={SPECS}/>
+          <Sel label='Priority' value={nr.priority} onChange={v=>setNr({...nr,priority:v})} options={['Routine (within 4 weeks)','Soon (within 2 weeks)','Urgent (within 48 hours)','Emergency']}/>
+          <Inp label='Practitioner name' value={nr.name} onChange={v=>setNr({...nr,name:v})} placeholder='Dr. John Smith'/>
+          <Inp label='Clinic name' value={nr.clinic} onChange={v=>setNr({...nr,clinic:v})} placeholder='Melbourne Orthopaedics'/>
+          <Inp label='Email address' value={nr.email} onChange={v=>setNr({...nr,email:v})} type='email' placeholder='dr.smith@clinic.com'/>
+        </div>
+        <button style={css.btnP} onClick={addRef}>+ Add referral</button>
+        {refs.length>0&&<div style={{marginTop:14}}>{refs.map(r=><div key={r.id} style={{...css.cardSm,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><div style={{fontWeight:600,fontSize:'0.87rem'}}>{r.specialty.replace(' ⚠️ GP referral required','')}</div>{r.name&&<div style={{fontSize:'0.76rem',color:'#5B7A99',marginTop:2}}>{r.name}{r.clinic?' · '+r.clinic:''}</div>}<div style={{display:'flex',gap:6,marginTop:5}}><span style={{...css.pill,...css.pillM,fontSize:'0.68rem',padding:'2px 7px'}}>{r.priority}</span>{r.gpRefRequired&&<span style={{...css.pill,...css.pillA,fontSize:'0.68rem',padding:'2px 7px'}}>⚠️ GP referral required</span>}</div></div><button style={css.btnD} onClick={()=>remRef(r.id)}>Remove</button></div>)}</div>}
+      </div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Goals & management</div>
+        <Ta label='Short-term goals (0–4 weeks)' value={claim.goalsShort} onChange={v=>up('goalsShort',v)} placeholder='e.g. Pain reduction to ≤4/10, restore 50% ROM...'/>
+        <Ta label='Long-term goals (4+ weeks)' value={claim.goalsLong} onChange={v=>up('goalsLong',v)} placeholder='e.g. Return to full duties, independent self-management...'/>
+        <Ta label='Treatment plan' value={claim.treatmentPlan} onChange={v=>up('treatmentPlan',v)} placeholder='Management approach...' rows={4}/>
+        <Ta label='Barriers to recovery' value={claim.barriers} onChange={v=>up('barriers',v)} placeholder='Barriers and proposed solutions...'/>
+      </div>
+      <Collapsible title='Investigations' icon='🔬'>
+        <Sel label='Referral for radiological imaging' value={claim.imagingReferral} onChange={v=>up('imagingReferral',v)} options={['MRI','CT Scan','X-Ray','Ultrasound','Bone Scan','DEXA Scan','PET Scan']}/>
+        <Ta label='Imaging clinical indication' value={claim.imagingIndication} onChange={v=>up('imagingIndication',v)} placeholder='Clinical reason for imaging request...'/>
+        <Ta label='Other investigations' value={claim.otherInvestigations} onChange={v=>up('otherInvestigations',v)} placeholder='Blood tests, nerve conduction studies...'/>
+      </Collapsible>
+      <MedicationSection claim={claim} up={up}/>
+    </div>
+  );
+}
+
+function Tab5({claim,up}){
+  const[meds,setMeds]=useState(claim.medications||[]);
+  const[nm,setNm]=useState({name:'',dosage:'',frequency:'',duration:'',review:''});
+  const add=()=>{if(!nm.name)return;const u=[...meds,{...nm,id:'med_'+Date.now()}];setMeds(u);up('medications',u);setNm({name:'',dosage:'',frequency:'',duration:'',review:''});};
+  const rem=(id)=>{const u=meds.filter(m=>m.id!==id);setMeds(u);up('medications',u);};
+  return(
+    <div>
+      <div style={{fontWeight:800,fontSize:'1.1rem',marginBottom:4}}>💊 Medication</div>
+      <div style={{fontSize:'0.82rem',color:'#5B7A99',marginBottom:20}}>Document medication recommendations for the treatment plan.</div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Add medication</div>
+        <div style={css.g2}>
+          <Inp label='Medication name' value={nm.name} onChange={v=>setNm({...nm,name:v})} placeholder='e.g. Ibuprofen, Amitriptyline'/>
+          <Inp label='Dosage' value={nm.dosage} onChange={v=>setNm({...nm,dosage:v})} placeholder='e.g. 400mg'/>
+          <Inp label='Frequency' value={nm.frequency} onChange={v=>setNm({...nm,frequency:v})} placeholder='e.g. TDS, BD, PRN, daily'/>
+          <Inp label='Duration' value={nm.duration} onChange={v=>setNm({...nm,duration:v})} placeholder='e.g. 2 weeks, 1 month'/>
+        </div>
+        <Inp label='Review notes' value={nm.review} onChange={v=>setNm({...nm,review:v})} placeholder='e.g. Review at 1 month, cease if symptom-free'/>
+        <button style={css.btnP} onClick={add}>+ Add medication</button>
+      </div>
+      {meds.length>0&&<div style={css.card}><div style={{fontWeight:700,marginBottom:14}}>Current medications</div>{meds.map(m=><div key={m.id} style={{...css.cardSm,marginBottom:10,display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><div style={{fontWeight:600,fontSize:'0.9rem'}}>{m.name}</div><div style={{fontSize:'0.8rem',color:'#5B7A99',marginTop:3}}>{m.dosage} · {m.frequency} · {m.duration}</div>{m.review&&<div style={{fontSize:'0.76rem',color:'#5B7A99',marginTop:2}}>Review: {m.review}</div>}</div><button style={css.btnD} onClick={()=>rem(m.id)}>Remove</button></div>)}</div>}
+    </div>
+  );
+}
+
+function Tab6({claim,up}){
+  const cnt=claim.cocCount||1;
+  return(
+    <div>
+      <div style={{fontWeight:800,fontSize:'1.1rem',marginBottom:4}}>📜 Certificate of Capacity</div>
+      <div style={{fontSize:'0.82rem',color:'#5B7A99',marginBottom:20}}>WorkSafe Victoria COC — auto-filled from diagnosis and capacity assessment.</div>
+      <div style={css.ok}>✅ Capacity limitations imported from Diagnosis screen. Review and adjust below.</div>
+      <div style={css.card}>
+        <div style={{...css.fb,marginBottom:14}}><div style={{fontWeight:700}}>Certificate details</div><div style={{...css.pill,...css.pillT,cursor:'default'}}>Certificate #{cnt}</div></div>
+        <div style={css.g2}>
+          <div>
+            <label style={css.label}>Certificate type</label>
+            <div style={{display:'flex',gap:8,marginBottom:16}}>{['First','Subsequent'].map(t=><button key={t} onClick={()=>up('cocType',t)} style={{...css.pill,...(claim.cocType===t||(!claim.cocType&&t==='First')?css.pillT:css.pillM),fontSize:'0.85rem',padding:'10px 20px'}}>{t}</button>)}</div>
+            <div style={{fontSize:'0.76rem',color:'#5B7A99',marginTop:-10,marginBottom:14}}>{(!claim.cocType||claim.cocType==='First')?'First certificate: typically 14 days':'Subsequent: typically 28 days'}</div>
+          </div>
+          <div>
+            <label style={css.label}>Certificate number</label>
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
+              <button style={{...css.btnS,padding:'8px 14px'}} onClick={()=>up('cocCount',Math.max(1,(claim.cocCount||1)-1))}>−</button>
+              <span style={{fontFamily:'monospace',fontSize:'1.2rem',fontWeight:700,color:'#00C9A7',minWidth:28,textAlign:'center'}}>{cnt}</span>
+              <button style={{...css.btnS,padding:'8px 14px'}} onClick={()=>up('cocCount',(claim.cocCount||1)+1)}>+</button>
+            </div>
+          </div>
+        </div>
+        <div style={css.g2}>
+          <Inp label='Valid from' value={claim.cocFrom} onChange={v=>up('cocFrom',v)} type='date' required/>
+          <Inp label='Valid to' value={claim.cocTo} onChange={v=>up('cocTo',v)} type='date' required/>
+        </div>
+      </div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Fitness for work</div>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>{['Fit for normal duties','Fit with restrictions','Unfit for all work'].map(o=><button key={o} onClick={()=>up('fitnessForWork',o)} style={{...css.pill,...(claim.fitnessForWork===o?css.pillT:css.pillM),fontSize:'0.87rem',padding:'11px 18px'}}>{o==='Fit for normal duties'&&'✅ '}{o==='Fit with restrictions'&&'⚠️ '}{o==='Unfit for all work'&&'🔴 '}{o}</button>)}</div>
+        {claim.fitnessForWork==='Fit with restrictions'&&<div style={{marginTop:14}}><Ta label='Restrictions detail' value={claim.fitnessRestrictions} onChange={v=>up('fitnessRestrictions',v)} placeholder='Detail specific restrictions...'/></div>}
+      </div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:6}}>Physical capacity summary</div>
+        <div style={{fontSize:'0.8rem',color:'#5B7A99',marginBottom:12}}>Auto-populated from Diagnosis screen</div>
+        {PHYSICAL_FUNCTIONS.map(f=>{const c=(claim.capacity||{})[f.id];if(!c)return null;return<div key={f.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,0.05)'}}><span style={{fontSize:'0.87rem'}}>{f.label}</span><span style={{...css.pill,...(c==='Can'?css.pillT:c==='Modified'?css.pillA:css.pillR),fontSize:'0.73rem',padding:'3px 10px',cursor:'default'}}>{c}</span></div>;})}
+        {!Object.values(claim.capacity||{}).some(v=>v)&&<div style={{color:'#5B7A99',fontSize:'0.84rem'}}>No capacity assessments yet. Complete the Diagnosis screen first.</div>}
+      </div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:6}}>Mental function</div>
+        <div style={{...css.pill,...(claim.mentalStatus==='Not affected'?css.pillT:css.pillA),marginBottom:claim.mentalStatus==='Affected'?14:0,cursor:'default'}}>{claim.mentalStatus||'Not assessed'}</div>
+        {claim.mentalStatus==='Affected'&&MENTAL_FUNCTIONS.map(f=>{const s=(claim.mentalSeverity||{})[f.id];if(!s)return null;return<div key={f.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,0.05)'}}><span style={{fontSize:'0.87rem'}}>{f.label}</span><span style={{...css.pill,...css.pillA,fontSize:'0.73rem',padding:'3px 10px',cursor:'default'}}>{s}</span></div>;})}
+        <div style={{marginTop:14}}>
+          <Ta label='Additional COC notes' value={claim.cocNotes} onChange={v=>up('cocNotes',v)} placeholder='Additional notes for the Certificate of Capacity...'/>
+          <Ta label='Other considerations' value={claim.otherConsiderations} onChange={v=>up('otherConsiderations',v)} placeholder='Medications affecting work capacity, specific workplace considerations...'/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Tab7({claim,up}){
+  const[sel,setSel]=useState(claim.alliedForm||'');
+  const FORMS=[{id:'ahrmp',label:'Allied Health Recovery Management Plan (AHRMP)'},{id:'household',label:'Household Help Request'},{id:'gym_swim',label:'Gym / Swim Membership Request'},{id:'ps604',label:'PS604 — Psychology Treatment Planning Form'},{id:'ps109',label:'PS109 — Psychology Treatment Review Form'}];
+  return(
+    <div>
+      <div style={{fontWeight:800,fontSize:'1.1rem',marginBottom:4}}>📄 Allied Health Forms</div>
+      <div style={{fontSize:'0.82rem',color:'#5B7A99',marginBottom:20}}>WorkSafe forms auto-populate from previous screens.</div>
+      <div style={css.card}>
+        <label style={css.label}>Select form</label>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>{FORMS.map(f=><button key={f.id} onClick={()=>{setSel(f.id);up('alliedForm',f.id);}} style={{...css.cardSm,textAlign:'left',border:'1px solid '+(sel===f.id?'rgba(0,201,167,0.35)':'rgba(255,255,255,0.07)'),background:sel===f.id?'rgba(0,201,167,0.08)':'rgba(255,255,255,0.03)',cursor:'pointer',color:'#EFF6FF',fontWeight:sel===f.id?600:400,transition:'all 0.15s'}}>{f.label}</button>)}</div>
+      </div>
+      {sel==='ahrmp'&&<div style={css.card}><div style={{fontWeight:700,marginBottom:14}}>Allied Health Recovery Management Plan</div><div style={css.ok}>✅ Patient, diagnosis and capacity details pre-populated</div><Ta label='Treatment goals' value={claim.ahrmGoals} onChange={v=>up('ahrmGoals',v)} placeholder='Specific goals for this referral...'/><div style={css.g2}><Inp label='Treatment type' value={claim.ahrmTreatment} onChange={v=>up('ahrmTreatment',v)} placeholder='e.g. Physiotherapy'/><Inp label='Frequency' value={claim.ahrmFrequency} onChange={v=>up('ahrmFrequency',v)} placeholder='e.g. 2x per week'/></div><div style={css.g2}><Inp label='Duration' value={claim.ahrmDuration} onChange={v=>up('ahrmDuration',v)} placeholder='e.g. 6 weeks'/><Inp label='Sessions requested' value={claim.ahrmSessions} onChange={v=>up('ahrmSessions',v)} placeholder='e.g. 12'/></div><Ta label='Expected outcomes' value={claim.ahrmOutcomes} onChange={v=>up('ahrmOutcomes',v)} placeholder='Expected functional improvements...'/><Ta label='Clinical justification' value={claim.ahrmJustification} onChange={v=>up('ahrmJustification',v)} placeholder='Clinical reasoning...' rows={4}/></div>}
+      {sel==='household'&&<div style={css.card}><div style={{fontWeight:700,marginBottom:14}}>Household Help Request</div><div style={css.ok}>✅ Capacity limitations auto-populated from diagnosis screen</div><Ta label='Tasks patient cannot perform' value={claim.hhTasks} onChange={v=>up('hhTasks',v)} placeholder='e.g. Vacuuming, mopping, laundry, grocery shopping...'/><div style={css.g2}><Inp label='Frequency required' value={claim.hhFrequency} onChange={v=>up('hhFrequency',v)} placeholder='e.g. 2x per week'/><Inp label='Duration requested' value={claim.hhDuration} onChange={v=>up('hhDuration',v)} placeholder='e.g. 4 weeks'/></div><Ta label='Clinical justification' value={claim.hhJustification} onChange={v=>up('hhJustification',v)} placeholder='Clinical reasoning...' rows={4}/></div>}
+      {sel==='gym_swim'&&<div style={css.card}><div style={{fontWeight:700,marginBottom:14}}>Gym / Swim Membership Request</div><Sel label='Type' value={claim.gymType} onChange={v=>up('gymType',v)} options={['Gym membership','Hydrotherapy / pool access','Gym + hydrotherapy combined']}/><Ta label='Clinical justification' value={claim.gymJustification} onChange={v=>up('gymJustification',v)} placeholder='Why gym/swim is appropriate...'/><Ta label='Recommended program' value={claim.gymProgram} onChange={v=>up('gymProgram',v)} placeholder='e.g. Supervised gym program, aquatic physio...'/><Inp label='Duration requested' value={claim.gymDuration} onChange={v=>up('gymDuration',v)} placeholder='e.g. 3 months'/><Ta label='Expected outcomes' value={claim.gymOutcomes} onChange={v=>up('gymOutcomes',v)} placeholder='Expected improvements...'/></div>}
+      {sel==='ps604'&&<div style={css.card}><div style={{fontWeight:700,marginBottom:4}}>PS604 — Psychology Treatment Planning Form</div><div style={{fontSize:'0.76rem',color:'#5B7A99',marginBottom:14}}>Item code PS604 · Fee $203.91 excl. GST · Complete early in treatment</div><Ta label='Psychological diagnosis (DSM-5)' value={claim.ps604Diagnosis} onChange={v=>up('ps604Diagnosis',v)} placeholder='e.g. Adjustment Disorder with Mixed Anxiety and Depressed Mood (309.28)'/><Ta label='Relationship to compensable injury' value={claim.ps604Relationship} onChange={v=>up('ps604Relationship',v)} placeholder='How does the condition relate to the injury...'/><Ta label='Current symptoms' value={claim.ps604Symptoms} onChange={v=>up('ps604Symptoms',v)} placeholder='Current presenting symptoms...' rows={4}/><Ta label='Impact on daily functioning' value={claim.ps604Impact} onChange={v=>up('ps604Impact',v)} placeholder='Impact on work, social, domestic activities...'/><Ta label='Treatment goals' value={claim.ps604Goals} onChange={v=>up('ps604Goals',v)} placeholder='Specific treatment goals...'/><div style={css.g2}><Inp label='Anticipated sessions (3–6 months)' value={claim.ps604Sessions} onChange={v=>up('ps604Sessions',v)} placeholder='e.g. 12–16 sessions'/><Inp label='Frequency' value={claim.ps604Frequency} onChange={v=>up('ps604Frequency',v)} placeholder='e.g. Weekly'/></div><Ta label='Treatment modality & rationale' value={claim.ps604Modality} onChange={v=>up('ps604Modality',v)} placeholder='e.g. CBT, ACT and clinical rationale...'/></div>}
+      {sel==='ps109'&&<div style={css.card}><div style={{fontWeight:700,marginBottom:4}}>PS109 — Psychology Treatment Review Form</div><div style={{fontSize:'0.76rem',color:'#5B7A99',marginBottom:14}}>Item code PS109 · Fee $203.91 excl. GST · Complete within first 9 months</div><div style={css.ok}>✅ References PS604 treatment planning data where available</div><Ta label='Treatment progress to date' value={claim.ps109Progress} onChange={v=>up('ps109Progress',v)} placeholder='Progress against PS604 goals...'/><Ta label='Outcome measure results' value={claim.ps109Outcomes} onChange={v=>up('ps109Outcomes',v)} placeholder='DASS-21 scores and comparison to baseline...'/><Ta label='Ongoing barriers' value={claim.ps109Barriers} onChange={v=>up('ps109Barriers',v)} placeholder='Remaining barriers to recovery...'/><Ta label='Revised treatment plan' value={claim.ps109Plan} onChange={v=>up('ps109Plan',v)} placeholder='Updated goals if different from PS604...'/><div style={css.g2}><Inp label='Additional sessions requested' value={claim.ps109Sessions} onChange={v=>up('ps109Sessions',v)} placeholder='e.g. 8 further sessions'/><Inp label='Anticipated end date' value={claim.ps109EndDate} onChange={v=>up('ps109EndDate',v)} type='date'/></div></div>}
+    </div>
+  );
+}
+
+function Tab8({claim,up}){
+  return(
+    <div>
+      <div style={{fontWeight:800,fontSize:'1.1rem',marginBottom:4}}>🔄 RTW & Rehabilitation Plan</div>
+      <div style={{fontSize:'0.82rem',color:'#5B7A99',marginBottom:20}}>Return to work planning. Complete after all clinical assessments above.</div>
+      <div style={css.warn}>📖 RTW timeframes are research-based guidelines for your consideration — clinical judgement applies to each individual patient.</div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>RTW assessment</div>
+        <div style={css.g2}>
+          <Inp label='Estimated RTW — normal duties' value={claim.rtwNormalDate} onChange={v=>up('rtwNormalDate',v)} type='date'/>
+          <Inp label='Estimated RTW — modified duties' value={claim.rtwModifiedDate} onChange={v=>up('rtwModifiedDate',v)} type='date'/>
+        </div>
+        <Ta label='RTW plan / graded return' value={claim.rtwPlan} onChange={v=>up('rtwPlan',v)} placeholder='Graduated return to work approach...' rows={4}/>
+        <Ta label='Modified duties recommendations' value={claim.modifiedDuties} onChange={v=>up('modifiedDuties',v)} placeholder='Specific modified duties available...'/>
+      </div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Suggested treatment & recovery plan</div>
+        <Ta label='Phase 1 — Acute (Week 1–4)' value={claim.rehabPhase1} onChange={v=>up('rehabPhase1',v)} placeholder='Goals and interventions...'/>
+        <Ta label='Phase 2 — Rehabilitation (Week 4–12)' value={claim.rehabPhase2} onChange={v=>up('rehabPhase2',v)} placeholder='Goals and interventions...'/>
+        <Ta label='Phase 3 — Return to work (Week 12+)' value={claim.rehabPhase3} onChange={v=>up('rehabPhase3',v)} placeholder='Goals and work reintegration...'/>
+        {/* TOOCS code removed — will be reviewed for NSW expansion */}
+      </div>
+    </div>
+  );
+}
+
+function Tab9({claim,up,clinic,practitioners}){
+  const[tmpl,setTmpl]=useState('');
+  const[letter,setLetter]=useState('');
+  const[gen,setGen]=useState(false);
+  const TMPLS=[{id:'specialist_opinion',label:'Specialist referral — Opinion'},{id:'specialist_ongoing',label:'Specialist referral — Ongoing management'},{id:'allied_health',label:'Allied health referral'},{id:'psychology',label:'Psychology referral'},{id:'gym_swim',label:'Gym / Swim referral'},{id:'radiology',label:'Radiological imaging referral'},{id:'household',label:'Household / ADL assessment'},{id:'travel',label:'Travel & accommodation request'},{id:'procedure',label:'Procedure / Surgery request'}];
+  const refs=claim.referrals||[];
+  const prac=practitioners.find(p=>p.id===claim.practitionerId);
+  const diags=(claim.diagnoses||[]).map(d=>d.label).join(', ')||'Not specified';
+  const firstRef=refs[0]||{};
+  const genLetter=async()=>{
+    if(!tmpl)return;setGen(true);
+    const t=TMPLS.find(x=>x.id===tmpl);
+    try{
+      const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:`Generate a professional ${claim.scheme||'WorkCover'} referral letter for: "${t.label}".
+Patient: ${claim.patientName||'[Patient]'}, DOB: ${claim.dob||'[DOB]'}, Claim: ${claim.claimNumber||'[Claim No]'}, Injury date: ${claim.dateOfInjury||'[Date]'}
+Diagnosis: ${diags}
+Referring: ${prac?.name||'[Practitioner]'}, ${prac?.profession||''}, Provider: ${prac?.providerNo||'[No]'}, Clinic: ${clinic.name}
+Referred to: ${firstRef.name||'[Colleague]'}, ${firstRef.specialty||''}, Priority: ${firstRef.priority||'Routine'}
+Fitness for work: ${claim.fitnessForWork||'Not assessed'}
+Treatment: ${claim.treatmentPlan||'As per clinical assessment'}
+Start with "Dear ${firstRef.name||'Colleague'}," and include: thank you for accepting, patient details, reason for referral, clinical summary, specific request. Close professionally. Australian medical letter format. Include causation/clinical reasoning section. Sign with practitioner details.`}]})});
+      const d=await r.json();setLetter(d.content?.[0]?.text||'Error generating letter');
+    }catch{setLetter('Unable to generate letter. Please try again.');}
+    setGen(false);
+  };
+  return(
+    <div>
+      <div style={{fontWeight:800,fontSize:'1.1rem',marginBottom:4}}>📨 Referral & Export</div>
+      <div style={{fontSize:'0.82rem',color:'#5B7A99',marginBottom:20}}>Generate professional referral letters. Auto-populated from claim data.</div>
+      {refs.length>0&&<div style={css.card}><div style={{fontWeight:700,marginBottom:12}}>Referrals from treatment plan</div>{refs.map(r=><div key={r.id} style={{...css.cardSm,marginBottom:8}}><div style={{fontWeight:600,fontSize:'0.87rem'}}>{r.specialty.replace(' ⚠️ GP referral required','')}</div>{r.name&&<div style={{fontSize:'0.76rem',color:'#5B7A99',marginTop:2}}>{r.name}{r.clinic?' · '+r.clinic:''}{r.email?' · '+r.email:''}</div>}</div>)}</div>}
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Generate referral letter</div>
+        <Sel label='Select letter template' value={tmpl} onChange={setTmpl} options={TMPLS.map(t=>({value:t.id,label:t.label}))}/>
+        <button style={css.btnP} onClick={genLetter} disabled={gen||!tmpl}>{gen?'⚡ Generating…':'⚡ Generate letter'}</button>
+        {letter&&<div style={{marginTop:20}}>
+          <div style={{...css.fb,marginBottom:10}}><div style={{fontWeight:600,fontSize:'0.87rem'}}>Generated letter</div><button style={css.btnS} onClick={()=>{navigator.clipboard.writeText(letter);alert('Copied!');}}>📋 Copy</button></div>
+          <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:10,padding:'20px',fontFamily:'Georgia,serif',fontSize:'0.9rem',lineHeight:1.8,whiteSpace:'pre-wrap',color:'rgba(239,246,255,0.9)',maxHeight:480,overflow:'auto'}}>{letter}</div>
+          <div style={{marginTop:12,display:'flex',gap:8,flexWrap:'wrap'}}>
+            <button style={{...css.btnP,fontSize:'0.83rem',padding:'9px 16px'}}>📧 Send to practitioner</button>
+            <button style={{...css.btnS,fontSize:'0.83rem',padding:'9px 16px'}}>📧 Send to insurer</button>
+            <button style={{...css.btnS,fontSize:'0.83rem',padding:'9px 16px'}}>📧 CC patient</button>
+          </div>
+        </div>}
+      </div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:10}}>Travel & accommodation</div>
+        <div style={css.warn}>⚠️ If patient cannot travel to approved consultations due to their compensable injury, state clinical reasoning below.</div>
+        <Ta label='Clinical reasoning for funded travel' value={claim.travelReasoning} onChange={v=>up('travelReasoning',v)} placeholder='e.g. Patient unable to travel by private vehicle due to cervical injury preventing safe head rotation...'/>
+      </div>
+      <div style={css.card}>
+        <div style={{fontWeight:700,marginBottom:14}}>Claim summary</div>
+        {[['Patient',claim.patientName],['Claim number',claim.claimNumber],['Scheme',claim.scheme],['Insurer',claim.insurerName||claim.insurerNameCustom],['Diagnosis',diags],['Fitness for work',claim.fitnessForWork],['COC valid',claim.cocFrom?(claim.cocFrom+' → '+claim.cocTo):'—'],['Practitioner',claim.practitionerName]].map(([l,v])=><div key={l} style={{fontSize:'0.85rem',lineHeight:2}}><span style={{color:'#5B7A99'}}>{l}:</span> {v||'—'}</div>)}
+      </div>
+    </div>
+  );
+}
+
 function App(){
-  const [clinic,setClinic]=useState(null);
-  const [claims,setClaims]=useState([]);
-  const [activeClaim,setActiveClaim]=useState(null);
-  const [view,setView]=useState("dashboard"); // dashboard | claim
-
-  // Load session on mount
-  useEffect(()=>{
-    sget("session:current").then(s=>{ if(s){ setClinic(s.clinic); loadClinicClaims(s.clinic.id); } });
-  },[]);
-
-  const loadClinicClaims=async(clinicId)=>{
-    const saved=await sget(`claims:${clinicId}`)||[];
-    setClaims(saved);
-  };
-
-  const handleLogin=async(clinicObj)=>{
-    setClinic(clinicObj);
-    await sset("session:current",{clinic:clinicObj,loggedInAt:new Date().toISOString()});
-    await loadClinicClaims(clinicObj.id);
-    setView("dashboard");
-  };
-
-  const handleLogout=async()=>{
-    await sdel("session:current");
-    setClinic(null); setClaims([]); setActiveClaim(null); setView("dashboard");
-  };
-
-  const handleSaveClaim=async(claimObj)=>{
-    const updated=claims.find(c=>c.id===claimObj.id)?claims.map(c=>c.id===claimObj.id?claimObj:c):[...claims,claimObj];
-    setClaims(updated);
-    await sset(`claims:${clinic.id}`,updated);
-    setActiveClaim(claimObj);
-  };
-
-  const handleNewClaim=()=>{ setActiveClaim(null); setView("claim"); };
-  const handleOpenClaim=(claim)=>{ setActiveClaim(claim); setView("claim"); };
-  const handleBack=()=>{ setView("dashboard"); loadClinicClaims(clinic.id); };
-
-  if(!clinic) return <LoginScreen onLogin={handleLogin}/>;
-  const colors=SCHEME_COLORS[clinic.scheme]||SCHEME_COLORS.WorkCover;
-
-  if(view==="claim") return <ClaimForm clinic={clinic} claimData={activeClaim} onSave={handleSaveClaim} onBack={handleBack} colors={colors}/>;
-  return <ClinicDashboard clinic={clinic} claims={claims} onNewClaim={handleNewClaim} onOpenClaim={handleOpenClaim} onLogout={handleLogout} colors={colors}/>;
+  const[clinic,setClinic]=useState(null);
+  const[claims,setClaims]=useState([]);
+  const[nav,setNav]=useState('dashboard');
+  const[activeClaim,setActiveClaim]=useState(null);
+  const[collapsed,setCollapsed]=useState(false);
+  useEffect(()=>{sget('session9:current').then(s=>{if(s){setClinic(s.clinic);loadClaims(s.clinic.id);}});},[]);
+  const loadClaims=async(cid)=>{const s=await sget('claims9:'+cid)||[];setClaims(s);};
+  const handleLogin=async(c)=>{setClinic(c);await sset('session9:current',{clinic:c,loggedInAt:new Date().toISOString()});await loadClaims(c.id);setNav('dashboard');};
+  const handleLogout=async()=>{await sdel('session9:current');setClinic(null);setClaims([]);setActiveClaim(null);setNav('dashboard');};
+  const handleSave=async(claim)=>{const up=claims.find(c=>c.id===claim.id)?claims.map(c=>c.id===claim.id?claim:c):[...claims,claim];setClaims(up);await sset('claims9:'+clinic.id,up);setActiveClaim(claim);};
+  const handleNav=(n)=>{if(n==='new_claim'){setActiveClaim(null);setNav('claim');}else{setNav(n);}};
+  const handleOpen=(c)=>{setActiveClaim(c);setNav('claim');};
+  const handleBack=()=>{setNav('dashboard');loadClaims(clinic.id);};
+  if(!clinic)return <LoginScreen onLogin={handleLogin}/>;
+  return(
+    <div style={css.appShell}>
+      <Sidebar nav={nav==='claim'?'claims':nav} onNav={handleNav} clinic={clinic} onLogout={handleLogout} collapsed={collapsed} onToggle={()=>setCollapsed(!collapsed)}/>
+      <div style={css.mainContent}>
+        <TopBar clinic={clinic} nav={nav} claim={activeClaim}/>
+        {nav==='dashboard'&&<Dashboard clinic={clinic} claims={claims} onNew={()=>{setActiveClaim(null);setNav('claim');}} onOpen={handleOpen}/>}
+        {nav==='claims'&&<ClaimsPage claims={claims} onOpen={handleOpen} onNew={()=>{setActiveClaim(null);setNav('claim');}}/>}
+        {nav==='claim'&&<ClaimForm clinic={clinic} claimData={activeClaim} onSave={handleSave} onBack={handleBack}/>}
+        {nav==='practitioners'&&<PractitionersPage clinic={clinic}/>}
+        {nav==='settings'&&<div style={css.page}><div style={{fontWeight:800,fontSize:'1.2rem',marginBottom:20}}>⚙️ Settings</div><div style={css.card}><div style={{fontWeight:700,marginBottom:12}}>Clinic details</div>{[['Name',clinic.name],['Plan',clinic.plan],['ABN',clinic.abn]].map(([l,v])=><div key={l} style={{fontSize:'0.88rem',lineHeight:2}}><span style={{color:'#5B7A99'}}>{l}:</span> {v}</div>)}</div></div>}
+        {nav==='help'&&<div style={css.page}><div style={{fontWeight:800,fontSize:'1.2rem',marginBottom:20}}>❓ Help & Support</div><div style={css.card}><div style={{fontWeight:700,marginBottom:14}}>Quick guide</div>{[['1','Select scheme first','Always choose WorkCover or TAC at the top of Patient & Claim — this drives everything.'],['2','Add practitioners','Go to Practitioners in the sidebar to add staff and provider numbers.'],['3','Work through each tab','Complete tabs in order. Use Next at the bottom.'],['4','Save often','Use Save draft to preserve progress. Save claim when complete.'],['5','Generate referral letters','On the Referral & Export tab, select a template and click Generate.']].map(([n,t,d])=><div key={n} style={{display:'flex',gap:14,marginBottom:16}}><div style={{width:28,height:28,borderRadius:'50%',background:'rgba(0,201,167,0.15)',border:'1px solid rgba(0,201,167,0.3)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'monospace',fontWeight:700,color:'#00C9A7',fontSize:'0.84rem',flexShrink:0}}>{n}</div><div><div style={{fontWeight:600,fontSize:'0.9rem',marginBottom:3}}>{t}</div><div style={{fontSize:'0.82rem',color:'#5B7A99',lineHeight:1.5}}>{d}</div></div></div>)}</div></div>}
+        {nav==='invoicing'&&<div style={css.page}><div style={{fontWeight:800,fontSize:'1.2rem',marginBottom:20}}>🧾 Invoicing</div><div style={{...css.card,textAlign:'center',padding:'40px'}}><div style={{fontSize:'2.5rem',marginBottom:12}}>🧾</div><div style={{fontWeight:600,marginBottom:8}}>Coming soon</div><div style={{fontSize:'0.84rem',color:'#5B7A99'}}>Invoice generation with WorkSafe and TAC item codes will be available in the next update.</div></div></div>}
+      </div>
+    </div>
+  );
 }
 
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
+
 </body>
 </html>
