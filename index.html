@@ -875,6 +875,13 @@ function Tab1({claim,up,practitioners}){
   );
 }
 
+const PSYCH_FLAGS=[
+  {key:'yellow',label:'Yellow Flags',color:'#F59E0B',desc:'Individual psychological & attitudinal barriers',items:['Pain catastrophising','Fear-avoidance beliefs','Low self-efficacy','High pain anxiety','Passive coping','History of depression/anxiety','Sleep disturbance','Unhelpful beliefs about injury']},
+  {key:'blue',label:'Blue Flags',color:'#3B82F6',desc:'Work-related perceptions & occupational factors',items:['Poor relationship with employer','Low job satisfaction','High physical job demands','Belief that work caused injury','Lack of modified duties','No RTW coordinator']},
+  {key:'black',label:'Black Flags',color:'#9CA3AF',desc:'Systemic / contextual barriers',items:['Medicolegal proceedings active','Claim processing delays','Financial hardship','Cultural / language barriers','Housing instability','Previous claim history']},
+  {key:'orange',label:'Orange Flags',color:'#F97316',desc:'Psychiatric conditions requiring specialist input',items:['Major depressive disorder','PTSD (active)','Substance use disorder','Active suicidal ideation']},
+];
+
 function Tab2({claim,up}){
   const[q,setQ]=useState('');
   const[show,setShow]=useState(false);
@@ -946,7 +953,7 @@ function Tab2({claim,up}){
       </div>
       <Collapsible title='Psychosocial flags' icon='🚩'>
         <div style={{fontSize:'0.83rem',color:'#5B7A99',marginBottom:14}}>Identify barriers to recovery that inform the RTW plan.</div>
-        {[['yellow','Yellow Flags','#F59E0B','Individual psychological barriers',['Pain catastrophising','Fear-avoidance beliefs','Low self-efficacy','High pain anxiety','Passive coping','History of depression/anxiety','Sleep disturbance','Unhelpful beliefs about injury']],['blue','Blue Flags','#3B82F6','Work-related perceptions',['Poor relationship with employer','Low job satisfaction','High physical job demands','Belief that work caused injury','Lack of modified duties','No RTW coordinator']],['black','Black Flags','#9CA3AF','Systemic barriers',['Medicolegal proceedings active','Claim processing delays','Financial hardship','Cultural / language barriers','Housing instability','Previous claim history']],['orange','Orange Flags','#F97316','Psychiatric conditions',['Major depressive disorder','PTSD (active)','Substance use disorder','Active suicidal ideation']]].map(([key,label,color,desc,items])=>(
+        {PSYCH_FLAGS.map(({key,label,color,desc,items})=>(
           <div key={key} style={{marginBottom:18}}>
             <div style={{fontWeight:700,color,fontSize:'0.87rem',marginBottom:3}}>{label}</div>
             <div style={{fontSize:'0.76rem',color:'#5B7A99',marginBottom:9}}>{desc}</div>
