@@ -795,100 +795,118 @@ function Tab3({claim,up}){
 
 // ── TAB 4: TREATMENT PLAN ─────────────────────────────────────────────────────
 function Tab4({claim,up}){
-  const[refs,setRefs]=useState(claim.referrals||[]);
-  const[nr,setNr]=useState({specialty:"",name:"",clinic:"",email:"",priority:"Routine (within 4 weeks)"});
-  const addRef=()=>{
-    if(!nr.specialty)return;
-    const gpReq=nr.specialty.includes("GP referral required");
-    const u=[...refs,{...nr,id:"ref_"+Date.now(),gpRefRequired:gpReq}];
-    setRefs(u);up("referrals",u);
-    setNr({specialty:"",name:"",clinic:"",email:"",priority:"Routine (within 4 weeks)"});
-  };
-  const remRef=id=>{const u=refs.filter(r=>r.id!==id);setRefs(u);up("referrals",u);};
+  const[subTab,setSubTab]=useState(0);
+  const SUB=["Goals & Management","Referrals","Medication & Investigations"];
   const isPrescriber=PRESCRIBING.includes(claim.practitionerProfession);
+  const isAlliedHealth=!PRESCRIBING.includes(claim.practitionerProfession)&&claim.practitionerProfession!=="General Practitioner"&&claim.practitionerProfession!=="";
+  const subStyle=i=>({padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:subTab===i?"rgba(0,201,167,0.1)":"transparent",color:subTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:subTab===i?"2px solid #00C9A7":"none"});
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Treatment Plan"),
-    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Document treatment goals, referrals and management approach."),
-    div({key:"refs",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Specialist & Allied Health Referrals"),
-      div({key:"g",style:S.g2},[
-        e(Sel,{key:"sp",label:"Specialty / profession",value:nr.specialty,onChange:v=>setNr({...nr,specialty:v}),options:SPECIALTIES}),
-        e(Sel,{key:"pr",label:"Priority",value:nr.priority,onChange:v=>setNr({...nr,priority:v}),options:["Routine (within 4 weeks)","Soon (within 2 weeks)","Urgent (within 48 hours)","Emergency"]}),
-        e(Inp,{key:"n",label:"Practitioner name",value:nr.name,onChange:v=>setNr({...nr,name:v}),placeholder:"Dr. John Smith"}),
-        e(Inp,{key:"cl",label:"Clinic name",value:nr.clinic,onChange:v=>setNr({...nr,clinic:v}),placeholder:"Melbourne Orthopaedics"}),
-        e(Inp,{key:"em",label:"Email address",value:nr.email,onChange:v=>setNr({...nr,email:v}),type:"email",placeholder:"dr.smith@clinic.com"}),
-      ]),
-      btn({key:"add",style:S.btnP,onClick:addRef},"+ Add referral"),
-      refs.length>0&&div({key:"list",style:{marginTop:14}},
-        refs.map(r=>div({key:r.id,style:{...S.cardSm,marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}},[
-          div({key:"i"},[
-            div({key:"n",style:{fontWeight:600,fontSize:"0.87rem"}},r.specialty.replace(" (GP referral required)","")),
-            r.name&&div({key:"d",style:{fontSize:"0.76rem",color:"#5B7A99",marginTop:2}},r.name+(r.clinic?" - "+r.clinic:"")),
-            div({key:"tags",style:{display:"flex",gap:6,marginTop:5}},[
-              span({key:"p",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 7px"}},r.priority),
-              r.gpRefRequired&&span({key:"gp",style:{...S.pill,...S.pillA,fontSize:"0.68rem",padding:"2px 7px"}},"GP referral required"),
-            ]),
+    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Complete the sections relevant to this consultation."),
+    div({key:"subtabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:24}},
+      SUB.map((t,i)=>e("button",{key:t,onClick:()=>setSubTab(i),style:subStyle(i)},t))
+    ),
+
+    subTab===0&&div({key:"goals"},[
+      div({key:"card",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:14}},"Goals & management"),
+        isAlliedHealth?[
+          div({key:"note",style:{...S.warn,marginBottom:14}},"Activity/functional limitations and SMART goals (AHRMP format)"),
+          ...[1,2,3].map(n=>div({key:"row"+n,style:{display:"grid",gridTemplateColumns:"1fr 1fr 140px",gap:10,marginBottom:10}},[
+            e(Inp,{key:"lim",label:n===1?"Current limitation":"",value:(claim["ahGoalLim"+n]||""),onChange:v=>up("ahGoalLim"+n,v),placeholder:"e.g. Unable to walk 100m",mb:0}),
+            e(Inp,{key:"goal",label:n===1?"Related SMART goal":"",value:(claim["ahGoalTarget"+n]||""),onChange:v=>up("ahGoalTarget"+n,v),placeholder:"e.g. Walk 500m by discharge",mb:0}),
+            e(Inp,{key:"date",label:n===1?"Est. date":"",value:(claim["ahGoalDate"+n]||""),onChange:v=>up("ahGoalDate"+n,v),type:"date",mb:0}),
+          ])),
+          div({key:"tx-grid",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}},[
+            e(Inp,{key:"ns",label:"No. of treatments",value:claim.txNum,onChange:v=>up("txNum",v),placeholder:"e.g. 12",mb:0}),
+            e(Inp,{key:"wks",label:"Over (weeks)",value:claim.txWeeks,onChange:v=>up("txWeeks",v),placeholder:"e.g. 6",mb:0}),
+            e(Inp,{key:"disc",label:"Anticipated discharge",value:claim.txDischarge,onChange:v=>up("txDischarge",v),type:"date",mb:0}),
           ]),
-          btn({key:"r",style:S.btnD,onClick:()=>remRef(r.id)},"Remove"),
-        ]))
+          div({key:"dates",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}},[
+            e(Inp,{key:"from",label:"Treatment from",value:claim.txFrom,onChange:v=>up("txFrom",v),type:"date",mb:0}),
+            e(Inp,{key:"to",label:"Treatment to",value:claim.txTo,onChange:v=>up("txTo",v),type:"date",mb:0}),
+          ]),
+          e(Ta,{key:"tp",label:"Treatment methods / proposed treatment",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Describe treatment methods to be used...",rows:3}),
+          e(Ta,{key:"sm",label:"Self-management strategies",value:claim.selfManagement,onChange:v=>up("selfManagement",v),placeholder:"Strategies the worker will use to manage their condition..."}),
+        ]:[
+          e(Ta,{key:"sg",label:"Short-term goals (0-4 weeks)",value:claim.goalsShort,onChange:v=>up("goalsShort",v),placeholder:"e.g. Pain reduction, restore ROM..."}),
+          e(Ta,{key:"lg",label:"Long-term goals (4+ weeks)",value:claim.goalsLong,onChange:v=>up("goalsLong",v),placeholder:"e.g. Return to full duties..."}),
+          e(Ta,{key:"tp",label:"Treatment plan / management approach",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Management approach...",rows:4}),
+        ],
+        div({key:"barriers-section",style:{marginBottom:16}},[
+          e("label",{key:"l",style:S.label},"Barriers to recovery"),
+          (()=>{
+            const flags=claim.psychosocial||{};
+            const allFlags=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
+            return allFlags.length>0?div({key:"auto"},[
+              div({key:"note",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:8}},"Auto-populated from psychosocial flags in Diagnosis screen:"),
+              div({key:"pills",style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}},allFlags.map(f=>e("span",{key:f,style:{...S.pill,...S.pillA,cursor:"default",fontSize:"0.72rem"}},f))),
+            ]):null;
+          })(),
+          e("textarea",{key:"t",className:"cb-ta",style:{...S.ta,minHeight:72},value:claim.barriers||"",onChange:ev=>up("barriers",ev.target.value),placeholder:"Additional barriers not listed above..."}),
+        ]),
+        claim.practitionerProfession==="Podiatrist"&&e(Collapsible,{key:"pod",title:"Orthotics & Aids",icon:"👟",defaultOpen:true},
+          div({},[
+            e(Ta,{key:"ort",label:"Recommended orthotics / aids",value:claim.orthotics,onChange:v=>up("orthotics",v),placeholder:"e.g. Custom foot orthotics, ankle brace, walking aids..."}),
+            e(Ta,{key:"cli",label:"Clinical justification for orthotics",value:claim.orthJustification,onChange:v=>up("orthJustification",v),placeholder:"Clinical reasoning for recommended aids..."}),
+          ])
+        ),
+      ]),
+    ]),
+
+    subTab===1&&div({key:"refs"},[
+      div({key:"card",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:6}},"Specialist & Allied Health Referrals"),
+        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:14}},"Only complete this section if a referral is required for this consultation."),
+        div({key:"g",style:S.g2},[
+          e(Sel,{key:"sp",label:"Specialty / profession",value:(claim.newRef&&claim.newRef.specialty)||"",onChange:v=>up("newRef",{...(claim.newRef||{}),specialty:v}),options:SPECIALTIES}),
+          e(Sel,{key:"pr",label:"Priority",value:(claim.newRef&&claim.newRef.priority)||"Routine (within 4 weeks)",onChange:v=>up("newRef",{...(claim.newRef||{}),priority:v}),options:["Routine (within 4 weeks)","Soon (within 2 weeks)","Urgent (within 48 hours)","Emergency"]}),
+          e(Inp,{key:"n",label:"Practitioner name",value:(claim.newRef&&claim.newRef.name)||"",onChange:v=>up("newRef",{...(claim.newRef||{}),name:v}),placeholder:"Dr. John Smith"}),
+          e(Inp,{key:"cl",label:"Clinic name",value:(claim.newRef&&claim.newRef.clinic)||"",onChange:v=>up("newRef",{...(claim.newRef||{}),clinic:v}),placeholder:"Melbourne Orthopaedics"}),
+          e(Inp,{key:"em",label:"Email address",value:(claim.newRef&&claim.newRef.email)||"",onChange:v=>up("newRef",{...(claim.newRef||{}),email:v}),type:"email",placeholder:"dr.smith@clinic.com"}),
+        ]),
+        e(Ta,{key:"cr",label:"Clinical reasoning for referral",value:(claim.newRef&&claim.newRef.reasoning)||"",onChange:v=>up("newRef",{...(claim.newRef||{}),reasoning:v}),placeholder:"Why is this referral clinically necessary?"}),
+        e("button",{key:"add",style:S.btnP,onClick:()=>{
+          const nr=claim.newRef||{};
+          if(!nr.specialty)return;
+          const gpReq=nr.specialty.includes("GP referral required");
+          const updated=[...(claim.referrals||[]),{...nr,id:"ref_"+Date.now(),gpRefRequired:gpReq}];
+          up("referrals",updated);
+          up("newRef",{specialty:"",name:"",clinic:"",email:"",priority:"Routine (within 4 weeks)",reasoning:""});
+        }},"+ Add referral"),
+        (claim.referrals||[]).length>0&&div({key:"list",style:{marginTop:16}},[
+          div({key:"h",style:{fontWeight:600,fontSize:"0.85rem",marginBottom:10,color:"#5B7A99"}},"Referrals added:"),
+          ...(claim.referrals||[]).map(r=>div({key:r.id,style:{...S.cardSm,marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}},[
+            div({key:"i"},[
+              div({key:"n",style:{fontWeight:600,fontSize:"0.87rem"}},r.specialty.replace(" (GP referral required)","")),
+              r.name&&div({key:"d",style:{fontSize:"0.76rem",color:"#5B7A99",marginTop:2}},r.name+(r.clinic?" - "+r.clinic:"")),
+              r.reasoning&&div({key:"r",style:{fontSize:"0.76rem",color:"#5B7A99",marginTop:2,fontStyle:"italic"}},r.reasoning),
+              div({key:"tags",style:{display:"flex",gap:6,marginTop:5}},[
+                e("span",{key:"p",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 7px"}},r.priority),
+                r.gpRefRequired&&e("span",{key:"gp",style:{...S.pill,...S.pillA,fontSize:"0.68rem",padding:"2px 7px"}},"GP referral required"),
+              ]),
+            ]),
+            e("button",{key:"r",style:S.btnD,onClick:()=>up("referrals",(claim.referrals||[]).filter(x=>x.id!==r.id))},"Remove"),
+          ])),
+        ]),
+      ]),
+    ]),
+
+    subTab===2&&div({key:"medinv"},[
+      e(Collapsible,{key:"meds",title:isPrescriber?"Medication recommendations":"Medication (prescribing practitioners only)",icon:"💊",defaultOpen:isPrescriber},
+        e(MedSection,{claim,up})
+      ),
+      e(Collapsible,{key:"inv",title:"Investigations",icon:"🔬"},
+        div({},[
+          e(Sel,{key:"img",label:"Referral for radiological imaging",value:claim.imagingReferral,onChange:v=>up("imagingReferral",v),options:["MRI","CT Scan","X-Ray","Ultrasound","Bone Scan","DEXA Scan","PET Scan"]}),
+          e(Ta,{key:"ind",label:"Imaging clinical indication",value:claim.imagingIndication,onChange:v=>up("imagingIndication",v),placeholder:"Clinical reason..."}),
+          e(Ta,{key:"oth",label:"Other investigations",value:claim.otherInvestigations,onChange:v=>up("otherInvestigations",v),placeholder:"Blood tests, nerve conduction studies..."}),
+        ])
       ),
     ]),
-    div({key:"goals",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Goals & management"),
-      PRESCRIBING.includes(claim.practitionerProfession)||claim.practitionerProfession==="General Practitioner"?[
-        e(Ta,{key:"sg",label:"Short-term goals (0-4 weeks)",value:claim.goalsShort,onChange:v=>up("goalsShort",v),placeholder:"e.g. Pain reduction, restore ROM..."}),
-        e(Ta,{key:"lg",label:"Long-term goals (4+ weeks)",value:claim.goalsLong,onChange:v=>up("goalsLong",v),placeholder:"e.g. Return to full duties..."}),
-        e(Ta,{key:"tp",label:"Treatment plan",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Management approach...",rows:4}),
-      ]:[
-        div({key:"ahrmp-note",style:{...S.warn,marginBottom:14}},"Activity/functional limitations and SMART goals (AHRMP format)"),
-        ...[1,2,3].map(n=>div({key:"row"+n,style:{display:"grid",gridTemplateColumns:"1fr 1fr 140px",gap:10,marginBottom:10}},[
-          e(Inp,{key:"lim",label:n===1?"Current limitation":"",value:(claim["ahGoalLim"+n]||""),onChange:v=>up("ahGoalLim"+n,v),placeholder:"e.g. Unable to walk 100m",mb:0}),
-          e(Inp,{key:"goal",label:n===1?"Related SMART goal":"",value:(claim["ahGoalTarget"+n]||""),onChange:v=>up("ahGoalTarget"+n,v),placeholder:"e.g. Walk 500m by discharge",mb:0}),
-          e(Inp,{key:"date",label:n===1?"Est. date":"",value:(claim["ahGoalDate"+n]||""),onChange:v=>up("ahGoalDate"+n,v),type:"date",mb:0}),
-        ])),
-        div({key:"tx-grid",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}},[
-          e(Inp,{key:"ns",label:"No. of treatments",value:claim.txNum,onChange:v=>up("txNum",v),placeholder:"e.g. 12",mb:0}),
-          e(Inp,{key:"wks",label:"Over (weeks)",value:claim.txWeeks,onChange:v=>up("txWeeks",v),placeholder:"e.g. 6",mb:0}),
-          e(Inp,{key:"disc",label:"Anticipated discharge",value:claim.txDischarge,onChange:v=>up("txDischarge",v),type:"date",mb:0}),
-        ]),
-        div({key:"dates",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}},[
-          e(Inp,{key:"from",label:"Treatment from",value:claim.txFrom,onChange:v=>up("txFrom",v),type:"date",mb:0}),
-          e(Inp,{key:"to",label:"Treatment to",value:claim.txTo,onChange:v=>up("txTo",v),type:"date",mb:0}),
-        ]),
-        e(Ta,{key:"tp",label:"Treatment methods / proposed treatment",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Describe treatment methods to be used...",rows:3}),
-        e(Ta,{key:"sm",label:"Self-management strategies",value:claim.selfManagement,onChange:v=>up("selfManagement",v),placeholder:"Strategies the worker will use to manage their condition..."}),
-      ],
-      div({key:"barriers-section",style:{marginBottom:16}},[
-      e("label",{key:"l",style:S.label},"Barriers to recovery"),
-      (()=>{
-        const flags=claim.psychosocial||{};
-        const allFlags=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
-        return allFlags.length>0?div({key:"auto"},[
-          div({key:"note",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:8}},"Auto-populated from psychosocial flags in Diagnosis screen:"),
-          div({key:"pills",style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}},allFlags.map(f=>e("span",{key:f,style:{...S.pill,...S.pillA,cursor:"default",fontSize:"0.72rem"}},f))),
-        ]):null;
-      })(),
-      e("textarea",{key:"t",className:"cb-ta",style:{...S.ta,minHeight:72},value:claim.barriers||"",onChange:ev=>up("barriers",ev.target.value),placeholder:"Additional barriers not listed above..."}),
-    ]),
-    ]),
-    e(Collapsible,{key:"meds",title:(isPrescriber?"Medication recommendations":"Medication (prescribing practitioners only)"),icon:"💊",defaultOpen:isPrescriber},
-      e(MedSection,{claim,up})
-    ),
-    claim.practitionerProfession==="Podiatrist"&&e(Collapsible,{key:"pod",title:"Orthotics & Aids",icon:"👟",defaultOpen:true},
-      div({},[
-        e(Ta,{key:"ort",label:"Recommended orthotics / aids",value:claim.orthotics,onChange:v=>up("orthotics",v),placeholder:"e.g. Custom foot orthotics, ankle brace, walking aids..."}),
-        e(Ta,{key:"cli",label:"Clinical justification for orthotics",value:claim.orthJustification,onChange:v=>up("orthJustification",v),placeholder:"Clinical reasoning for recommended aids..."}),
-      ])
-    ),
-    e(Collapsible,{key:"inv",title:"Investigations",icon:"🔬"},
-      div({},[
-        e(Sel,{key:"img",label:"Referral for radiological imaging",value:claim.imagingReferral,onChange:v=>up("imagingReferral",v),options:["MRI","CT Scan","X-Ray","Ultrasound","Bone Scan","DEXA Scan","PET Scan"]}),
-        e(Ta,{key:"ind",label:"Imaging clinical indication",value:claim.imagingIndication,onChange:v=>up("imagingIndication",v),placeholder:"Clinical reason..."}),
-        e(Ta,{key:"oth",label:"Other investigations",value:claim.otherInvestigations,onChange:v=>up("otherInvestigations",v),placeholder:"Blood tests, nerve conduction studies..."}),
-      ])
-    ),
   ]);
 }
+
 
 function MedSection({claim,up}){
   const[meds,setMeds]=useState(claim.medications||[]);
