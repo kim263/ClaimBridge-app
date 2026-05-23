@@ -622,6 +622,7 @@ function Tab2({claim,up}){
   const[show,setShow]=useState(false);
   const[diags,setDiags]=useState(claim.diagnoses||[]);
   const[dSubTab,setDSubTab]=useState(0);
+  const[hiIdx,setHiIdx]=useState(-1);
   const DSUB=["Diagnosis & Capacity","Clinical Assessment","Psychosocial Barriers"];
   const dSubStyle=i=>({padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:dSubTab===i?"rgba(0,201,167,0.1)":"transparent",color:dSubTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:dSubTab===i?"2px solid #00C9A7":"none"});
   const sugg=useMemo(()=>{
@@ -648,10 +649,21 @@ function Tab2({claim,up}){
     dSubTab===0&&div({key:"diag",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:14}},"Conditions / Diagnosis"),
       div({key:"sw",style:{position:"relative"}},[
-        inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:42},placeholder:"Search conditions (e.g. low back pain, PTSD)...",value:q,onChange:ev=>{setQ(ev.target.value);setShow(true);},onFocus:()=>setShow(true),onBlur:()=>setTimeout(()=>setShow(false),200)}),
+        inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:42},placeholder:"Search conditions (e.g. low back pain, PTSD)...",value:q,
+          onChange:ev=>{setQ(ev.target.value);setShow(true);setHiIdx(-1);},
+          onFocus:()=>setShow(true),
+          onBlur:()=>setTimeout(()=>setShow(false),200),
+          onKeyDown:ev=>{
+            if(!show||sugg.length===0)return;
+            if(ev.key==="ArrowDown"){ev.preventDefault();setHiIdx(i=>Math.min(i+1,sugg.length-1));}
+            else if(ev.key==="ArrowUp"){ev.preventDefault();setHiIdx(i=>Math.max(i-1,0));}
+            else if(ev.key==="Enter"){ev.preventDefault();if(hiIdx>=0&&hiIdx<sugg.length)addD(sugg[hiIdx]);}
+            else if(ev.key==="Escape"){setShow(false);setHiIdx(-1);}
+          }
+        }),
         e("div",{key:"ic",style:{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#5B7A99",fontSize:"13px",fontWeight:400}},"[S]"),
         show&&sugg.length>0&&div({key:"dd",style:{position:"absolute",top:"100%",left:0,right:0,background:"#112240",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,zIndex:100,marginTop:4,maxHeight:280,overflow:"auto",boxShadow:"0 8px 30px rgba(0,0,0,0.3)"}},
-          sugg.map(d=>div({key:d.icd10,onClick:()=>addD(d),style:{padding:"11px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
+          sugg.map((d,si)=>div({key:d.icd10,onClick:()=>addD(d),onMouseEnter:()=>setHiIdx(si),style:{padding:"11px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.05)",background:hiIdx===si?"rgba(0,201,167,0.12)":"transparent"}},[
             div({key:"l"},[
               div({key:"n",style:{fontSize:"0.88rem",fontWeight:500}},d.label),
               div({key:"c",style:{fontSize:"0.73rem",color:"#5B7A99",marginTop:1}},d.cat),
@@ -721,13 +733,7 @@ function Tab2({claim,up}){
         e(Ta,{key:"pn",label:"Psychosocial notes",value:claim.psychosocialNotes,onChange:v=>up("psychosocialNotes",v),placeholder:"Additional observations..."}),
       ])
     ),
-    div({key:"barriers-diag",style:{...S.card,marginTop:0}},[
-      div({key:"h",style:{fontWeight:700,marginBottom:6}},"Work & activity barriers"),
-      div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:14}},"These auto-populate into the COC and Treatment Plan."),
-      e(Ta,{key:"wr",label:"Work restrictions",value:claim.workRestrictions,onChange:v=>up("workRestrictions",v),placeholder:"e.g. No lifting >5kg, avoid prolonged sitting >30 min..."}),
-      e(Ta,{key:"ar",label:"Activity restrictions",value:claim.activityRestrictions,onChange:v=>up("activityRestrictions",v),placeholder:"e.g. No driving, avoid stairs..."}),
-      e(Ta,{key:"we",label:"Work environment considerations",value:claim.workEnvironment,onChange:v=>up("workEnvironment",v),placeholder:"e.g. Temperature, noise, lighting considerations..."}),
-    ]),
+
     ],),
     dSubTab===1&&div({key:"clin"},[div({key:"h",style:{fontWeight:700,marginBottom:14}},"Clinical assessment"),e(Collapsible,{key:"clin-inner",title:"Allied health clinical findings",icon:"🩺",defaultOpen:true},
       div({},[
@@ -773,7 +779,7 @@ function Tab3({claim,up}){
       div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:18}},"PDF or image - AI summary generated automatically"),
       e("label",{key:"l",style:{...S.btnP,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:8}},[
         uploading?"Uploading...":"Choose file",
-        inp({key:"i",type:"file",accept:".pdf,.jpg,.jpeg,.png",onChange:upload,style:{display:"none"}}),
+        inp({key:"file-"+reports.length,type:"file",accept:".pdf,.jpg,.jpeg,.png",onChange:upload,style:{display:"none"},value:""}),
       ]),
     ]),
     ...reports.map(r=>div({key:r.id,style:S.card},[
