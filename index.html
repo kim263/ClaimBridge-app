@@ -532,48 +532,43 @@ function Tab1({claim,up,practitioners}){
   const si=(INSURERS[claim.scheme]||INSURERS.WorkCover).find(i=>i.id===claim.insurerId);
   const selPrac=id=>{const p=practitioners.find(x=>x.id===id);up("practitionerId",id);up("practitionerName",p&&p.name||"");up("practitionerProviderNo",p&&p.providerNo||"");up("practitionerProfession",p&&p.profession||"");};
   const selIns=id=>{const ins=(INSURERS[claim.scheme]||INSURERS.WorkCover).find(i=>i.id===id);up("insurerId",id);up("insurerName",ins&&ins.name||"");up("insurerPhone",ins&&ins.phone||"");up("insurerAddress",ins&&ins.address||"");};
+  const JURS=[{id:"vic",label:"Victoria",on:true},{id:"nsw",label:"NSW"},{id:"qld",label:"QLD"},{id:"sa",label:"SA"},{id:"wa",label:"WA"},{id:"act",label:"ACT"},{id:"tas",label:"TAS"},{id:"nt",label:"NT"},{id:"federal",label:"Federal"}];
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:20}},"Patient & Claim Details"),
 
-    // ── Scheme + Insurer in one card, side by side ──
-    div({key:"scheme-ins",style:S.card},[
-      div({key:"row",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,alignItems:"start"}},[
-        div({key:"scheme"},[
-          e("label",{key:"l",style:S.label},"Claim scheme *"),
-          div({key:"jur",style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}},
-            [{id:"vic",label:"Victoria",on:true},{id:"nsw",label:"NSW"},{id:"qld",label:"QLD"},{id:"sa",label:"SA"},{id:"wa",label:"WA"},{id:"act",label:"ACT"},{id:"tas",label:"TAS"},{id:"nt",label:"NT"}].map(j=>{
-              const active=claim.jurisdiction===j.id||(j.id==="vic"&&!claim.jurisdiction);
-              return e("button",{key:j.id,onClick:()=>j.on?up("jurisdiction",j.id):alert(j.label+" coming soon"),style:{...S.pill,...(active?S.pillT:S.pillM),fontSize:"0.72rem",padding:"4px 10px",...(!j.on?{opacity:0.4}:{})}},j.label+(j.on?"":" soon"));
-            })
-          ),
-          div({key:"tog",style:{display:"flex",gap:6,padding:"4px",background:"rgba(255,255,255,0.04)",borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",width:"fit-content"}},[
-            e("button",{key:"wc",onClick:()=>{up("scheme","WorkCover");up("insurerId","");},style:{padding:"9px 22px",borderRadius:9,border:"none",fontWeight:700,fontSize:"0.88rem",cursor:"pointer",background:claim.scheme==="WorkCover"?"#0057A8":"transparent",color:claim.scheme==="WorkCover"?"#fff":"rgba(255,255,255,0.4)"}},"WorkCover"),
-            e("button",{key:"tac",onClick:()=>{up("scheme","TAC");up("insurerId","");},style:{padding:"9px 22px",borderRadius:9,border:"none",fontWeight:700,fontSize:"0.88rem",cursor:"pointer",background:claim.scheme==="TAC"?"#C0392B":"transparent",color:claim.scheme==="TAC"?"#fff":"rgba(255,255,255,0.4)"}},"TAC"),
-          ]),
-        ]),
-        div({key:"ins"},[
-          e(Sel,{key:"is",label:"Insurer *",value:claim.insurerId,onChange:selIns,options:(INSURERS[claim.scheme]||INSURERS.WorkCover).map(i=>({value:i.id,label:i.name})),required:true}),
-          si&&si.id!=="other"&&div({key:"det",style:{background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"10px 12px",marginTop:-8}},[
-            div({key:"ph",style:{fontSize:"0.78rem",color:"#5B7A99"}},si.phone),
-            div({key:"ad",style:{fontSize:"0.76rem",color:"#5B7A99",marginTop:2}},si.address),
-          ]),
-          claim.insurerId==="other"&&div({key:"custom",style:{marginTop:8}},[
-            e(Inp,{key:"n",label:"Insurer name",value:claim.insurerNameCustom,onChange:v=>up("insurerNameCustom",v),placeholder:"Enter insurer name",mb:8}),
-            e(Inp,{key:"e",label:"AP email",value:claim.insurerEmail,onChange:v=>up("insurerEmail",v),type:"email",placeholder:"ap@insurer.com.au",mb:8}),
-            e("button",{key:"req",style:{...S.pill,...S.pillA,fontSize:"0.74rem"},onClick:()=>alert("Request submitted! We will add this insurer soon.")},"Request to add insurer"),
-          ]),
-        ]),
+    div({key:"scheme-card",style:S.card},[
+      div({key:"tog-row",style:{display:"flex",gap:8,marginBottom:16}},[
+        e("button",{key:"wc",onClick:()=>{up("scheme","WorkCover");up("insurerId","");},style:{flex:1,padding:"12px",borderRadius:10,border:"none",fontWeight:700,fontSize:"1rem",cursor:"pointer",background:claim.scheme==="WorkCover"?"#0057A8":"rgba(255,255,255,0.05)",color:claim.scheme==="WorkCover"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"WorkCover"),
+        e("button",{key:"tac",onClick:()=>{up("scheme","TAC");up("insurerId","");},style:{flex:1,padding:"12px",borderRadius:10,border:"none",fontWeight:700,fontSize:"1rem",cursor:"pointer",background:claim.scheme==="TAC"?"#C0392B":"rgba(255,255,255,0.05)",color:claim.scheme==="TAC"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"TAC"),
+      ]),
+      div({key:"jur-row",style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}},
+        JURS.map(j=>{
+          const active=claim.jurisdiction===j.id||(j.id==="vic"&&!claim.jurisdiction);
+          return e("button",{key:j.id,onClick:()=>j.on?up("jurisdiction",j.id):alert(j.label+" coming soon"),style:{...S.pill,...(active?S.pillT:S.pillM),fontSize:"0.8rem",padding:"7px 16px",...(!j.on?{opacity:0.4}:{})}},j.label+(j.on?"":" (soon)"));
+        })
+      ),
+      e("label",{key:"ins-label",style:{...S.label,marginBottom:10}},"Insurer *"),
+      div({key:"ins-pills",style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}},
+        (INSURERS[claim.scheme]||INSURERS.WorkCover).map(ins=>e("button",{key:ins.id,onClick:()=>selIns(ins.id),style:{...S.pill,...(claim.insurerId===ins.id?S.pillT:S.pillM),fontSize:"0.8rem",padding:"7px 16px"}},ins.name))
+      ),
+      si&&si.id!=="other"&&div({key:"ins-det",style:{background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"10px 14px",marginTop:4,display:"flex",gap:24,flexWrap:"wrap"}},[
+        si.phone&&div({key:"ph",style:{fontSize:"0.8rem",color:"#5B7A99"}},"Tel: "+si.phone),
+        si.address&&div({key:"ad",style:{fontSize:"0.78rem",color:"#5B7A99"}},si.address),
+      ]),
+      claim.insurerId==="other"&&div({key:"custom",style:{marginTop:12}},[
+        e(Inp,{key:"n",label:"Insurer name",value:claim.insurerNameCustom,onChange:v=>up("insurerNameCustom",v),placeholder:"Enter insurer name"}),
+        e(Inp,{key:"e",label:"Accounts payable email",value:claim.insurerEmail,onChange:v=>up("insurerEmail",v),type:"email",placeholder:"ap@insurer.com.au"}),
+        e("button",{key:"req",style:{...S.pill,...S.pillA,fontSize:"0.78rem"},onClick:()=>alert("Request submitted!")},"Request to add insurer"),
       ]),
     ]),
 
-    // ── Patient + Practitioner side by side ──
     div({key:"pat-prac",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},[
       div({key:"pat",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:14}},"Patient information"),
         e(Inp,{key:"n",label:"Full name",value:claim.patientName,onChange:v=>up("patientName",v),placeholder:"Jane Smith",required:true}),
         e(Inp,{key:"d",label:"Date of birth",value:claim.dob,onChange:v=>up("dob",v),type:"date",required:true}),
         e(Inp,{key:"a",label:"Address",value:claim.patientAddress,onChange:v=>up("patientAddress",v),placeholder:"123 Main St, Melbourne VIC 3000"}),
-        e(Inp,{key:"e",label:"Email",value:claim.patientEmail,onChange:v=>up("patientEmail",v),type:"email",placeholder:"patient@email.com"}),
+        e(Inp,{key:"em",label:"Email",value:claim.patientEmail,onChange:v=>up("patientEmail",v),type:"email",placeholder:"patient@email.com"}),
         e(Inp,{key:"ph",label:"Phone",value:claim.patientPhone,onChange:v=>up("patientPhone",v),placeholder:"04XX XXX XXX"}),
       ]),
       div({key:"prac",style:S.card},[
@@ -582,41 +577,40 @@ function Tab1({claim,up,practitioners}){
         sp&&e(OK,{key:"ok"},"Provider No: "+(sp.providerNo||"Not set")+" | "+sp.profession),
         practitioners.length===0&&e(WARN,{key:"warn"},"No practitioners added. Go to Practitioners in the sidebar."),
         e(Inp,{key:"nrd",label:"Next review date",value:claim.nextReviewDate,onChange:v=>up("nextReviewDate",v),type:"date"}),
-      ]),
-    ]),
-
-    // ── Claim info + Injury side by side ──
-    div({key:"claim-inj",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},[
-      div({key:"claim",style:S.card},[
-        div({key:"h",style:{fontWeight:700,marginBottom:14}},"Claim information"),
-        e(Inp,{key:"cn",label:"Claim number",value:claim.claimNumber,onChange:v=>up("claimNumber",v),placeholder:"WC-2025-XXXXX"}),
-        e(Inp,{key:"doi",label:"Date of injury",value:claim.dateOfInjury,onChange:v=>up("dateOfInjury",v),type:"date",required:true}),
-        e(Sel,{key:"st",label:"Claim status",value:claim.status,onChange:v=>up("status",v),options:["Active","Pending Approval","Approved","Closed","Disputed"]}),
-        claim.scheme==="WorkCover"&&e(Inp,{key:"en",label:"Employer name",value:claim.employerName,onChange:v=>up("employerName",v),placeholder:"ABC Company Pty Ltd"}),
-        claim.scheme==="WorkCover"&&e(Inp,{key:"ec",label:"Employer contact",value:claim.employerContact,onChange:v=>up("employerContact",v),placeholder:"HR Manager - 03 XXXX XXXX"}),
-      ]),
-      div({key:"inj",style:S.card},[
-        div({key:"h",style:{fontWeight:700,marginBottom:14}},"Injury details"),
-        e(Sel,{key:"moi",label:"Mechanism of injury",value:claim.injuryMechanism,onChange:v=>up("injuryMechanism",v),options:["Lifting / manual handling","Repetitive strain / overuse","Fall from height","Fall on same level / slip / trip","Struck by object","Motor vehicle accident","Psychological - workplace stress","Psychological - workplace bullying / harassment","Psychological - traumatic event witnessed","Noise exposure","Other - see notes"]}),
-        e(Sel,{key:"bp",label:"Body part (primary)",value:claim.injuryBodyPart,onChange:v=>up("injuryBodyPart",v),options:["Head / skull","Neck / cervical spine","Shoulder - left","Shoulder - right","Elbow - left","Elbow - right","Wrist - left","Wrist - right","Hand - left","Hand - right","Thoracic spine","Lumbar spine / lower back","Hip - left","Hip - right","Knee - left","Knee - right","Ankle - left","Ankle - right","Foot - left","Foot - right","Multiple body parts","Psychological / mental health","Other"]}),
-        e(Sel,{key:"it",label:"Injury type",value:claim.injuryType,onChange:v=>up("injuryType",v),options:["Sprain / strain","Fracture","Dislocation","Soft tissue tear","Contusion / bruising","Nerve injury","Disc injury","Concussion / head injury","Psychological / psychiatric","Cumulative / gradual onset","Aggravation of pre-existing condition","Other"]}),
-        e(Sel,{key:"io",label:"Onset type",value:claim.injuryOnset,onChange:v=>up("injuryOnset",v),options:["Sudden / acute - single incident","Gradual onset - over days","Gradual onset - over weeks","Gradual onset - over months","Aggravation of pre-existing condition","Recurrence of previous injury"]}),
-        e(Ta,{key:"desc",label:"Description",value:claim.injuryDescription,onChange:v=>up("injuryDescription",v),placeholder:"How did the injury occur?",rows:2}),
-        e(Ta,{key:"caus",label:"Causation / pathophysiology",value:claim.injuryCausation,onChange:v=>up("injuryCausation",v),placeholder:"Clinical opinion on causation...",rows:2}),
-      ]),
-    ]),
-
-    // ── Pre-existing + Consent ──
-    div({key:"pre-con",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},[
-      div({key:"pre",style:S.card},[
-        e(Ta,{key:"pre",label:"Pre-existing conditions / relevant history",value:claim.preExisting,onChange:v=>up("preExisting",v),placeholder:"Relevant prior injuries or pre-existing conditions...",rows:3}),
-      ]),
-      div({key:"consent",style:S.card},[
-        div({key:"h",style:{fontWeight:700,marginBottom:14}},"Consent"),
-        div({style:{display:"flex",alignItems:"flex-start",gap:12,cursor:"pointer"},onClick:()=>up("consent",!claim.consent)},[
-          div({key:"cb",style:{width:20,height:20,borderRadius:6,border:claim.consent?"none":"1.5px solid #5B7A99",background:claim.consent?"#00C9A7":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#07101E",fontWeight:700,fontSize:"0.75rem",flexShrink:0,marginTop:2}},claim.consent?"v":""),
-          div({key:"t",style:{fontSize:"0.88rem",lineHeight:1.5}},"The patient has consented to their information being shared with the insurer, referred practitioners and other treating providers."),
+        div({key:"con",style:{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
+          div({key:"h",style:{fontWeight:600,fontSize:"0.85rem",marginBottom:10}},"Consent"),
+          div({style:{display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer"},onClick:()=>up("consent",!claim.consent)},[
+            div({key:"cb",style:{width:20,height:20,borderRadius:6,border:claim.consent?"none":"1.5px solid #5B7A99",background:claim.consent?"#00C9A7":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#07101E",fontWeight:700,fontSize:"0.75rem",flexShrink:0,marginTop:2}},claim.consent?"v":""),
+            div({key:"t",style:{fontSize:"0.84rem",lineHeight:1.5,color:"rgba(239,246,255,0.8)"}},"Patient has consented to information being shared with the insurer and treating providers."),
+          ]),
         ]),
+      ]),
+    ]),
+
+    div({key:"claim",style:S.card},[
+      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Claim information"),
+      div({key:"g",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}},[
+        e(Inp,{key:"cn",label:"Claim number",value:claim.claimNumber,onChange:v=>up("claimNumber",v),placeholder:"WC-2025-XXXXX",mb:0}),
+        e(Inp,{key:"doi",label:"Date of injury",value:claim.dateOfInjury,onChange:v=>up("dateOfInjury",v),type:"date",required:true,mb:0}),
+        e(Sel,{key:"st",label:"Claim status",value:claim.status,onChange:v=>up("status",v),options:["Active","Pending Approval","Approved","Closed","Disputed"],mb:0}),
+      ]),
+      claim.scheme==="WorkCover"&&div({key:"emp",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginTop:16}},[
+        e(Inp,{key:"en",label:"Employer name",value:claim.employerName,onChange:v=>up("employerName",v),placeholder:"ABC Company Pty Ltd",mb:0}),
+        e(Inp,{key:"ec",label:"Employer contact",value:claim.employerContact,onChange:v=>up("employerContact",v),placeholder:"HR Manager - 03 XXXX XXXX",mb:0}),
+      ]),
+    ]),
+
+    div({key:"inj",style:S.card},[
+      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Injury details"),
+      div({key:"g1",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},[
+        e(Sel,{key:"moi",label:"Mechanism of injury",value:claim.injuryMechanism,onChange:v=>up("injuryMechanism",v),options:["Lifting / manual handling","Repetitive strain / overuse","Fall from height","Fall on same level / slip / trip","Struck by object","Motor vehicle accident","Psychological - workplace stress","Psychological - workplace bullying / harassment","Psychological - traumatic event witnessed","Noise exposure","Other - see notes"],mb:0}),
+        e(Sel,{key:"bp",label:"Body part (primary)",value:claim.injuryBodyPart,onChange:v=>up("injuryBodyPart",v),options:["Head / skull","Neck / cervical spine","Shoulder - left","Shoulder - right","Elbow - left","Elbow - right","Wrist - left","Wrist - right","Hand - left","Hand - right","Thoracic spine","Lumbar spine / lower back","Hip - left","Hip - right","Knee - left","Knee - right","Ankle - left","Ankle - right","Foot - left","Foot - right","Multiple body parts","Psychological / mental health","Other"],mb:0}),
+        e(Sel,{key:"it",label:"Injury type",value:claim.injuryType,onChange:v=>up("injuryType",v),options:["Sprain / strain","Fracture","Dislocation","Soft tissue tear","Contusion / bruising","Nerve injury","Disc injury","Concussion / head injury","Psychological / psychiatric","Cumulative / gradual onset","Aggravation of pre-existing condition","Other"],mb:0}),
+        e(Sel,{key:"io",label:"Onset type",value:claim.injuryOnset,onChange:v=>up("injuryOnset",v),options:["Sudden / acute - single incident","Gradual onset - over days","Gradual onset - over weeks","Gradual onset - over months","Aggravation of pre-existing condition","Recurrence of previous injury"],mb:0}),
+      ]),
+      div({key:"g2",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginTop:16}},[
+        e(Ta,{key:"desc",label:"Mechanism description",value:claim.injuryDescription,onChange:v=>up("injuryDescription",v),placeholder:"Describe exactly how the injury occurred...",rows:3,mb:0}),
+        e(Ta,{key:"caus",label:"Causation / pathophysiology",value:claim.injuryCausation,onChange:v=>up("injuryCausation",v),placeholder:"Clinical opinion on causation and sequelae...",rows:3,mb:0}),
       ]),
     ]),
   ]);
@@ -648,6 +642,9 @@ function Tab2({claim,up}){
     div({key:"dsubtabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:24}},
       DSUB.map((t,i)=>e("button",{key:t,onClick:()=>setDSubTab(i),style:{padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:dSubTab===i?"rgba(0,201,167,0.1)":"transparent",color:dSubTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:dSubTab===i?"2px solid #00C9A7":"none"}},(i+1)+". "+t))
     ),
+    dSubTab===0&&div({key:"preexist",style:S.card},[
+      e(Ta,{key:"pre",label:"Pre-existing conditions / relevant history",value:claim.preExisting,onChange:v=>up("preExisting",v),placeholder:"Relevant prior injuries, pre-existing conditions and their relationship to the current claim...",rows:3}),
+    ]),
     dSubTab===0&&div({key:"diag",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:14}},"Conditions / Diagnosis"),
       div({key:"sw",style:{position:"relative"}},[
