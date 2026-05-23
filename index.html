@@ -21,6 +21,24 @@ button{font-family:inherit;cursor:pointer;}
 .card-hover:hover{border-color:rgba(0,201,167,0.2)!important;}
 .tab-btn:hover{color:rgba(255,255,255,0.75)!important;}
 .coll-btn:hover{background:rgba(255,255,255,0.05)!important;}
+
+/* COC PRINT STYLES */
+@media print {
+  body { background: white !important; color: black !important; font-size: 11px; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .coc-print-page { background: white !important; color: black !important; padding: 20px !important; max-width: 100% !important; margin: 0 !important; box-shadow: none !important; border: none !important; }
+  .coc-section-header { background: #1a1a1a !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .coc-table { border-collapse: collapse; width: 100%; }
+  .coc-table td, .coc-table th { border: 1px solid #333 !important; }
+  @page { margin: 15mm; size: A4; }
+}
+.print-only { display: none; }
+
+/* CHART SVG */
+.trend-line { fill: none; stroke-width: 2.5; }
+.trend-dot { cursor: pointer; }
+.trend-dot:hover { r: 6; }
 </style>
 </head>
 <body>
@@ -30,9 +48,9 @@ const e=React.createElement;
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
 
 // ── STORAGE ──────────────────────────────────────────────────────────────────
-async function sget(k){try{const r=localStorage.getItem("cb9_"+k);return r?JSON.parse(r):null;}catch{return null;}}
-async function sset(k,v){try{localStorage.setItem("cb9_"+k,JSON.stringify(v));}catch{}}
-async function sdel(k){try{localStorage.removeItem("cb9_"+k);}catch{}}
+async function sget(k){try{const r=localStorage.getItem("cb10_"+k);return r?JSON.parse(r):null;}catch{return null;}}
+async function sset(k,v){try{localStorage.setItem("cb10_"+k,JSON.stringify(v));}catch{}}
+async function sdel(k){try{localStorage.removeItem("cb10_"+k);}catch{}}
 
 // ── STYLES ───────────────────────────────────────────────────────────────────
 const S={
@@ -59,18 +77,18 @@ const S={
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
 const DEMO_CLINICS=[
-  {id:"c001",name:"Bayside Medical Centre",email:"admin@baysidemedical.com.au",password:"demo1234",plan:"Professional",abn:"12 345 678 901"},
-  {id:"c002",name:"TAC Rehab Specialists",email:"reception@tacrehab.com.au",password:"demo1234",plan:"Growth",abn:"98 765 432 109"},
+  {id:"c001",name:"Bayside Medical Centre",email:"admin@baysidemedical.com.au",password:"demo1234",plan:"Professional",abn:"12 345 678 901",address:"123 Bay Rd, Brighton VIC 3186",phone:"03 9553 1234",postcode:"3186"},
+  {id:"c002",name:"TAC Rehab Specialists",email:"reception@tacrehab.com.au",password:"demo1234",plan:"Growth",abn:"98 765 432 109",address:"45 Collins St, Melbourne VIC 3000",phone:"03 9654 5678",postcode:"3000"},
 ];
 const DEMO_PRACTITIONERS={
   c001:[
-    {id:"p1",name:"Dr. Sarah Chen",profession:"General Practitioner",providerNo:"123456A",email:"sarah@bayside.com.au"},
-    {id:"p2",name:"Dr. Marcus Webb",profession:"Physiotherapist",providerNo:"234567B",email:"marcus@bayside.com.au"},
-    {id:"p3",name:"Dr. Priya Sharma",profession:"Osteopath",providerNo:"345678C",email:"priya@bayside.com.au"},
+    {id:"p1",name:"Dr. Sarah Chen",profession:"General Practitioner",providerNo:"123456A",email:"sarah@bayside.com.au",phone:"03 9553 1234",address:"123 Bay Rd, Brighton VIC 3186",postcode:"3186"},
+    {id:"p2",name:"Dr. Marcus Webb",profession:"Physiotherapist",providerNo:"234567B",email:"marcus@bayside.com.au",phone:"03 9553 1234",address:"123 Bay Rd, Brighton VIC 3186",postcode:"3186"},
+    {id:"p3",name:"Dr. Priya Sharma",profession:"Osteopath",providerNo:"345678C",email:"priya@bayside.com.au",phone:"03 9553 1234",address:"123 Bay Rd, Brighton VIC 3186",postcode:"3186"},
   ],
   c002:[
-    {id:"p4",name:"Dr. James Okafor",profession:"Pain Specialist",providerNo:"456789D",email:"james@tacrehab.com.au"},
-    {id:"p5",name:"Dr. Lily Nguyen",profession:"Physiotherapist",providerNo:"567890E",email:"lily@tacrehab.com.au"},
+    {id:"p4",name:"Dr. James Okafor",profession:"Pain Specialist",providerNo:"456789D",email:"james@tacrehab.com.au",phone:"03 9654 5678",address:"45 Collins St, Melbourne VIC 3000",postcode:"3000"},
+    {id:"p5",name:"Dr. Lily Nguyen",profession:"Physiotherapist",providerNo:"567890E",email:"lily@tacrehab.com.au",phone:"03 9654 5678",address:"45 Collins St, Melbourne VIC 3000",postcode:"3000"},
   ],
 };
 const INSURERS={
@@ -109,96 +127,111 @@ const PSYCH_FLAGS=[
 const PRESCRIBING=["General Practitioner","Pain Specialist","Orthopaedic Surgeon","Psychiatrist","Neurologist","Rehabilitation Physician","Rheumatologist","Other Specialist"];
 const PROFESSIONS=["General Practitioner","Physiotherapist","Osteopath","Chiropractor","Pain Specialist","Orthopaedic Surgeon","Occupational Therapist","Exercise Physiologist","Psychologist","Podiatrist","Other"];
 const SPECIALTIES=["Orthopaedic Surgeon","Pain Specialist / Anaesthetist","Neurologist","Rheumatologist","Psychiatrist","Rehabilitation Physician","Physiotherapist","Osteopath","Chiropractor","Podiatrist","Exercise Physiologist (GP referral required)","Occupational Therapist (GP referral required)","Psychologist","Hand Therapist","Other Specialist"];
+
+// ── RTW GUIDELINES DATABASE ──────────────────────────────────────────────────
+const RTW_DB={
+  "Low back pain":{mod:[1,2],normal:[2,6],notes:"Non-specific LBP. Early activity encouraged."},
+  "Lumbago with sciatica":{mod:[2,4],normal:[6,12],notes:"Radiculopathy adds complexity."},
+  "Sciatica":{mod:[2,4],normal:[6,12],notes:"Nerve root recovery varies."},
+  "Lumbar disc herniation with radiculopathy":{mod:[2,6],normal:[6,16],notes:"Conservative management first."},
+  "Lumbar disc degeneration":{mod:[2,4],normal:[4,10],notes:"Functional rehab approach."},
+  "Cervicalgia / Neck pain":{mod:[1,2],normal:[2,6],notes:"Early mobilisation recommended."},
+  "Whiplash associated disorder (WAD)":{mod:[1,2],normal:[2,6],notes:"WAD I-II. Higher grades extend significantly."},
+  "Cervical disc herniation with radiculopathy":{mod:[2,4],normal:[6,14],notes:"Neurological recovery variable."},
+  "Rotator cuff syndrome / tear":{mod:[4,8],normal:[8,16],notes:"Partial tear conservative. Full tear extends to 24-52w."},
+  "Adhesive capsulitis (frozen shoulder)":{mod:[6,12],normal:[16,52],notes:"Natural history 12-24 months."},
+  "Lateral epicondylalgia (tennis elbow)":{mod:[2,4],normal:[6,12],notes:"Load management key."},
+  "Carpal tunnel syndrome":{mod:[2,4],normal:[4,8],notes:"Post-operative. Conservative longer."},
+  "ACL sprain / tear":{mod:[8,12],normal:[24,52],notes:"Reconstruction 36-52w RTW heavy duties."},
+  "Meniscal tear":{mod:[6,8],normal:[12,24],notes:"Repair longer than partial meniscectomy."},
+  "Osteoarthritis of knee":{mod:[2,4],normal:[4,12],notes:"Post-conservative management."},
+  "Achilles tendon tear / rupture":{mod:[12,16],normal:[24,52],notes:"Surgical repair typical."},
+  "Ankle sprain (lateral)":{mod:[1,2],normal:[2,6],notes:"Grade dependent."},
+  "Fracture of distal radius":{mod:[4,6],normal:[8,12],notes:"Simple fracture. Complex adds 4-8w."},
+  "Fracture of neck of femur":{mod:[8,12],normal:[16,24],notes:"Surgical fixation typical."},
+  "Major Depressive Disorder - moderate":{mod:[4,8],normal:[8,24],notes:"With appropriate treatment support."},
+  "Major Depressive Disorder - severe":{mod:[8,16],normal:[24,52],notes:"Specialist psychiatric input indicated."},
+  "Post-Traumatic Stress Disorder (PTSD)":{mod:[8,16],normal:[24,60],notes:"Complex trauma extends significantly."},
+  "Generalised Anxiety Disorder (GAD)":{mod:[4,8],normal:[8,16],notes:"With psychological treatment."},
+  "Adjustment Disorder with Depressed Mood":{mod:[2,4],normal:[4,12],notes:"Good prognosis with early intervention."},
+  "Adjustment Disorder with Anxiety":{mod:[2,4],normal:[4,12],notes:"Good prognosis with early intervention."},
+  "Adjustment Disorder with Mixed Anxiety and Depression":{mod:[2,6],normal:[6,16],notes:"Monitor for progression to MDD."},
+  "Concussion":{mod:[1,2],normal:[2,6],notes:"Symptom-guided return."},
+  "Post-concussion syndrome":{mod:[4,8],normal:[8,20],notes:"Multidisciplinary approach."},
+  "Myofascial pain syndrome":{mod:[2,4],normal:[4,10],notes:"Trigger point therapy + functional rehab."},
+  "Complex regional pain syndrome (CRPS)":{mod:[8,16],normal:[24,60],notes:"Multidisciplinary pain team required."},
+};
+
+const PSYCH_ADJUSTMENTS=[
+  {flag:"Fear-avoidance beliefs",key:"yellow",mult:0.75,desc:"+50-100% base timeframe","category":"mult"},
+  {flag:"Pain catastrophising",key:"yellow",mult:0.5,desc:"+30-75% base timeframe","category":"mult"},
+  {flag:"Low self-efficacy",key:"yellow",mult:0.375,desc:"+25-50% base timeframe","category":"mult"},
+  {flag:"Poor relationship with employer",key:"blue",mult:0.375,desc:"+25-50% base timeframe","category":"mult"},
+  {flag:"Medicolegal proceedings active",key:"black",mult:0.75,desc:"+50-100% base timeframe","category":"mult"},
+  {flag:"PTSD (active)",key:"orange",flat:12,desc:"+8-16 weeks flat addition","category":"flat"},
+  {flag:"Major depressive disorder",key:"orange",flat:8,desc:"+4-12 weeks flat addition","category":"flat"},
+  {flag:"Financial hardship",key:"black",mult:0.175,desc:"+10-25% base timeframe","category":"mult"},
+  {flag:"Housing instability",key:"black",mult:0.175,desc:"+10-25% base timeframe","category":"mult"},
+];
+
+// ── OUTCOME MEASURES DB ──────────────────────────────────────────────────────
+const OUTCOME_MEASURES={
+  "PSFS":{name:"Patient-Specific Functional Scale",min:0,max:10,higherBetter:true,desc:"Rate ability to perform specific activities (0=unable, 10=same as before injury).",unit:"/ 10",interpretation:{good:7,moderate:4}},
+  "Pain VAS/NRS":{name:"Pain Visual Analogue / Numeric Rating Scale",min:0,max:10,higherBetter:false,desc:"Rate current pain level (0=no pain, 10=worst imaginable pain).",unit:"/ 10",interpretation:{good:3,moderate:6}},
+  "Oswestry":{name:"Oswestry Disability Index (ODI)",min:0,max:100,higherBetter:false,desc:"Lumbar spine disability. Score = % disability.",unit:"%",interpretation:{good:20,moderate:40}},
+  "NDI":{name:"Neck Disability Index (NDI)",min:0,max:50,higherBetter:false,desc:"Cervical spine disability (0-50 raw score).",unit:"/ 50",interpretation:{good:10,moderate:25}},
+  "DASH":{name:"Disabilities of Arm, Shoulder & Hand (DASH)",min:0,max:100,higherBetter:false,desc:"Upper limb disability (0=no disability, 100=severe).",unit:"/ 100",interpretation:{good:20,moderate:40}},
+  "KOOS":{name:"Knee Injury & Osteoarthritis Outcome Score (KOOS)",min:0,max:100,higherBetter:true,desc:"Knee function (0=extreme problems, 100=no problems).",unit:"/ 100",interpretation:{good:75,moderate:50}},
+  "DASS-21":{name:"Depression Anxiety Stress Scales (DASS-21)",min:0,max:63,higherBetter:false,desc:"Psychological distress. Depression+Anxiety+Stress (×2 for full score).",unit:"/ 63",interpretation:{good:14,moderate:28}},
+  "Orebro Short":{name:"Örebro Musculoskeletal Pain Questionnaire - Short (ÖMSPQ-10)",min:10,max:100,higherBetter:false,desc:"Screening for risk of prolonged disability (10-item version).",unit:"/ 100",interpretation:{good:30,moderate:50}},
+  "Orebro Long":{name:"Örebro Musculoskeletal Pain Questionnaire - Long",min:21,max:210,higherBetter:false,desc:"Full risk assessment for prolonged disability.",unit:"/ 210",interpretation:{good:63,moderate:105}},
+};
+
 const DIAGNOSES_DB=[
-  {icd10:"M54.5",label:"Low back pain",cat:"Spine"},
-  {icd10:"M54.4",label:"Lumbago with sciatica",cat:"Spine"},
-  {icd10:"M54.3",label:"Sciatica",cat:"Spine"},
-  {icd10:"M51.1",label:"Lumbar disc herniation with radiculopathy",cat:"Spine"},
-  {icd10:"M51.2",label:"Lumbar disc degeneration",cat:"Spine"},
-  {icd10:"M47.8",label:"Lumbar spondylosis",cat:"Spine"},
-  {icd10:"M48.0",label:"Spinal stenosis",cat:"Spine"},
-  {icd10:"M43.1",label:"Spondylolisthesis",cat:"Spine"},
-  {icd10:"M54.6",label:"Thoracic pain",cat:"Spine"},
-  {icd10:"M54.2",label:"Cervicalgia / Neck pain",cat:"Spine"},
-  {icd10:"S13.4",label:"Whiplash associated disorder (WAD)",cat:"Spine"},
-  {icd10:"M50.1",label:"Cervical disc herniation with radiculopathy",cat:"Spine"},
-  {icd10:"M50.3",label:"Cervical disc degeneration",cat:"Spine"},
-  {icd10:"M54.1",label:"Radiculopathy - cervical",cat:"Spine"},
-  {icd10:"M48.8",label:"Facet joint syndrome",cat:"Spine"},
-  {icd10:"M75.1",label:"Rotator cuff syndrome / tear",cat:"Shoulder"},
-  {icd10:"M75.0",label:"Adhesive capsulitis (frozen shoulder)",cat:"Shoulder"},
-  {icd10:"M75.5",label:"Subacromial bursitis",cat:"Shoulder"},
-  {icd10:"M75.2",label:"Bicipital tendinitis",cat:"Shoulder"},
-  {icd10:"M75.3",label:"Calcific tendinitis of shoulder",cat:"Shoulder"},
-  {icd10:"S43.0",label:"Glenohumeral dislocation",cat:"Shoulder"},
-  {icd10:"S43.1",label:"Acromioclavicular joint sprain / dislocation",cat:"Shoulder"},
-  {icd10:"M75.8",label:"SLAP tear (superior labral tear)",cat:"Shoulder"},
-  {icd10:"S42.2",label:"Fracture of proximal humerus",cat:"Shoulder"},
-  {icd10:"M77.1",label:"Lateral epicondylalgia (tennis elbow)",cat:"Elbow"},
-  {icd10:"M77.0",label:"Medial epicondylalgia (golfers elbow)",cat:"Elbow"},
-  {icd10:"M70.2",label:"Olecranon bursitis",cat:"Elbow"},
-  {icd10:"G56.2",label:"Cubital tunnel syndrome",cat:"Elbow"},
-  {icd10:"S53.1",label:"Elbow dislocation",cat:"Elbow"},
-  {icd10:"G56.0",label:"Carpal tunnel syndrome",cat:"Wrist/Hand"},
-  {icd10:"M65.3",label:"De Quervains tenosynovitis",cat:"Wrist/Hand"},
-  {icd10:"M65.9",label:"Trigger finger / flexor tenosynovitis",cat:"Wrist/Hand"},
-  {icd10:"S62.5",label:"Fracture of metacarpal",cat:"Wrist/Hand"},
-  {icd10:"S52.5",label:"Fracture of distal radius",cat:"Wrist/Hand"},
-  {icd10:"S62.0",label:"Fracture of scaphoid",cat:"Wrist/Hand"},
-  {icd10:"S63.0",label:"Wrist sprain / TFCC injury",cat:"Wrist/Hand"},
-  {icd10:"M16.1",label:"Osteoarthritis of hip",cat:"Hip"},
-  {icd10:"M70.6",label:"Trochanteric bursitis",cat:"Hip"},
-  {icd10:"M76.0",label:"Gluteal tendinopathy",cat:"Hip"},
-  {icd10:"S72.0",label:"Fracture of neck of femur",cat:"Hip"},
-  {icd10:"M24.8",label:"Femoroacetabular impingement (FAI)",cat:"Hip"},
-  {icd10:"M17.1",label:"Osteoarthritis of knee",cat:"Knee"},
-  {icd10:"M23.2",label:"Meniscal tear",cat:"Knee"},
-  {icd10:"S83.5",label:"ACL sprain / tear",cat:"Knee"},
-  {icd10:"S83.4",label:"Collateral ligament sprain (MCL/LCL)",cat:"Knee"},
-  {icd10:"M76.5",label:"Patellar tendinopathy",cat:"Knee"},
-  {icd10:"M22.2",label:"Patellofemoral pain syndrome",cat:"Knee"},
-  {icd10:"M70.4",label:"Prepatellar bursitis",cat:"Knee"},
-  {icd10:"S83.0",label:"Patellar dislocation",cat:"Knee"},
-  {icd10:"M76.6",label:"Achilles tendinopathy",cat:"Ankle/Foot"},
-  {icd10:"S86.0",label:"Achilles tendon tear / rupture",cat:"Ankle/Foot"},
-  {icd10:"S93.4",label:"Ankle sprain (lateral)",cat:"Ankle/Foot"},
-  {icd10:"M79.3",label:"Plantar fasciitis",cat:"Ankle/Foot"},
-  {icd10:"M77.5",label:"Heel spur",cat:"Ankle/Foot"},
-  {icd10:"G54.2",label:"Thoracic outlet syndrome",cat:"Nerve"},
-  {icd10:"G56.0",label:"Median nerve lesion",cat:"Nerve"},
-  {icd10:"G57.0",label:"Sciatic nerve lesion",cat:"Nerve"},
-  {icd10:"G57.1",label:"Meralgia paraesthetica",cat:"Nerve"},
-  {icd10:"M89.0",label:"Complex regional pain syndrome (CRPS)",cat:"Nerve"},
-  {icd10:"M79.1",label:"Myofascial pain syndrome",cat:"Soft Tissue"},
-  {icd10:"M79.7",label:"Fibromyalgia",cat:"Soft Tissue"},
-  {icd10:"M70.0",label:"Occupational tenosynovitis",cat:"Soft Tissue"},
-  {icd10:"M17.0",label:"Primary osteoarthritis of knee",cat:"Osteoarthritis"},
-  {icd10:"M16.0",label:"Primary osteoarthritis of hip",cat:"Osteoarthritis"},
-  {icd10:"M06.9",label:"Rheumatoid arthritis",cat:"Osteoarthritis"},
-  {icd10:"F32.1",label:"Major Depressive Disorder - moderate",cat:"Psychological"},
-  {icd10:"F32.2",label:"Major Depressive Disorder - severe",cat:"Psychological"},
-  {icd10:"F33.1",label:"Major Depressive Disorder - recurrent moderate",cat:"Psychological"},
-  {icd10:"F34.1",label:"Persistent Depressive Disorder (Dysthymia)",cat:"Psychological"},
-  {icd10:"F41.1",label:"Generalised Anxiety Disorder (GAD)",cat:"Psychological"},
-  {icd10:"F41.0",label:"Panic Disorder",cat:"Psychological"},
-  {icd10:"F43.1",label:"Post-Traumatic Stress Disorder (PTSD)",cat:"Psychological"},
-  {icd10:"F43.0",label:"Acute Stress Disorder",cat:"Psychological"},
-  {icd10:"F43.20",label:"Adjustment Disorder with Depressed Mood",cat:"Psychological"},
-  {icd10:"F43.21",label:"Adjustment Disorder with Anxiety",cat:"Psychological"},
+  {icd10:"M54.5",label:"Low back pain",cat:"Spine"},{icd10:"M54.4",label:"Lumbago with sciatica",cat:"Spine"},
+  {icd10:"M54.3",label:"Sciatica",cat:"Spine"},{icd10:"M51.1",label:"Lumbar disc herniation with radiculopathy",cat:"Spine"},
+  {icd10:"M51.2",label:"Lumbar disc degeneration",cat:"Spine"},{icd10:"M47.8",label:"Lumbar spondylosis",cat:"Spine"},
+  {icd10:"M48.0",label:"Spinal stenosis",cat:"Spine"},{icd10:"M43.1",label:"Spondylolisthesis",cat:"Spine"},
+  {icd10:"M54.6",label:"Thoracic pain",cat:"Spine"},{icd10:"M54.2",label:"Cervicalgia / Neck pain",cat:"Spine"},
+  {icd10:"S13.4",label:"Whiplash associated disorder (WAD)",cat:"Spine"},{icd10:"M50.1",label:"Cervical disc herniation with radiculopathy",cat:"Spine"},
+  {icd10:"M50.3",label:"Cervical disc degeneration",cat:"Spine"},{icd10:"M54.1",label:"Radiculopathy - cervical",cat:"Spine"},
+  {icd10:"M48.8",label:"Facet joint syndrome",cat:"Spine"},{icd10:"M75.1",label:"Rotator cuff syndrome / tear",cat:"Shoulder"},
+  {icd10:"M75.0",label:"Adhesive capsulitis (frozen shoulder)",cat:"Shoulder"},{icd10:"M75.5",label:"Subacromial bursitis",cat:"Shoulder"},
+  {icd10:"M75.2",label:"Bicipital tendinitis",cat:"Shoulder"},{icd10:"M75.3",label:"Calcific tendinitis of shoulder",cat:"Shoulder"},
+  {icd10:"S43.0",label:"Glenohumeral dislocation",cat:"Shoulder"},{icd10:"S43.1",label:"Acromioclavicular joint sprain / dislocation",cat:"Shoulder"},
+  {icd10:"M75.8",label:"SLAP tear (superior labral tear)",cat:"Shoulder"},{icd10:"S42.2",label:"Fracture of proximal humerus",cat:"Shoulder"},
+  {icd10:"M77.1",label:"Lateral epicondylalgia (tennis elbow)",cat:"Elbow"},{icd10:"M77.0",label:"Medial epicondylalgia (golfers elbow)",cat:"Elbow"},
+  {icd10:"M70.2",label:"Olecranon bursitis",cat:"Elbow"},{icd10:"G56.2",label:"Cubital tunnel syndrome",cat:"Elbow"},
+  {icd10:"S53.1",label:"Elbow dislocation",cat:"Elbow"},{icd10:"G56.0",label:"Carpal tunnel syndrome",cat:"Wrist/Hand"},
+  {icd10:"M65.3",label:"De Quervains tenosynovitis",cat:"Wrist/Hand"},{icd10:"M65.9",label:"Trigger finger / flexor tenosynovitis",cat:"Wrist/Hand"},
+  {icd10:"S62.5",label:"Fracture of metacarpal",cat:"Wrist/Hand"},{icd10:"S52.5",label:"Fracture of distal radius",cat:"Wrist/Hand"},
+  {icd10:"S62.0",label:"Fracture of scaphoid",cat:"Wrist/Hand"},{icd10:"S63.0",label:"Wrist sprain / TFCC injury",cat:"Wrist/Hand"},
+  {icd10:"M16.1",label:"Osteoarthritis of hip",cat:"Hip"},{icd10:"M70.6",label:"Trochanteric bursitis",cat:"Hip"},
+  {icd10:"M76.0",label:"Gluteal tendinopathy",cat:"Hip"},{icd10:"S72.0",label:"Fracture of neck of femur",cat:"Hip"},
+  {icd10:"M24.8",label:"Femoroacetabular impingement (FAI)",cat:"Hip"},{icd10:"M17.1",label:"Osteoarthritis of knee",cat:"Knee"},
+  {icd10:"M23.2",label:"Meniscal tear",cat:"Knee"},{icd10:"S83.5",label:"ACL sprain / tear",cat:"Knee"},
+  {icd10:"S83.4",label:"Collateral ligament sprain (MCL/LCL)",cat:"Knee"},{icd10:"M76.5",label:"Patellar tendinopathy",cat:"Knee"},
+  {icd10:"M22.2",label:"Patellofemoral pain syndrome",cat:"Knee"},{icd10:"M70.4",label:"Prepatellar bursitis",cat:"Knee"},
+  {icd10:"S83.0",label:"Patellar dislocation",cat:"Knee"},{icd10:"M76.6",label:"Achilles tendinopathy",cat:"Ankle/Foot"},
+  {icd10:"S86.0",label:"Achilles tendon tear / rupture",cat:"Ankle/Foot"},{icd10:"S93.4",label:"Ankle sprain (lateral)",cat:"Ankle/Foot"},
+  {icd10:"M79.3",label:"Plantar fasciitis",cat:"Ankle/Foot"},{icd10:"M77.5",label:"Heel spur",cat:"Ankle/Foot"},
+  {icd10:"G54.2",label:"Thoracic outlet syndrome",cat:"Nerve"},{icd10:"G56.0",label:"Median nerve lesion",cat:"Nerve"},
+  {icd10:"G57.0",label:"Sciatic nerve lesion",cat:"Nerve"},{icd10:"G57.1",label:"Meralgia paraesthetica",cat:"Nerve"},
+  {icd10:"M89.0",label:"Complex regional pain syndrome (CRPS)",cat:"Nerve"},{icd10:"M79.1",label:"Myofascial pain syndrome",cat:"Soft Tissue"},
+  {icd10:"M79.7",label:"Fibromyalgia",cat:"Soft Tissue"},{icd10:"M70.0",label:"Occupational tenosynovitis",cat:"Soft Tissue"},
+  {icd10:"F32.1",label:"Major Depressive Disorder - moderate",cat:"Psychological"},{icd10:"F32.2",label:"Major Depressive Disorder - severe",cat:"Psychological"},
+  {icd10:"F33.1",label:"Major Depressive Disorder - recurrent moderate",cat:"Psychological"},{icd10:"F34.1",label:"Persistent Depressive Disorder (Dysthymia)",cat:"Psychological"},
+  {icd10:"F41.1",label:"Generalised Anxiety Disorder (GAD)",cat:"Psychological"},{icd10:"F41.0",label:"Panic Disorder",cat:"Psychological"},
+  {icd10:"F43.1",label:"Post-Traumatic Stress Disorder (PTSD)",cat:"Psychological"},{icd10:"F43.0",label:"Acute Stress Disorder",cat:"Psychological"},
+  {icd10:"F43.20",label:"Adjustment Disorder with Depressed Mood",cat:"Psychological"},{icd10:"F43.21",label:"Adjustment Disorder with Anxiety",cat:"Psychological"},
   {icd10:"F43.22",label:"Adjustment Disorder with Mixed Anxiety and Depression",cat:"Psychological"},
   {icd10:"F43.23",label:"Adjustment Disorder with Disturbance of Conduct",cat:"Psychological"},
-  {icd10:"F43.25",label:"Adjustment Disorder unspecified",cat:"Psychological"},
-  {icd10:"F42",label:"Obsessive-Compulsive Disorder (OCD)",cat:"Psychological"},
-  {icd10:"F45.1",label:"Somatic Symptom Disorder",cat:"Psychological"},
-  {icd10:"F10.2",label:"Alcohol Use Disorder",cat:"Psychological"},
-  {icd10:"F11.2",label:"Opioid Use Disorder",cat:"Psychological"},
-  {icd10:"G47.0",label:"Insomnia Disorder",cat:"Psychological"},
-  {icd10:"F90.2",label:"ADHD - combined presentation",cat:"Psychological"},
-  {icd10:"F60.3",label:"Borderline Personality Disorder",cat:"Psychological"},
-  {icd10:"F07.81",label:"Post-concussion syndrome",cat:"Head"},
-  {icd10:"S06.0",label:"Concussion",cat:"Head"},
-  {icd10:"G44.3",label:"Post-traumatic headache",cat:"Head"},
-  {icd10:"H83.3",label:"Noise-induced hearing loss",cat:"Head"},
+  {icd10:"F43.25",label:"Adjustment Disorder unspecified",cat:"Psychological"},{icd10:"F42",label:"Obsessive-Compulsive Disorder (OCD)",cat:"Psychological"},
+  {icd10:"F45.1",label:"Somatic Symptom Disorder",cat:"Psychological"},{icd10:"F10.2",label:"Alcohol Use Disorder",cat:"Psychological"},
+  {icd10:"F11.2",label:"Opioid Use Disorder",cat:"Psychological"},{icd10:"G47.0",label:"Insomnia Disorder",cat:"Psychological"},
+  {icd10:"F90.2",label:"ADHD - combined presentation",cat:"Psychological"},{icd10:"F60.3",label:"Borderline Personality Disorder",cat:"Psychological"},
+  {icd10:"F07.81",label:"Post-concussion syndrome",cat:"Head"},{icd10:"S06.0",label:"Concussion",cat:"Head"},
+  {icd10:"G44.3",label:"Post-traumatic headache",cat:"Head"},{icd10:"H83.3",label:"Noise-induced hearing loss",cat:"Head"},
 ];
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -231,11 +264,6 @@ function Ta({label:l,value,onChange,placeholder,rows=3,mb=16}){
     l&&e("label",{key:"l",style:S.label},l),
     ta({key:"t",className:"cb-ta",style:{...S.ta,minHeight:rows*36},value:value||"",onChange:ev=>onChange(ev.target.value),placeholder:placeholder||""}),
   ]);
-}
-function Pill({children,active,color,onClick,style:sx}){
-  const base=color?{...S.pill,background:active?color+"22":"rgba(255,255,255,0.03)",borderColor:active?color+"55":"rgba(255,255,255,0.08)",color:active?color:"rgba(255,255,255,0.5)"}:
-    {...S.pill,...(active?S.pillT:S.pillM)};
-  return btn({style:{...base,...(sx||{})},onClick:onClick||null},children);
 }
 function OK({children}){return div({style:S.ok},"✅ ",children);}
 function WARN({children}){return div({style:S.warn},"⚠️ ",children);}
@@ -514,7 +542,7 @@ function ClaimForm({clinic,claimData,onSave,onBack}){
     tab===1&&e(Tab2,{key:"t1",claim,up}),
     tab===2&&e(Tab3,{key:"t2",claim,up}),
     tab===3&&e(Tab4,{key:"t3",claim,up}),
-    tab===4&&e(Tab5,{key:"t4",claim,up}),
+    tab===4&&e(Tab5,{key:"t4",claim,up,clinic,practitioners}),
     tab===5&&e(Tab6,{key:"t5",claim,up}),
     tab===6&&e(Tab7,{key:"t6",claim,up}),
     tab===7&&e(Tab8,{key:"t7",claim,up,clinic,practitioners}),
@@ -535,17 +563,13 @@ function Tab1({claim,up,practitioners}){
   const JURS=[{id:"vic",label:"Victoria",on:true},{id:"nsw",label:"NSW"},{id:"qld",label:"QLD"},{id:"sa",label:"SA"},{id:"wa",label:"WA"},{id:"act",label:"ACT"},{id:"tas",label:"TAS"},{id:"nt",label:"NT"},{id:"federal",label:"Federal"}];
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:20}},"Patient & Claim Details"),
-
     div({key:"scheme-card",style:S.card},[
       div({key:"tog-row",style:{display:"flex",gap:8,marginBottom:16}},[
         e("button",{key:"wc",onClick:()=>{up("scheme","WorkCover");up("insurerId","");},style:{flex:1,padding:"12px",borderRadius:10,border:"none",fontWeight:700,fontSize:"1rem",cursor:"pointer",background:claim.scheme==="WorkCover"?"#0057A8":"rgba(255,255,255,0.05)",color:claim.scheme==="WorkCover"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"WorkCover"),
         e("button",{key:"tac",onClick:()=>{up("scheme","TAC");up("insurerId","");},style:{flex:1,padding:"12px",borderRadius:10,border:"none",fontWeight:700,fontSize:"1rem",cursor:"pointer",background:claim.scheme==="TAC"?"#C0392B":"rgba(255,255,255,0.05)",color:claim.scheme==="TAC"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"TAC"),
       ]),
       div({key:"jur-row",style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}},
-        JURS.map(j=>{
-          const active=claim.jurisdiction===j.id||(j.id==="vic"&&!claim.jurisdiction);
-          return e("button",{key:j.id,onClick:()=>j.on?up("jurisdiction",j.id):alert(j.label+" coming soon"),style:{...S.pill,...(active?S.pillT:S.pillM),fontSize:"0.8rem",padding:"7px 16px",...(!j.on?{opacity:0.4}:{})}},j.label+(j.on?"":" (soon)"));
-        })
+        JURS.map(j=>{const active=claim.jurisdiction===j.id||(j.id==="vic"&&!claim.jurisdiction);return e("button",{key:j.id,onClick:()=>j.on?up("jurisdiction",j.id):alert(j.label+" coming soon"),style:{...S.pill,...(active?S.pillT:S.pillM),fontSize:"0.8rem",padding:"7px 16px",...(!j.on?{opacity:0.4}:{})}},j.label+(j.on?"":" (soon)"));})
       ),
       e("label",{key:"ins-label",style:{...S.label,marginBottom:10}},"Insurer *"),
       div({key:"ins-pills",style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}},
@@ -558,16 +582,16 @@ function Tab1({claim,up,practitioners}){
       claim.insurerId==="other"&&div({key:"custom",style:{marginTop:12}},[
         e(Inp,{key:"n",label:"Insurer name",value:claim.insurerNameCustom,onChange:v=>up("insurerNameCustom",v),placeholder:"Enter insurer name"}),
         e(Inp,{key:"e",label:"Accounts payable email",value:claim.insurerEmail,onChange:v=>up("insurerEmail",v),type:"email",placeholder:"ap@insurer.com.au"}),
-        e("button",{key:"req",style:{...S.pill,...S.pillA,fontSize:"0.78rem"},onClick:()=>alert("Request submitted!")},"Request to add insurer"),
       ]),
     ]),
-
     div({key:"pat-prac",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},[
       div({key:"pat",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:14}},"Patient information"),
-        e(Inp,{key:"n",label:"Full name",value:claim.patientName,onChange:v=>up("patientName",v),placeholder:"Jane Smith",required:true}),
+        e(Inp,{key:"fn",label:"First name",value:claim.patientFirstName,onChange:v=>{up("patientFirstName",v);up("patientName",(v||"")+" "+(claim.patientLastName||"").trim());},placeholder:"Jane",required:true}),
+        e(Inp,{key:"ln",label:"Last name",value:claim.patientLastName,onChange:v=>{up("patientLastName",v);up("patientName",(claim.patientFirstName||"")+" "+(v||"").trim());},placeholder:"Smith",required:true}),
         e(Inp,{key:"d",label:"Date of birth",value:claim.dob,onChange:v=>up("dob",v),type:"date",required:true}),
         e(Inp,{key:"a",label:"Address",value:claim.patientAddress,onChange:v=>up("patientAddress",v),placeholder:"123 Main St, Melbourne VIC 3000"}),
+        e(Inp,{key:"pc",label:"Postcode",value:claim.patientPostcode,onChange:v=>up("patientPostcode",v),placeholder:"3000"}),
         e(Inp,{key:"em",label:"Email",value:claim.patientEmail,onChange:v=>up("patientEmail",v),type:"email",placeholder:"patient@email.com"}),
         e(Inp,{key:"ph",label:"Phone",value:claim.patientPhone,onChange:v=>up("patientPhone",v),placeholder:"04XX XXX XXX"}),
       ]),
@@ -586,7 +610,6 @@ function Tab1({claim,up,practitioners}){
         ]),
       ]),
     ]),
-
     div({key:"claim",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:14}},"Claim information"),
       div({key:"g",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}},[
@@ -599,7 +622,6 @@ function Tab1({claim,up,practitioners}){
         e(Inp,{key:"ec",label:"Employer contact",value:claim.employerContact,onChange:v=>up("employerContact",v),placeholder:"HR Manager - 03 XXXX XXXX",mb:0}),
       ]),
     ]),
-
     div({key:"inj",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:14}},"Injury details"),
       div({key:"g1",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},[
@@ -616,7 +638,7 @@ function Tab1({claim,up,practitioners}){
   ]);
 }
 
-
+// ── TAB 2: DIAGNOSIS ──────────────────────────────────────────────────────────
 function Tab2({claim,up}){
   const[q,setQ]=useState("");
   const[show,setShow]=useState(false);
@@ -624,12 +646,7 @@ function Tab2({claim,up}){
   const[dSubTab,setDSubTab]=useState(0);
   const[hiIdx,setHiIdx]=useState(-1);
   const DSUB=["Diagnosis & Capacity","Clinical Assessment","Psychosocial Barriers"];
-  const dSubStyle=i=>({padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:dSubTab===i?"rgba(0,201,167,0.1)":"transparent",color:dSubTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:dSubTab===i?"2px solid #00C9A7":"none"});
-  const sugg=useMemo(()=>{
-    if(!q||q.length<2)return[];
-    const ql=q.toLowerCase();
-    return DIAGNOSES_DB.filter(d=>d.label.toLowerCase().includes(ql)||d.icd10.toLowerCase().includes(ql)).slice(0,8);
-  },[q]);
+  const sugg=useMemo(()=>{if(!q||q.length<2)return[];const ql=q.toLowerCase();return DIAGNOSES_DB.filter(d=>d.label.toLowerCase().includes(ql)||d.icd10.toLowerCase().includes(ql)).slice(0,8);},[q]);
   const addD=d=>{if(diags.find(x=>x.icd10===d.icd10))return;const u=[...diags,d];setDiags(u);up("diagnoses",u);setQ("");setShow(false);};
   const remD=icd=>{const u=diags.filter(d=>d.icd10!==icd);setDiags(u);up("diagnoses",u);};
   const setCap=(fid,opt)=>up("capacity",{...(claim.capacity||{}),[fid]:opt});
@@ -638,114 +655,98 @@ function Tab2({claim,up}){
   const capText={Can:"#00C9A7",Modified:"#FFB830",Cannot:"#FF4D6D"};
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Diagnosis"),
-    NO_DIAG_PROFS&&NO_DIAG_PROFS.includes(claim.practitionerProfession)&&e(WARN,{key:"nd"},"Diagnosis is completed by the referring medical practitioner or allied health practitioner. OTs and Exercise Physiologists cannot diagnose conditions."),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:12}},"Search and add conditions. Capacity limitations auto-populate the Certificate of Capacity."),
     div({key:"dsubtabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:24}},
       DSUB.map((t,i)=>e("button",{key:t,onClick:()=>setDSubTab(i),style:{padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:dSubTab===i?"rgba(0,201,167,0.1)":"transparent",color:dSubTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:dSubTab===i?"2px solid #00C9A7":"none"}},(i+1)+". "+t))
     ),
-    dSubTab===0&&div({key:"preexist",style:S.card},[
-      e(Ta,{key:"pre",label:"Pre-existing conditions / relevant history",value:claim.preExisting,onChange:v=>up("preExisting",v),placeholder:"Relevant prior injuries, pre-existing conditions and their relationship to the current claim...",rows:3}),
-    ]),
-    dSubTab===0&&div({key:"diag",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Conditions / Diagnosis"),
-      div({key:"sw",style:{position:"relative"}},[
-        inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:42},placeholder:"Search conditions (e.g. low back pain, PTSD)...",value:q,
-          onChange:ev=>{setQ(ev.target.value);setShow(true);setHiIdx(-1);},
-          onFocus:()=>setShow(true),
-          onBlur:()=>setTimeout(()=>setShow(false),200),
-          onKeyDown:ev=>{
-            if(!show||sugg.length===0)return;
-            if(ev.key==="ArrowDown"){ev.preventDefault();setHiIdx(i=>Math.min(i+1,sugg.length-1));}
-            else if(ev.key==="ArrowUp"){ev.preventDefault();setHiIdx(i=>Math.max(i-1,0));}
-            else if(ev.key==="Enter"){ev.preventDefault();if(hiIdx>=0&&hiIdx<sugg.length)addD(sugg[hiIdx]);}
-            else if(ev.key==="Escape"){setShow(false);setHiIdx(-1);}
-          }
-        }),
-        e("div",{key:"ic",style:{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#5B7A99",fontSize:"13px",fontWeight:400}},"[S]"),
-        show&&sugg.length>0&&div({key:"dd",style:{position:"absolute",top:"100%",left:0,right:0,background:"#112240",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,zIndex:100,marginTop:4,maxHeight:280,overflow:"auto",boxShadow:"0 8px 30px rgba(0,0,0,0.3)"}},
-          sugg.map((d,si)=>div({key:d.icd10,onClick:()=>addD(d),onMouseEnter:()=>setHiIdx(si),style:{padding:"11px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.05)",background:hiIdx===si?"rgba(0,201,167,0.12)":"transparent"}},[
-            div({key:"l"},[
-              div({key:"n",style:{fontSize:"0.88rem",fontWeight:500}},d.label),
-              div({key:"c",style:{fontSize:"0.73rem",color:"#5B7A99",marginTop:1}},d.cat),
-            ]),
-            span({key:"code",style:{fontSize:"0.72rem",fontFamily:"monospace",color:"#5B7A99",background:"rgba(255,255,255,0.05)",padding:"2px 7px",borderRadius:5}},d.icd10),
+    dSubTab===0&&div({key:"tab0"},[
+      div({key:"preexist",style:S.card},[
+        e(Ta,{key:"pre",label:"Pre-existing conditions / relevant history",value:claim.preExisting,onChange:v=>up("preExisting",v),placeholder:"Relevant prior injuries, pre-existing conditions and their relationship to the current claim...",rows:3}),
+      ]),
+      div({key:"diag",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:14}},"Conditions / Diagnosis"),
+        div({key:"sw",style:{position:"relative"}},[
+          inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:42},placeholder:"Search conditions (e.g. low back pain, PTSD)...",value:q,
+            onChange:ev=>{setQ(ev.target.value);setShow(true);setHiIdx(-1);},
+            onFocus:()=>setShow(true),onBlur:()=>setTimeout(()=>setShow(false),200),
+            onKeyDown:ev=>{
+              if(!show||sugg.length===0)return;
+              if(ev.key==="ArrowDown"){ev.preventDefault();setHiIdx(i=>Math.min(i+1,sugg.length-1));}
+              else if(ev.key==="ArrowUp"){ev.preventDefault();setHiIdx(i=>Math.max(i-1,0));}
+              else if(ev.key==="Enter"){ev.preventDefault();if(hiIdx>=0&&hiIdx<sugg.length)addD(sugg[hiIdx]);}
+              else if(ev.key==="Escape"){setShow(false);setHiIdx(-1);}
+            }
+          }),
+          e("div",{key:"ic",style:{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#5B7A99",fontSize:"13px"}},"[S]"),
+          show&&sugg.length>0&&div({key:"dd",style:{position:"absolute",top:"100%",left:0,right:0,background:"#112240",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,zIndex:100,marginTop:4,maxHeight:280,overflow:"auto",boxShadow:"0 8px 30px rgba(0,0,0,0.3)"}},
+            sugg.map((d,si)=>div({key:d.icd10,onClick:()=>addD(d),onMouseEnter:()=>setHiIdx(si),style:{padding:"11px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.05)",background:hiIdx===si?"rgba(0,201,167,0.12)":"transparent"}},[
+              div({key:"l"},[div({key:"n",style:{fontSize:"0.88rem",fontWeight:500}},d.label),div({key:"c",style:{fontSize:"0.73rem",color:"#5B7A99",marginTop:1}},d.cat)]),
+              span({key:"code",style:{fontSize:"0.72rem",fontFamily:"monospace",color:"#5B7A99",background:"rgba(255,255,255,0.05)",padding:"2px 7px",borderRadius:5}},d.icd10),
+            ]))
+          ),
+        ]),
+        diags.length>0&&div({key:"sel",style:{marginTop:12,display:"flex",flexWrap:"wrap",gap:7}},
+          diags.map(d=>div({key:d.icd10,style:{...S.pill,...S.pillT,gap:7}},[
+            span({key:"l"},d.label),span({key:"c",style:{fontSize:"0.68rem",opacity:0.7}},d.icd10),
+            btn({key:"x",onClick:()=>remD(d.icd10),style:{background:"transparent",border:"none",color:"#00C9A7",cursor:"pointer",padding:"0 0 0 3px",fontSize:"0.9rem"}},"x"),
           ]))
         ),
+        diags.length===0&&div({key:"empty",style:{color:"#5B7A99",fontSize:"0.82rem",marginTop:10}},"No conditions added. Search above."),
       ]),
-      diags.length>0&&div({key:"sel",style:{marginTop:12,display:"flex",flexWrap:"wrap",gap:7}},
-        diags.map(d=>div({key:d.icd10,style:{...S.pill,...S.pillT,gap:7}},[
-          span({key:"l"},d.label),
-          span({key:"c",style:{fontSize:"0.68rem",opacity:0.7}},d.icd10),
-          btn({key:"x",onClick:()=>remD(d.icd10),style:{background:"transparent",border:"none",color:"#00C9A7",cursor:"pointer",padding:"0 0 0 3px",fontSize:"0.9rem"}},"x"),
-        ]))
-      ),
-      diags.length===0&&div({key:"empty",style:{color:"#5B7A99",fontSize:"0.82rem",marginTop:10}},"No conditions added. Search above."),
-    ]),
-    dSubTab===0&&div({key:"cap",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:6}},"Physical capacity assessment"),
-      div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Select capacity for each function. Auto-populates the Certificate of Capacity."),
-      div({key:"hdr",style:{display:"grid",gridTemplateColumns:"1fr 90px 90px 90px",gap:6,marginBottom:8}},[
-        div({key:"f",style:{fontSize:"0.7rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#5B7A99"}},"Function"),
-        ...["Can","Modified","Cannot"].map(o=>div({key:o,style:{fontSize:"0.7rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#5B7A99",textAlign:"center"}},o)),
-      ]),
-      ...PHYSICAL_FUNCTIONS.map(f=>div({key:f.id,style:{display:"grid",gridTemplateColumns:"1fr 90px 90px 90px",gap:6,alignItems:"center",marginBottom:5}},[
-        div({key:"l",style:{fontSize:"0.87rem"}},f.label),
-        ...["Can","Modified","Cannot"].map(o=>{
-          const active=(claim.capacity||{})[f.id]===o;
-          return div({key:o,onClick:()=>setCap(f.id,o),style:{padding:"7px 8px",borderRadius:7,border:"1px solid "+(active?capBorders[o]:"rgba(255,255,255,0.07)"),background:active?capColors[o]:"rgba(255,255,255,0.02)",cursor:"pointer",fontSize:"0.75rem",fontWeight:600,textAlign:"center",color:active?capText[o]:"rgba(255,255,255,0.35)",userSelect:"none"}},o);
-        }),
-      ])),
-      e(Ta,{key:"pn",label:"Physical function notes",value:claim.physicalNotes,onChange:v=>up("physicalNotes",v),placeholder:"Additional notes..."}),
-    ]),
-    dSubTab===0&&div({key:"mental",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Mental function"),
-      div({key:"tog",style:{display:"flex",gap:10,marginBottom:16}},[
-        ["Not affected","Affected"].map(o=>btn({key:o,onClick:()=>up("mentalStatus",o),style:{...S.pill,...(claim.mentalStatus===o?S.pillT:S.pillM),fontSize:"0.85rem",padding:"10px 22px"}},o)),
-      ]),
-      claim.mentalStatus==="Affected"&&div({key:"detail"},[
-        ...MENTAL_FUNCTIONS.map(f=>div({key:f.id,style:{marginBottom:14}},[
-          div({key:"l",style:{fontSize:"0.85rem",fontWeight:500,marginBottom:7}},f.label),
-          div({key:"opts",style:{display:"flex",gap:8,flexWrap:"wrap"}},
-            SEVERITY.map(s=>{
-              const active=(claim.mentalSeverity||{})[f.id]===s;
-              return btn({key:s,onClick:()=>up("mentalSeverity",{...(claim.mentalSeverity||{}),[f.id]:s}),style:{...S.pill,...(active?S.pillA:S.pillM),fontSize:"0.77rem"}},s);
-            })
-          ),
+      div({key:"cap",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:6}},"Physical capacity assessment"),
+        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Select capacity for each function. Auto-populates the Certificate of Capacity."),
+        div({key:"hdr",style:{display:"grid",gridTemplateColumns:"1fr 90px 90px 90px",gap:6,marginBottom:8}},[
+          div({key:"f",style:{fontSize:"0.7rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#5B7A99"}},"Function"),
+          ...["Can","Modified","Cannot"].map(o=>div({key:o,style:{fontSize:"0.7rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#5B7A99",textAlign:"center"}},o)),
+        ]),
+        ...PHYSICAL_FUNCTIONS.map(f=>div({key:f.id,style:{display:"grid",gridTemplateColumns:"1fr 90px 90px 90px",gap:6,alignItems:"center",marginBottom:5}},[
+          div({key:"l",style:{fontSize:"0.87rem"}},f.label),
+          ...["Can","Modified","Cannot"].map(o=>{const active=(claim.capacity||{})[f.id]===o;return div({key:o,onClick:()=>setCap(f.id,o),style:{padding:"7px 8px",borderRadius:7,border:"1px solid "+(active?capBorders[o]:"rgba(255,255,255,0.07)"),background:active?capColors[o]:"rgba(255,255,255,0.02)",cursor:"pointer",fontSize:"0.75rem",fontWeight:600,textAlign:"center",color:active?capText[o]:"rgba(255,255,255,0.35)",userSelect:"none"}},o);}),
         ])),
-        e(Ta,{key:"mn",label:"Mental function notes",value:claim.mentalNotes,onChange:v=>up("mentalNotes",v),placeholder:"Additional mental function notes..."}),
+        e(Ta,{key:"pn",label:"Physical function notes",value:claim.physicalNotes,onChange:v=>up("physicalNotes",v),placeholder:"Additional notes..."}),
+      ]),
+      div({key:"mental",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:14}},"Mental function"),
+        div({key:"tog",style:{display:"flex",gap:10,marginBottom:16}},[
+          ["Not affected","Affected"].map(o=>btn({key:o,onClick:()=>up("mentalStatus",o),style:{...S.pill,...(claim.mentalStatus===o?S.pillT:S.pillM),fontSize:"0.85rem",padding:"10px 22px"}},o)),
+        ]),
+        claim.mentalStatus==="Affected"&&div({key:"detail"},[
+          ...MENTAL_FUNCTIONS.map(f=>div({key:f.id,style:{marginBottom:14}},[
+            div({key:"l",style:{fontSize:"0.85rem",fontWeight:500,marginBottom:7}},f.label),
+            div({key:"opts",style:{display:"flex",gap:8,flexWrap:"wrap"}},SEVERITY.map(s=>{const active=(claim.mentalSeverity||{})[f.id]===s;return btn({key:s,onClick:()=>up("mentalSeverity",{...(claim.mentalSeverity||{}),[f.id]:s}),style:{...S.pill,...(active?S.pillA:S.pillM),fontSize:"0.77rem"}},s);})),
+          ])),
+          e(Ta,{key:"mn",label:"Mental function notes",value:claim.mentalNotes,onChange:v=>up("mentalNotes",v),placeholder:"Additional mental function notes..."}),
+        ]),
       ]),
     ]),
-    dSubTab===2&&div({key:"psych-wrap"},[
+    dSubTab===2&&div({key:"tab2"},[
       e(Collapsible,{key:"psych",title:"Psychosocial flags",icon:"🚩",defaultOpen:true},
-      div({},[
-        div({key:"s",style:{fontSize:"0.83rem",color:"#5B7A99",marginBottom:14}},"Identify barriers to recovery that inform the RTW plan."),
-        ...PSYCH_FLAGS.map(({key,label,color,desc,items})=>div({key},[
-          div({key:"l",style:{fontWeight:700,color,fontSize:"0.87rem",marginBottom:3}},label),
-          div({key:"d",style:{fontSize:"0.76rem",color:"#5B7A99",marginBottom:9}},desc),
-          div({key:"items",style:{display:"flex",flexWrap:"wrap",gap:7}},
-            items.map(item=>{
-              const sel=((claim.psychosocial||{})[key]||[]).includes(item);
-              return btn({key:item,onClick:()=>{const cur=(claim.psychosocial||{})[key]||[];const upd=sel?cur.filter(x=>x!==item):[...cur,item];up("psychosocial",{...(claim.psychosocial||{}),[key]:upd});},style:{...S.pill,background:sel?color+"22":"rgba(255,255,255,0.03)",borderColor:sel?color+"55":"rgba(255,255,255,0.08)",color:sel?color:"rgba(255,255,255,0.5)",fontSize:"0.76rem"}},item);
-            })
-          ),
-        ])),
-        div({key:"spacer",style:{height:24}}),
-        e(Ta,{key:"pn",label:"Psychosocial notes",value:claim.psychosocialNotes,onChange:v=>up("psychosocialNotes",v),placeholder:"Additional observations..."}),
-      ])
-    ),
-
-    ],),
-    dSubTab===1&&div({key:"clin"},[div({key:"h",style:{fontWeight:700,marginBottom:14}},"Clinical assessment"),e(Collapsible,{key:"clin-inner",title:"Allied health clinical findings",icon:"🩺",defaultOpen:true},
-      div({},[
-        e(Ta,{key:"cp",label:"Clinical presentation",value:claim.clinicalPresentation,onChange:v=>up("clinicalPresentation",v),placeholder:"Describe clinical presentation...",rows:4}),
-        e(Ta,{key:"ot",label:"Orthopaedic test results",value:claim.orthoTests,onChange:v=>up("orthoTests",v),placeholder:"e.g. Positive Spurlings, SLR 45 degrees..."}),
-        e(Inp,{key:"ar",label:"Body region assessed",value:claim.aromRegion,onChange:v=>up("aromRegion",v),placeholder:"e.g. Lumbar spine, Cervical spine"}),
-        e(Ta,{key:"af",label:"Active ROM findings",value:claim.arom,onChange:v=>up("arom",v),placeholder:"Flexion 40 degrees, Extension 15 degrees..."}),
-        e(Ta,{key:"pf",label:"Passive ROM findings",value:claim.prom,onChange:v=>up("prom",v),placeholder:"Passive ROM findings..."}),
-      ])
-    ),
-    ],),
-    // Work & activity restrictions moved to Treatment Plan tab
+        div({},[
+          div({key:"s",style:{fontSize:"0.83rem",color:"#5B7A99",marginBottom:14}},"Identify barriers to recovery that inform the RTW plan."),
+          ...PSYCH_FLAGS.map(({key,label,color,desc,items})=>div({key},[
+            div({key:"l",style:{fontWeight:700,color,fontSize:"0.87rem",marginBottom:3}},label),
+            div({key:"d",style:{fontSize:"0.76rem",color:"#5B7A99",marginBottom:9}},desc),
+            div({key:"items",style:{display:"flex",flexWrap:"wrap",gap:7}},
+              items.map(item=>{const sel=((claim.psychosocial||{})[key]||[]).includes(item);return btn({key:item,onClick:()=>{const cur=(claim.psychosocial||{})[key]||[];const upd=sel?cur.filter(x=>x!==item):[...cur,item];up("psychosocial",{...(claim.psychosocial||{}),[key]:upd});},style:{...S.pill,background:sel?color+"22":"rgba(255,255,255,0.03)",borderColor:sel?color+"55":"rgba(255,255,255,0.08)",color:sel?color:"rgba(255,255,255,0.5)",fontSize:"0.76rem"}},item);})
+            ),
+            div({key:"sp",style:{height:20}}),
+          ])),
+          e(Ta,{key:"pn",label:"Psychosocial notes",value:claim.psychosocialNotes,onChange:v=>up("psychosocialNotes",v),placeholder:"Additional observations..."}),
+        ])
+      ),
+    ]),
+    dSubTab===1&&div({key:"tab1"},[
+      e(Collapsible,{key:"clin",title:"Allied health clinical findings",icon:"🩺",defaultOpen:true},
+        div({},[
+          e(Ta,{key:"cp",label:"Clinical presentation",value:claim.clinicalPresentation,onChange:v=>up("clinicalPresentation",v),placeholder:"Describe clinical presentation...",rows:4}),
+          e(Ta,{key:"ot",label:"Orthopaedic test results",value:claim.orthoTests,onChange:v=>up("orthoTests",v),placeholder:"e.g. Positive Spurlings, SLR 45 degrees..."}),
+          e(Inp,{key:"ar",label:"Body region assessed",value:claim.aromRegion,onChange:v=>up("aromRegion",v),placeholder:"e.g. Lumbar spine, Cervical spine"}),
+          e(Ta,{key:"af",label:"Active ROM findings",value:claim.arom,onChange:v=>up("arom",v),placeholder:"Flexion 40 degrees, Extension 15 degrees..."}),
+          e(Ta,{key:"pf",label:"Passive ROM findings",value:claim.prom,onChange:v=>up("prom",v),placeholder:"Passive ROM findings..."}),
+        ])
+      ),
+    ]),
   ]);
 }
 
@@ -761,42 +762,21 @@ function Tab3({claim,up}){
     up("imagingReports",[...reports,nr]);setUploading(false);
   };
   const genSummary=async rid=>{
-    setGenerating(rid);
-    await new Promise(r=>setTimeout(r,1200));
-    const report=reports.find(r=>r.id===rid);
-    const fname=(report&&report.name)||"";
+    setGenerating(rid);await new Promise(r=>setTimeout(r,1200));
+    const report=reports.find(r=>r.id===rid);const fname=(report&&report.name)||"";
     const today=new Date().toLocaleDateString("en-AU");
     const diags=(claim.diagnoses||[]).map(d=>d.label).join(", ")||"musculoskeletal injury";
     const bodyPart=claim.injuryBodyPart||"region of interest";
-    // Generate contextual summary based on claim data
     const summaries={
-      mri:{modality:"MRI",findings:"MRI demonstrates findings consistent with the reported mechanism of injury. "+
-        "There is evidence of soft tissue oedema and altered signal intensity in the affected region. "+
-        "No acute fracture identified. Findings are consistent with the clinical diagnosis of "+diags+"."},
-      ct:{modality:"CT",findings:"CT imaging of the "+bodyPart+" demonstrates bony alignment is maintained. "+
-        "No acute fracture or dislocation identified. Soft tissue swelling noted in the periarticular region. "+
-        "Clinical correlation recommended with the reported diagnosis of "+diags+"."},
-      xray:{modality:"X-Ray",findings:"Plain radiographs of the "+bodyPart+" demonstrate normal bony alignment. "+
-        "No acute fracture, dislocation or significant joint space narrowing identified. "+
-        "Soft tissue findings are within normal limits for the clinical context of "+diags+"."},
-      ultrasound:{modality:"Ultrasound",findings:"Ultrasound assessment demonstrates altered echogenicity and texture "+
-        "in the region of interest consistent with the reported injury. "+
-        "Findings support the clinical diagnosis of "+diags+". No significant fluid collection identified."},
+      mri:{modality:"MRI",findings:"MRI demonstrates findings consistent with the reported mechanism of injury. There is evidence of soft tissue oedema and altered signal intensity in the affected region. No acute fracture identified. Findings are consistent with the clinical diagnosis of "+diags+"."},
+      ct:{modality:"CT",findings:"CT imaging of the "+bodyPart+" demonstrates bony alignment is maintained. No acute fracture or dislocation identified. Soft tissue swelling noted in the periarticular region. Clinical correlation recommended with the reported diagnosis of "+diags+"."},
+      xray:{modality:"X-Ray",findings:"Plain radiographs of the "+bodyPart+" demonstrate normal bony alignment. No acute fracture, dislocation or significant joint space narrowing identified. Soft tissue findings are within normal limits for the clinical context of "+diags+"."},
+      ultrasound:{modality:"Ultrasound",findings:"Ultrasound assessment demonstrates altered echogenicity and texture in the region of interest consistent with the reported injury. Findings support the clinical diagnosis of "+diags+". No significant fluid collection identified."},
     };
-    const fl=fname.toLowerCase();
-    const type=fl.includes("mri")?"mri":fl.includes("ct")?"ct":fl.includes("xr")||fl.includes("xray")?"xray":"ultrasound";
+    const fl=fname.toLowerCase();const type=fl.includes("mri")?"mri":fl.includes("ct")?"ct":fl.includes("xr")||fl.includes("xray")?"xray":"ultrasound";
     const s=summaries[type]||summaries.mri;
-    const summary={
-      dateOfImaging:today,
-      requestingPractitioner:claim.practitionerName||"Treating practitioner",
-      reportingRadiologist:"Dr. [Radiologist Name]",
-      facility:"[Radiology Facility]",
-      clinicalSummary:s.findings,
-      keyFindings:"Findings consistent with "+diags+". Clinical correlation recommended. See full report for complete details.",
-      modality:s.modality,
-    };
-    up("imagingReports",reports.map(r=>r.id===rid?{...r,summary}:r));
-    setGenerating(false);
+    const summary={dateOfImaging:today,requestingPractitioner:claim.practitionerName||"Treating practitioner",reportingRadiologist:"Dr. [Radiologist Name]",facility:"[Radiology Facility]",clinicalSummary:s.findings,keyFindings:"Findings consistent with "+diags+". Clinical correlation recommended. See full report for complete details.",modality:s.modality};
+    up("imagingReports",reports.map(r=>r.id===rid?{...r,summary}:r));setGenerating(false);
   };
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Imaging Reports"),
@@ -814,10 +794,7 @@ function Tab3({claim,up}){
       div({key:"hdr",style:{...S.fb,marginBottom:r.summary?14:0}},[
         div({key:"l",style:S.fr},[
           span({key:"i",style:{fontSize:"1.4rem"}},"📋"),
-          div({key:"d"},[
-            div({key:"n",style:{fontWeight:600,fontSize:"0.9rem"}},r.name),
-            div({key:"s",style:{fontSize:"0.74rem",color:"#5B7A99",marginTop:2}},r.size+" - "+new Date(r.uploadedAt).toLocaleDateString("en-AU")),
-          ]),
+          div({key:"d"},[div({key:"n",style:{fontWeight:600,fontSize:"0.9rem"}},r.name),div({key:"s",style:{fontSize:"0.74rem",color:"#5B7A99",marginTop:2}},r.size+" - "+new Date(r.uploadedAt).toLocaleDateString("en-AU"))]),
         ]),
         div({key:"btns",style:{display:"flex",gap:8}},[
           !r.summary&&btn({key:"gen",style:S.btnP,onClick:()=>genSummary(r.id),disabled:generating===r.id},generating===r.id?"Generating...":"Generate AI Summary"),
@@ -833,67 +810,81 @@ function Tab3({claim,up}){
   ]);
 }
 
+// ── OUTCOME MEASURES CHART ────────────────────────────────────────────────────
+function OutcomeTrendChart({scores,measure,measureKey}){
+  if(!scores||scores.length<1)return null;
+  const W=500,H=180,PAD={top:20,right:20,bottom:40,left:50};
+  const iW=W-PAD.left-PAD.right,iH=H-PAD.top-PAD.bottom;
+  const m=OUTCOME_MEASURES[measureKey];if(!m)return null;
+  const sorted=[...scores].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const vals=sorted.map(s=>parseFloat(s.score));
+  const minV=m.min,maxV=m.max;
+  const toX=i=>(PAD.left+i*(iW/Math.max(sorted.length-1,1)));
+  const toY=v=>PAD.top+iH-(((v-minV)/(maxV-minV))*iH);
+  const pts=sorted.map((s,i)=>({x:toX(i),y:toY(parseFloat(s.score)),score:s.score,date:s.date}));
+  const path=pts.map((p,i)=>(i===0?"M":"L")+p.x+","+p.y).join(" ");
+  const trend=vals.length>1?(m.higherBetter?(vals[vals.length-1]>vals[0]):(vals[vals.length-1]<vals[0])):null;
+  const lineColor=trend===null?"#6B7280":trend?"#00C9A7":"#FF4D6D";
+  const[hov,setHov]=useState(null);
+  return div({style:{marginTop:16,background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"16px",position:"relative"}},[
+    div({key:"header",style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},[
+      div({key:"t",style:{fontSize:"0.8rem",fontWeight:600,color:"#EFF6FF"}},measureKey),
+      trend!==null&&span({key:"tr",style:{...S.pill,background:trend?"rgba(0,201,167,0.12)":"rgba(255,77,109,0.1)",borderColor:trend?"rgba(0,201,167,0.3)":"rgba(255,77,109,0.3)",color:trend?"#00C9A7":"#FF4D6D",fontSize:"0.7rem",cursor:"default"}},trend?"↑ Improving":"↓ Declining"),
+    ]),
+    e("svg",{key:"svg",viewBox:`0 0 ${W} ${H}`,style:{width:"100%",maxWidth:W,display:"block"}},[
+      // Grid lines
+      ...[0,0.25,0.5,0.75,1].map(t=>{
+        const y=PAD.top+t*iH;const val=Math.round(maxV-(t*(maxV-minV)));
+        return e("g",{key:"grid"+t},[
+          e("line",{key:"l",x1:PAD.left,y1:y,x2:PAD.left+iW,y2:y,stroke:"rgba(255,255,255,0.06)",strokeWidth:1}),
+          e("text",{key:"v",x:PAD.left-6,y:y+4,textAnchor:"end",fontSize:9,fill:"rgba(255,255,255,0.35)"},val),
+        ]);
+      }),
+      // Good threshold line
+      m.interpretation&&e("line",{key:"goodline",x1:PAD.left,y1:toY(m.interpretation.good),x2:PAD.left+iW,y2:toY(m.interpretation.good),stroke:"rgba(0,201,167,0.2)",strokeWidth:1,strokeDasharray:"4,4"}),
+      // Trend line
+      pts.length>1&&e("path",{key:"path",d:path,fill:"none",stroke:lineColor,strokeWidth:2.5,strokeLinecap:"round",strokeLinejoin:"round"}),
+      // Dots
+      ...pts.map((p,i)=>e("circle",{key:"dot"+i,cx:p.x,cy:p.y,r:hov===i?6:4,fill:lineColor,stroke:"#0C1A2E",strokeWidth:2,style:{cursor:"pointer"},onMouseEnter:()=>setHov(i),onMouseLeave:()=>setHov(null)})),
+      // X axis labels
+      ...sorted.map((s,i)=>{
+        const x=toX(i);
+        return e("text",{key:"xl"+i,x,y:H-6,textAnchor:"middle",fontSize:8,fill:"rgba(255,255,255,0.35)"},new Date(s.date).toLocaleDateString("en-AU",{day:"2-digit",month:"2-digit"}));
+      }),
+    ]),
+    // Tooltip
+    hov!==null&&pts[hov]&&div({key:"tip",style:{position:"absolute",background:"#112240",border:"1px solid rgba(255,255,255,0.15)",borderRadius:8,padding:"8px 12px",fontSize:"0.78rem",pointerEvents:"none",top:30,left:Math.min(hov/Math.max(sorted.length-1,1)*90,70)+"%",transform:"translateX(-50%)"}},[
+      div({key:"d",style:{color:"#5B7A99"}},new Date(pts[hov].date).toLocaleDateString("en-AU")),
+      div({key:"s",style:{fontWeight:700,color:"#EFF6FF",fontSize:"0.9rem"}},pts[hov].score+m.unit),
+    ]),
+  ]);
+}
+
 // ── TAB 4: TREATMENT PLAN ─────────────────────────────────────────────────────
 function Tab4({claim,up}){
   const[subTab,setSubTab]=useState(0);
-  const SUB=["Goals & Management","Referrals","Work & Activity","Medication & Investigations"];
+  const SUB=["Goals & Management","Referrals","Work & Activity","Medication & Investigations","Outcome Measures"];
   const isPrescriber=PRESCRIBING.includes(claim.practitionerProfession);
-  const isAlliedHealth=!PRESCRIBING.includes(claim.practitionerProfession)&&claim.practitionerProfession!=="General Practitioner"&&claim.practitionerProfession!=="";
   const subStyle=i=>({padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:subTab===i?"rgba(0,201,167,0.1)":"transparent",color:subTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:subTab===i?"2px solid #00C9A7":"none"});
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Treatment Plan"),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Complete the sections relevant to this consultation."),
-    div({key:"subtabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:24}},
+    div({key:"subtabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:24,flexWrap:"wrap"}},
       SUB.map((t,i)=>e("button",{key:t,onClick:()=>setSubTab(i),style:subStyle(i)},t))
     ),
-
     subTab===0&&div({key:"goals"},[
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:14}},"Goals & management"),
-        isAlliedHealth?[
-          div({key:"note",style:{...S.warn,marginBottom:14}},"Activity/functional limitations and SMART goals (AHRMP format)"),
-          ...[1,2,3].map(n=>div({key:"row"+n,style:{display:"grid",gridTemplateColumns:"1fr 1fr 140px",gap:10,marginBottom:10}},[
-            e(Inp,{key:"lim",label:n===1?"Current limitation":"",value:(claim["ahGoalLim"+n]||""),onChange:v=>up("ahGoalLim"+n,v),placeholder:"e.g. Unable to walk 100m",mb:0}),
-            e(Inp,{key:"goal",label:n===1?"Related SMART goal":"",value:(claim["ahGoalTarget"+n]||""),onChange:v=>up("ahGoalTarget"+n,v),placeholder:"e.g. Walk 500m by discharge",mb:0}),
-            e(Inp,{key:"date",label:n===1?"Est. date":"",value:(claim["ahGoalDate"+n]||""),onChange:v=>up("ahGoalDate"+n,v),type:"date",mb:0}),
-          ])),
-          div({key:"tx-grid",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}},[
-            e(Inp,{key:"ns",label:"No. of treatments",value:claim.txNum,onChange:v=>up("txNum",v),placeholder:"e.g. 12",mb:0}),
-            e(Inp,{key:"wks",label:"Over (weeks)",value:claim.txWeeks,onChange:v=>up("txWeeks",v),placeholder:"e.g. 6",mb:0}),
-            e(Inp,{key:"disc",label:"Anticipated discharge",value:claim.txDischarge,onChange:v=>up("txDischarge",v),type:"date",mb:0}),
-          ]),
-          div({key:"dates",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}},[
-            e(Inp,{key:"from",label:"Treatment from",value:claim.txFrom,onChange:v=>up("txFrom",v),type:"date",mb:0}),
-            e(Inp,{key:"to",label:"Treatment to",value:claim.txTo,onChange:v=>up("txTo",v),type:"date",mb:0}),
-          ]),
-          e(Ta,{key:"tp",label:"Treatment methods / proposed treatment",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Describe treatment methods to be used...",rows:3}),
-          e(Ta,{key:"sm",label:"Self-management strategies",value:claim.selfManagement,onChange:v=>up("selfManagement",v),placeholder:"Strategies the worker will use to manage their condition..."}),
-        ]:[
-          e(Ta,{key:"sg",label:"Short-term goals (0-4 weeks)",value:claim.goalsShort,onChange:v=>up("goalsShort",v),placeholder:"e.g. Pain reduction, restore ROM..."}),
-          e(Ta,{key:"lg",label:"Long-term goals (4+ weeks)",value:claim.goalsLong,onChange:v=>up("goalsLong",v),placeholder:"e.g. Return to full duties..."}),
-          e(Ta,{key:"tp",label:"Treatment plan / management approach",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Management approach...",rows:4}),
-        ],
+        e(Ta,{key:"sg",label:"Short-term goals (0-4 weeks)",value:claim.goalsShort,onChange:v=>up("goalsShort",v),placeholder:"e.g. Pain reduction, restore ROM..."}),
+        e(Ta,{key:"lg",label:"Long-term goals (4+ weeks)",value:claim.goalsLong,onChange:v=>up("goalsLong",v),placeholder:"e.g. Return to full duties..."}),
+        e(Ta,{key:"tp",label:"Treatment plan / management approach",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Management approach...",rows:4}),
         div({key:"barriers-section",style:{marginBottom:16}},[
           e("label",{key:"l",style:S.label},"Barriers to recovery"),
-          (()=>{
-            const flags=claim.psychosocial||{};
-            const allFlags=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
-            return allFlags.length>0?div({key:"auto"},[
-              div({key:"note",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:8}},"Auto-populated from psychosocial flags in Diagnosis screen:"),
-              div({key:"pills",style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}},allFlags.map(f=>e("span",{key:f,style:{...S.pill,...S.pillA,cursor:"default",fontSize:"0.72rem"}},f))),
-            ]):null;
-          })(),
+          (()=>{const flags=claim.psychosocial||{};const allFlags=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];return allFlags.length>0?div({key:"auto"},[div({key:"note",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:8}},"Auto-populated from psychosocial flags in Diagnosis screen:"),div({key:"pills",style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}},allFlags.map(f=>e("span",{key:f,style:{...S.pill,...S.pillA,cursor:"default",fontSize:"0.72rem"}},f)))]):null;})(),
           e("textarea",{key:"t",className:"cb-ta",style:{...S.ta,minHeight:72},value:claim.barriers||"",onChange:ev=>up("barriers",ev.target.value),placeholder:"Additional barriers not listed above..."}),
         ]),
-        claim.practitionerProfession==="Podiatrist"&&e(Collapsible,{key:"pod",title:"Orthotics & Aids",icon:"👟",defaultOpen:true},
-          div({},[
-            e(Ta,{key:"ort",label:"Recommended orthotics / aids",value:claim.orthotics,onChange:v=>up("orthotics",v),placeholder:"e.g. Custom foot orthotics, ankle brace, walking aids..."}),
-            e(Ta,{key:"cli",label:"Clinical justification for orthotics",value:claim.orthJustification,onChange:v=>up("orthJustification",v),placeholder:"Clinical reasoning for recommended aids..."}),
-          ])
-        ),
       ]),
     ]),
-
     subTab===1&&div({key:"refs"},[
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:6}},"Specialist & Allied Health Referrals"),
@@ -906,32 +897,19 @@ function Tab4({claim,up}){
           e(Inp,{key:"em",label:"Email address",value:(claim.newRef&&claim.newRef.email)||"",onChange:v=>up("newRef",{...(claim.newRef||{}),email:v}),type:"email",placeholder:"dr.smith@clinic.com"}),
         ]),
         e(Ta,{key:"cr",label:"Clinical reasoning for referral",value:(claim.newRef&&claim.newRef.reasoning)||"",onChange:v=>up("newRef",{...(claim.newRef||{}),reasoning:v}),placeholder:"Why is this referral clinically necessary?"}),
-        e("button",{key:"add",style:S.btnP,onClick:()=>{
-          const nr=claim.newRef||{};
-          if(!nr.specialty)return;
-          const gpReq=nr.specialty.includes("GP referral required");
-          const updated=[...(claim.referrals||[]),{...nr,id:"ref_"+Date.now(),gpRefRequired:gpReq}];
-          up("referrals",updated);
-          up("newRef",{specialty:"",name:"",clinic:"",email:"",priority:"Routine (within 4 weeks)",reasoning:""});
-        }},"+ Add referral"),
+        e("button",{key:"add",style:S.btnP,onClick:()=>{const nr=claim.newRef||{};if(!nr.specialty)return;const gpReq=nr.specialty.includes("GP referral required");const updated=[...(claim.referrals||[]),{...nr,id:"ref_"+Date.now(),gpRefRequired:gpReq}];up("referrals",updated);up("newRef",{specialty:"",name:"",clinic:"",email:"",priority:"Routine (within 4 weeks)",reasoning:""});}},"+ Add referral"),
         (claim.referrals||[]).length>0&&div({key:"list",style:{marginTop:16}},[
-          div({key:"h",style:{fontWeight:600,fontSize:"0.85rem",marginBottom:10,color:"#5B7A99"}},"Referrals added:"),
           ...(claim.referrals||[]).map(r=>div({key:r.id,style:{...S.cardSm,marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}},[
             div({key:"i"},[
               div({key:"n",style:{fontWeight:600,fontSize:"0.87rem"}},r.specialty.replace(" (GP referral required)","")),
               r.name&&div({key:"d",style:{fontSize:"0.76rem",color:"#5B7A99",marginTop:2}},r.name+(r.clinic?" - "+r.clinic:"")),
-              r.reasoning&&div({key:"r",style:{fontSize:"0.76rem",color:"#5B7A99",marginTop:2,fontStyle:"italic"}},r.reasoning),
-              div({key:"tags",style:{display:"flex",gap:6,marginTop:5}},[
-                e("span",{key:"p",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 7px"}},r.priority),
-                r.gpRefRequired&&e("span",{key:"gp",style:{...S.pill,...S.pillA,fontSize:"0.68rem",padding:"2px 7px"}},"GP referral required"),
-              ]),
+              div({key:"tags",style:{display:"flex",gap:6,marginTop:5}},[e("span",{key:"p",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 7px"}},r.priority)]),
             ]),
             e("button",{key:"r",style:S.btnD,onClick:()=>up("referrals",(claim.referrals||[]).filter(x=>x.id!==r.id))},"Remove"),
           ])),
         ]),
       ]),
     ]),
-
     subTab===2&&div({key:"work"},[
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:6}},"Work & activity restrictions"),
@@ -941,7 +919,6 @@ function Tab4({claim,up}){
         e(Ta,{key:"we",label:"Work environment considerations",value:claim.workEnvironment,onChange:v=>up("workEnvironment",v),placeholder:"e.g. Temperature, noise, space, lighting considerations..."}),
       ]),
     ]),
-
     subTab===3&&div({key:"medinv"},[
       e(Collapsible,{key:"meds",title:isPrescriber?"Medication recommendations":"Medication (prescribing practitioners only)",icon:"💊",defaultOpen:isPrescriber},
         e(MedSection,{claim,up})
@@ -954,9 +931,105 @@ function Tab4({claim,up}){
         ])
       ),
     ]),
+    subTab===4&&e(OutcomeMeasuresTab,{key:"om",claim,up}),
   ]);
 }
 
+// ── OUTCOME MEASURES TAB ──────────────────────────────────────────────────────
+function OutcomeMeasuresTab({claim,up}){
+  const[selMeasure,setSelMeasure]=useState("");
+  const[scoreVal,setScoreVal]=useState("");
+  const[scoreDate,setScoreDate]=useState(new Date().toISOString().split("T")[0]);
+  const[scoreNotes,setScoreNotes]=useState("");
+  const allScores=claim.outcomeScores||{};
+  const addScore=()=>{
+    if(!selMeasure||!scoreVal||!scoreDate)return;
+    const m=OUTCOME_MEASURES[selMeasure];if(!m)return;
+    const val=parseFloat(scoreVal);
+    if(isNaN(val)||val<m.min||val>m.max){alert("Score must be between "+m.min+" and "+m.max);return;}
+    const existing=allScores[selMeasure]||[];
+    const updated={...allScores,[selMeasure]:[...existing,{score:scoreVal,date:scoreDate,notes:scoreNotes,id:"sc_"+Date.now()}]};
+    up("outcomeScores",updated);
+    setScoreVal("");setScoreNotes("");
+  };
+  const remScore=(measure,id)=>{
+    const updated={...allScores,[measure]:(allScores[measure]||[]).filter(s=>s.id!==id)};
+    if(updated[measure].length===0)delete updated[measure];
+    up("outcomeScores",updated);
+  };
+  const activeMeasures=Object.keys(allScores).filter(k=>allScores[k]&&allScores[k].length>0);
+  const getLatest=key=>{const s=allScores[key];if(!s||s.length===0)return null;return [...s].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];};
+  const getTrend=key=>{const s=allScores[key];if(!s||s.length<2)return null;const sorted=[...s].sort((a,b)=>new Date(a.date)-new Date(b.date));const m=OUTCOME_MEASURES[key];const first=parseFloat(sorted[0].score),last=parseFloat(sorted[sorted.length-1].score);if(m.higherBetter)return last>first?"improving":last<first?"declining":"stable";return last<first?"improving":last>first?"declining":"stable";};
+  return div({},[
+    div({key:"h",style:{fontWeight:700,marginBottom:6}},"Functional Outcome Measures"),
+    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Track scores over time. Latest scores auto-populate into the Certificate of Capacity."),
+
+    // Summary row of active measures
+    activeMeasures.length>0&&div({key:"summary",style:{display:"flex",flexWrap:"wrap",gap:10,marginBottom:20}},
+      activeMeasures.map(key=>{
+        const latest=getLatest(key);const trend=getTrend(key);const m=OUTCOME_MEASURES[key];
+        const trendColor=trend==="improving"?"#00C9A7":trend==="declining"?"#FF4D6D":"#FFB830";
+        return div({key,style:{...S.cardSm,minWidth:140,flex:"1 0 140px"}},[
+          div({key:"n",style:{fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#5B7A99",marginBottom:4}},key),
+          div({key:"s",style:{fontWeight:800,fontSize:"1.4rem",color:"#EFF6FF",lineHeight:1}},latest.score+m.unit),
+          div({key:"d",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:2}},new Date(latest.date).toLocaleDateString("en-AU")),
+          trend&&span({key:"t",style:{fontSize:"0.7rem",color:trendColor,fontWeight:600}},trend==="improving"?"↑ Improving":trend==="declining"?"↓ Declining":"→ Stable"),
+        ]);
+      })
+    ),
+
+    // Add new score
+    div({key:"add",style:S.card},[
+      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Add score"),
+      div({key:"g",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:12}},[
+        div({key:"m"},[
+          e("label",{key:"l",style:S.label},"Measure"),
+          e("select",{key:"s",className:"cb-sel",style:S.sel,value:selMeasure,onChange:ev=>setSelMeasure(ev.target.value)},[
+            e("option",{key:"",value:""},"Select measure..."),
+            ...Object.keys(OUTCOME_MEASURES).map(k=>e("option",{key:k,value:k},k)),
+          ]),
+        ]),
+        div({key:"sc"},[
+          e("label",{key:"l",style:S.label},"Score"+(selMeasure?(" ("+OUTCOME_MEASURES[selMeasure].min+"-"+OUTCOME_MEASURES[selMeasure].max+")"):"" )),
+          inp({key:"i",className:"cb-input",style:S.inp,type:"number",value:scoreVal,onChange:ev=>setScoreVal(ev.target.value),placeholder:"Enter score",min:selMeasure?(OUTCOME_MEASURES[selMeasure]&&OUTCOME_MEASURES[selMeasure].min):0,max:selMeasure?(OUTCOME_MEASURES[selMeasure]&&OUTCOME_MEASURES[selMeasure].max):100}),
+        ]),
+        div({key:"dt"},[
+          e("label",{key:"l",style:S.label},"Date"),
+          inp({key:"i",className:"cb-input",style:S.inp,type:"date",value:scoreDate,onChange:ev=>setScoreDate(ev.target.value)}),
+        ]),
+      ]),
+      selMeasure&&OUTCOME_MEASURES[selMeasure]&&div({key:"info",style:{background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:"0.8rem",color:"#5B7A99"}},OUTCOME_MEASURES[selMeasure].desc),
+      e(Ta,{key:"n",label:"Notes",value:scoreNotes,onChange:setScoreNotes,placeholder:"Clinical notes for this score...",rows:2,mb:12}),
+      btn({key:"add",style:S.btnP,onClick:addScore},"+ Add score"),
+    ]),
+
+    // Charts for each tracked measure
+    ...activeMeasures.map(key=>{
+      const m=OUTCOME_MEASURES[key];const scores=allScores[key]||[];
+      return div({key,style:S.card},[
+        div({key:"hdr",style:{...S.fb,marginBottom:8}},[
+          div({key:"t"},[
+            div({key:"n",style:{fontWeight:700,fontSize:"0.9rem"}},key),
+            div({key:"fn",style:{fontSize:"0.76rem",color:"#5B7A99"}},m.name),
+          ]),
+          div({key:"r",style:{fontSize:"0.78rem",color:"#5B7A99"}},"Higher is "+(m.higherBetter?"better ↑":"worse ↓")),
+        ]),
+        e(OutcomeTrendChart,{key:"chart",scores,measureKey:key}),
+        div({key:"scores",style:{marginTop:12}},[
+          ...([...scores].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(s=>div({key:s.id,style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
+            div({key:"l",style:{display:"flex",gap:12,alignItems:"center"}},[
+              span({key:"d",style:{fontSize:"0.8rem",color:"#5B7A99"}},new Date(s.date).toLocaleDateString("en-AU")),
+              span({key:"s",style:{fontWeight:700,fontSize:"0.9rem"}},s.score+m.unit),
+              s.notes&&span({key:"n",style:{fontSize:"0.76rem",color:"#5B7A99",fontStyle:"italic"}},s.notes),
+            ]),
+            btn({key:"r",style:{background:"transparent",border:"none",color:"#FF4D6D",cursor:"pointer",fontSize:"0.8rem",padding:"2px 8px"},onClick:()=>remScore(key,s.id)},"Remove"),
+          ]))),
+        ]),
+      ]);
+    }),
+    activeMeasures.length===0&&div({key:"empty",style:{textAlign:"center",padding:"32px",color:"#5B7A99",fontSize:"0.84rem"}},"No scores recorded yet. Select a measure and enter a score above."),
+  ]);
+}
 
 function MedSection({claim,up}){
   const[meds,setMeds]=useState(claim.medications||[]);
@@ -964,7 +1037,7 @@ function MedSection({claim,up}){
   const add=()=>{if(!nm.name)return;const u=[...meds,{...nm,id:"med_"+Date.now()}];setMeds(u);up("medications",u);setNm({name:"",dosage:"",frequency:"",duration:"",review:""});};
   const rem=id=>{const u=meds.filter(m=>m.id!==id);setMeds(u);up("medications",u);};
   return div({},[
-    !PRESCRIBING.includes(claim.practitionerProfession)&&e(WARN,{key:"w"},"This section is for prescribing practitioners only - GPs, Specialists, Pain Specialists and Psychiatrists."),
+    !PRESCRIBING.includes(claim.practitionerProfession)&&e(WARN,{key:"w"},"This section is for prescribing practitioners only."),
     div({key:"g",style:S.g2},[
       e(Inp,{key:"n",label:"Medication name",value:nm.name,onChange:v=>setNm({...nm,name:v}),placeholder:"e.g. Ibuprofen, Amitriptyline"}),
       e(Inp,{key:"d",label:"Dosage",value:nm.dosage,onChange:v=>setNm({...nm,dosage:v}),placeholder:"e.g. 400mg"}),
@@ -975,74 +1048,345 @@ function MedSection({claim,up}){
     btn({key:"add",style:S.btnP,onClick:add},"+ Add medication"),
     meds.length>0&&div({key:"list",style:{marginTop:14}},
       meds.map(m=>div({key:m.id,style:{...S.cardSm,marginBottom:9,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}},[
-        div({key:"i"},[
-          div({key:"n",style:{fontWeight:600,fontSize:"0.9rem"}},m.name),
-          div({key:"d",style:{fontSize:"0.8rem",color:"#5B7A99",marginTop:3}},m.dosage+(m.frequency?" - "+m.frequency:"")+(m.duration?" - "+m.duration:"")),
-          m.review&&div({key:"r",style:{fontSize:"0.76rem",color:"#5B7A99",marginTop:2}},"Review: "+m.review),
-        ]),
+        div({key:"i"},[div({key:"n",style:{fontWeight:600,fontSize:"0.9rem"}},m.name),div({key:"d",style:{fontSize:"0.8rem",color:"#5B7A99",marginTop:3}},m.dosage+(m.frequency?" - "+m.frequency:"")+(m.duration?" - "+m.duration:""))]),
         btn({key:"rem",style:S.btnD,onClick:()=>rem(m.id)},"Remove"),
       ]))
     ),
   ]);
 }
 
-// ── TAB 5: CERTIFICATE OF CAPACITY ───────────────────────────────────────────
-function Tab5({claim,up}){
-  const cnt=claim.cocCount||1;
-  return div({},[
+// ── TAB 5: CERTIFICATE OF CAPACITY (OFFICIAL FORM) ───────────────────────────
+function Tab5({claim,up,clinic,practitioners}){
+  const[printMode,setPrintMode]=useState(false);
+  const prac=practitioners.find(p=>p.id===claim.practitionerId)||{};
+  const cocNum=claim.cocCount||1;
+  const diags=(claim.diagnoses||[]).map(d=>d.label).join("; ")||"";
+  const allOutcomeScores=claim.outcomeScores||{};
+  const latestOutcomes=Object.keys(allOutcomeScores).map(key=>{const scores=allOutcomeScores[key]||[];const latest=[...scores].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];return latest?{measure:key,score:latest.score,date:latest.date,unit:(OUTCOME_MEASURES[key]&&OUTCOME_MEASURES[key].unit)||""}:null;}).filter(Boolean);
+
+  const fmtDate=d=>{if(!d)return"";try{return new Date(d).toLocaleDateString("en-AU");}catch{return d;}};
+
+  // ── COC PRINT PAGE ─────────────────────────────────────────────────────────
+  if(printMode){
+    const COC_FIELD={borderBottom:"1px solid #333",minWidth:120,display:"inline-block",marginLeft:4,minHeight:18,fontSize:11};
+    const SEC_HDR={background:"#1a1a1a",color:"white",padding:"5px 10px",fontWeight:700,fontSize:11,letterSpacing:"0.05em",textTransform:"uppercase",marginBottom:0};
+    const CELL={border:"1px solid #ccc",padding:"4px 8px",fontSize:10,verticalAlign:"middle"};
+    const capMap=(claim.capacity||{});
+    const physFns=PHYSICAL_FUNCTIONS;
+    const mentalFns=MENTAL_FUNCTIONS;
+
+    return div({className:"coc-print-page",style:{background:"white",color:"black",fontFamily:"Arial,sans-serif",fontSize:11,padding:24,maxWidth:760,margin:"0 auto"}},[
+      // Print button (hidden on print)
+      div({key:"pbtns",className:"no-print",style:{display:"flex",gap:10,marginBottom:20}},[
+        btn({key:"p",onClick:()=>window.print(),style:{...S.btnP,fontSize:"0.85rem"}},"🖨️ Print / Save PDF"),
+        btn({key:"b",onClick:()=>setPrintMode(false),style:{...S.btnS,fontSize:"0.85rem"}},"← Back to edit"),
+      ]),
+
+      // HEADER
+      div({key:"hdr",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",borderBottom:"2px solid #1a1a1a",paddingBottom:12,marginBottom:8}},[
+        div({key:"logos",style:{display:"flex",alignItems:"center",gap:16}},[
+          div({key:"ws",style:{background:"#1a4a8a",color:"white",padding:"6px 12px",fontWeight:800,fontSize:13,borderRadius:3}},"WorkSafe"),
+          div({key:"tac",style:{background:"#c0392b",color:"white",padding:"6px 12px",fontWeight:800,fontSize:13,borderRadius:3}},"TAC"),
+        ]),
+        div({key:"title",style:{textAlign:"right"}},[
+          div({key:"t",style:{fontWeight:800,fontSize:16,marginBottom:2}},"Certificate of Capacity"),
+          div({key:"s",style:{fontSize:10,color:"#555"}},"FOR844/03/07.15"),
+          div({key:"c",style:{fontSize:10,marginTop:2}},[
+            span({key:"type",style:{fontWeight:700,marginRight:8,border:"1px solid #333",padding:"2px 8px"}},(claim.cocType||"First")+" Certificate"),
+            span({key:"num",style:{fontWeight:600}},"#"+cocNum),
+          ]),
+        ]),
+      ]),
+
+      // SECTION 1: Worker Details
+      div({key:"s1"},[
+        div({key:"hdr",style:SEC_HDR},"Section 1 — Worker Details"),
+        div({key:"body",style:{border:"1px solid #ccc",borderTop:"none",padding:"8px 10px",marginBottom:8}},[
+          div({key:"r1",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:6}},[
+            div({key:"fn"},[span({key:"l",style:{color:"#555",fontSize:10}},"First name: "),span({key:"v",style:{fontWeight:600}},claim.patientFirstName||claim.patientName||"")]),
+            div({key:"ln"},[span({key:"l",style:{color:"#555",fontSize:10}},"Last name: "),span({key:"v",style:{fontWeight:600}},claim.patientLastName||"")]),
+            div({key:"cn"},[span({key:"l",style:{color:"#555",fontSize:10}},"Claim number: "),span({key:"v",style:{fontWeight:600}},claim.claimNumber||"")]),
+          ]),
+          div({key:"r2",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:6}},[
+            div({key:"doi"},[span({key:"l",style:{color:"#555",fontSize:10}},"Date of injury: "),span({key:"v",style:{fontWeight:600}},fmtDate(claim.dateOfInjury))]),
+            div({key:"dob"},[span({key:"l",style:{color:"#555",fontSize:10}},"Date of birth: "),span({key:"v",style:{fontWeight:600}},fmtDate(claim.dob))]),
+            div({key:"pc"},[span({key:"l",style:{color:"#555",fontSize:10}},"Postcode: "),span({key:"v",style:{fontWeight:600}},claim.patientPostcode||"")]),
+          ]),
+          div({key:"r3"},[span({key:"l",style:{color:"#555",fontSize:10}},"Address: "),span({key:"v"},claim.patientAddress||"")]),
+        ]),
+      ]),
+
+      // SECTION 2: Diagnosis
+      div({key:"s2"},[
+        div({key:"hdr",style:SEC_HDR},"Section 2 — Diagnosis"),
+        div({key:"body",style:{border:"1px solid #ccc",borderTop:"none",padding:"8px 10px",marginBottom:8}},[
+          div({key:"r1",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:6}},[
+            div({key:"de"},[span({key:"l",style:{color:"#555",fontSize:10}},"Date examined: "),span({key:"v",style:{fontWeight:600}},claim.dateExamined||fmtDate(new Date().toISOString()))]),
+            div({key:"scheme"},[span({key:"l",style:{color:"#555",fontSize:10}},"Scheme: "),span({key:"v",style:{fontWeight:600}},claim.scheme||"WorkCover")]),
+          ]),
+          div({key:"diagrow"},[
+            span({key:"l",style:{color:"#555",fontSize:10,display:"block",marginBottom:3}},"Clinical diagnoses:"),
+            div({key:"v",style:{fontWeight:600,minHeight:24,borderBottom:"1px solid #eee",paddingBottom:4}},diags||""),
+          ]),
+          claim.preExisting&&div({key:"pre",style:{marginTop:6}},[span({key:"l",style:{color:"#555",fontSize:10}},"Pre-existing: "),span({key:"v"},claim.preExisting)]),
+        ]),
+      ]),
+
+      // SECTION 3: Capacity Assessment
+      div({key:"s3"},[
+        div({key:"hdr",style:SEC_HDR},"Section 3 — Capacity Assessment"),
+        div({key:"body",style:{border:"1px solid #ccc",borderTop:"none",padding:"8px 10px",marginBottom:8}},[
+          // Physical functions table
+          div({key:"phys-hdr",style:{fontWeight:700,fontSize:10,marginBottom:4}},"Physical Functions:"),
+          e("table",{key:"phys-table",style:{width:"100%",borderCollapse:"collapse",marginBottom:10,fontSize:10}},[
+            e("thead",{key:"thead"},e("tr",null,[
+              e("th",{key:"fn",style:{...CELL,background:"#f5f5f5",width:"40%",textAlign:"left"}},"Function"),
+              e("th",{key:"c",style:{...CELL,background:"#f5f5f5",textAlign:"center"}},"Can"),
+              e("th",{key:"m",style:{...CELL,background:"#f5f5f5",textAlign:"center"}},"With Modifications"),
+              e("th",{key:"cn",style:{...CELL,background:"#f5f5f5",textAlign:"center"}},"Cannot"),
+              e("th",{key:"cm",style:{...CELL,background:"#f5f5f5",textAlign:"left"}},"Comments"),
+            ])),
+            e("tbody",{key:"tbody"},physFns.map(f=>{
+              const cap=capMap[f.id];
+              return e("tr",{key:f.id},[
+                e("td",{key:"l",style:{...CELL}},f.label),
+                e("td",{key:"c",style:{...CELL,textAlign:"center"}},cap==="Can"?"☑":"☐"),
+                e("td",{key:"m",style:{...CELL,textAlign:"center"}},cap==="Modified"?"☑":"☐"),
+                e("td",{key:"cn",style:{...CELL,textAlign:"center"}},cap==="Cannot"?"☑":"☐"),
+                e("td",{key:"cm",style:{...CELL,minWidth:80}},""),
+              ]);
+            }))
+          ]),
+          claim.physicalNotes&&div({key:"pn",style:{fontSize:10,marginBottom:8}},[span({key:"l",style:{color:"#555"}},"Physical notes: "),claim.physicalNotes]),
+          claim.workRestrictions&&div({key:"wr",style:{fontSize:10,marginBottom:8}},[span({key:"l",style:{color:"#555"}},"Work restrictions: "),claim.workRestrictions]),
+
+          // Mental functions
+          div({key:"ment-hdr",style:{fontWeight:700,fontSize:10,marginBottom:4,marginTop:4}},"Mental Health Functions:"),
+          e("table",{key:"ment-table",style:{width:"100%",borderCollapse:"collapse",marginBottom:10,fontSize:10}},[
+            e("thead",{key:"thead"},e("tr",null,[
+              e("th",{key:"fn",style:{...CELL,background:"#f5f5f5",width:"40%",textAlign:"left"}},"Function"),
+              e("th",{key:"na",style:{...CELL,background:"#f5f5f5",textAlign:"center"}},"Not Affected"),
+              e("th",{key:"af",style:{...CELL,background:"#f5f5f5",textAlign:"center"}},"Affected"),
+              e("th",{key:"sev",style:{...CELL,background:"#f5f5f5",textAlign:"left"}},"Severity if Affected"),
+              e("th",{key:"cm",style:{...CELL,background:"#f5f5f5",textAlign:"left"}},"Comments"),
+            ])),
+            e("tbody",{key:"tbody"},mentalFns.map(f=>{
+              const aff=claim.mentalStatus==="Affected";const sev=(claim.mentalSeverity||{})[f.id];
+              return e("tr",{key:f.id},[
+                e("td",{key:"l",style:{...CELL}},f.label),
+                e("td",{key:"na",style:{...CELL,textAlign:"center"}},(!aff||(aff&&!sev))?"☑":"☐"),
+                e("td",{key:"af",style:{...CELL,textAlign:"center"}},(aff&&sev)?"☑":"☐"),
+                e("td",{key:"sev",style:{...CELL,fontSize:9}},sev||""),
+                e("td",{key:"cm",style:{...CELL}},""),
+              ]);
+            }))
+          ]),
+          claim.mentalNotes&&div({key:"mn",style:{fontSize:10,marginBottom:6}},[span({key:"l",style:{color:"#555"}},"Mental function notes: "),claim.mentalNotes]),
+
+          // Outcome measures
+          latestOutcomes.length>0&&div({key:"om"},[
+            div({key:"h",style:{fontWeight:700,fontSize:10,marginBottom:4}},"Outcome Measures (most recent):"),
+            div({key:"scores",style:{display:"flex",flexWrap:"wrap",gap:"4px 16px"}},
+              latestOutcomes.map(o=>div({key:o.measure,style:{fontSize:10}},[span({key:"m",style:{color:"#555"}},o.measure+": "),span({key:"s",style:{fontWeight:600}},o.score+o.unit+" ("+fmtDate(o.date)+")")]))
+            ),
+          ]),
+
+          // Other functional considerations
+          div({key:"ofc",style:{marginTop:8}},[
+            div({key:"l",style:{fontWeight:700,fontSize:10,marginBottom:3}},"Other Functional Considerations:"),
+            div({key:"v",style:{minHeight:30,borderBottom:"1px solid #eee",fontSize:10}},claim.otherConsiderations||""),
+          ]),
+          // Work environment
+          div({key:"wec",style:{marginTop:6}},[
+            div({key:"l",style:{fontWeight:700,fontSize:10,marginBottom:3}},"Work Environment Considerations:"),
+            div({key:"v",style:{minHeight:24,borderBottom:"1px solid #eee",fontSize:10}},claim.workEnvironment||""),
+          ]),
+        ]),
+      ]),
+
+      // SECTION 4: Certification
+      div({key:"s4"},[
+        div({key:"hdr",style:SEC_HDR},"Section 4 — Certification"),
+        div({key:"body",style:{border:"1px solid #ccc",borderTop:"none",padding:"8px 10px",marginBottom:8}},[
+          div({key:"row1",style:{marginBottom:8}},[
+            span({key:"l",style:{fontWeight:600,fontSize:10}},"In my opinion, the worker has:"),
+          ]),
+          div({key:"opts",style:{display:"grid",gridTemplateColumns:"auto 1fr",gap:"4px 16px",alignItems:"center",marginBottom:8,fontSize:10}},[
+            span({key:"cb1"},claim.fitnessForWork==="Fit for normal duties"?"☑":"☐"),span({key:"t1"},"Capacity to perform pre-injury employment from "+fmtDate(claim.cocFrom)),
+            span({key:"cb2"},claim.fitnessForWork==="Fit with restrictions"?"☑":"☐"),span({key:"t2"},["Capacity for suitable employment from ",span({key:"f",style:{fontWeight:claim.fitnessForWork==="Fit with restrictions"?600:400}},fmtDate(claim.cocFrom))," to ",span({key:"t"},fmtDate(claim.cocTo))]),
+            span({key:"cb3"},claim.fitnessForWork==="Unfit for all work"?"☑":"☐"),span({key:"t3"},["No capacity from ",span({key:"f",style:{fontWeight:600}},fmtDate(claim.cocFrom))," to ",span({key:"t"},fmtDate(claim.cocTo))]),
+          ]),
+          claim.fitnessForWork==="Fit with restrictions"&&claim.fitnessRestrictions&&div({key:"res",style:{marginBottom:8,fontSize:10}},[span({key:"l",style:{color:"#555"}},"Restrictions: "),claim.fitnessRestrictions]),
+          div({key:"rtw",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:10,marginBottom:6}},[
+            div({key:"nrd"},[span({key:"l",style:{color:"#555"}},"Next review date: "),span({key:"v",style:{fontWeight:600}},fmtDate(claim.nextReviewDate))]),
+            div({key:"rtw"},[span({key:"l",style:{color:"#555"}},"Estimated RTW (normal duties): "),span({key:"v",style:{fontWeight:600}},fmtDate(claim.rtwNormalDate)||"Not yet estimated")]),
+          ]),
+        ]),
+      ]),
+
+      // SECTION 5: Treatment Plan
+      div({key:"s5"},[
+        div({key:"hdr",style:SEC_HDR},"Section 5 — Treatment Plan"),
+        div({key:"body",style:{border:"1px solid #ccc",borderTop:"none",padding:"8px 10px",marginBottom:8}},[
+          ...[
+            ["Management approach",claim.treatmentPlan],
+            ["Short-term goals",claim.goalsShort],
+            ["Long-term goals",claim.goalsLong],
+            ["Strategies to increase capacity",claim.selfManagement],
+            ["Barriers to RTW",claim.barriers],
+            ["Activity restrictions",claim.activityRestrictions],
+          ].filter(([,v])=>v).map(([l,v])=>div({key:l,style:{marginBottom:6,fontSize:10}},[
+            span({key:"l",style:{fontWeight:600,color:"#555",display:"block"}},l+":"),
+            div({key:"v",style:{borderLeft:"2px solid #ddd",paddingLeft:8,marginTop:2}},v),
+          ])),
+          !claim.treatmentPlan&&!claim.goalsShort&&div({key:"empty",style:{color:"#999",fontSize:10,fontStyle:"italic"}},"Complete the Treatment Plan tab to populate this section."),
+        ]),
+      ]),
+
+      // SECTION 6: Certifier Declaration
+      div({key:"s6"},[
+        div({key:"hdr",style:SEC_HDR},"Section 6 — Certifier Declaration"),
+        div({key:"body",style:{border:"1px solid #ccc",borderTop:"none",padding:"8px 10px",marginBottom:8}},[
+          div({key:"r1",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:6,fontSize:10}},[
+            div({key:"pn"},[span({key:"l",style:{color:"#555"}},"Provider name: "),span({key:"v",style:{fontWeight:600}},prac.name||"")]),
+            div({key:"pp"},[span({key:"l",style:{color:"#555"}},"Profession: "),span({key:"v",style:{fontWeight:600}},prac.profession||"")]),
+            div({key:"provno"},[span({key:"l",style:{color:"#555"}},"Provider number: "),span({key:"v",style:{fontWeight:600}},prac.providerNo||"")]),
+            div({key:"ph"},[span({key:"l",style:{color:"#555"}},"Telephone: "),span({key:"v"},prac.phone||clinic.phone||"")]),
+          ]),
+          div({key:"addr",style:{fontSize:10,marginBottom:6}},[span({key:"l",style:{color:"#555"}},"Address: "),prac.address||clinic.address||"",span({key:"pc",style:{marginLeft:8,color:"#555"}},"Postcode: "),prac.postcode||clinic.postcode||""]),
+          div({key:"sig",style:{display:"grid",gridTemplateColumns:"2fr 1fr",gap:16,marginTop:10}},[
+            div({key:"s",style:{borderBottom:"1px solid #333",minHeight:40,fontSize:10,color:"#999"}},"Signature"),
+            div({key:"d",style:{borderBottom:"1px solid #333",minHeight:40,fontSize:10,color:"#555"}},"Date: "+fmtDate(new Date().toISOString())),
+          ]),
+        ]),
+      ]),
+
+      // SECTION 7: Worker Declaration
+      div({key:"s7"},[
+        div({key:"hdr",style:SEC_HDR},"Section 7 — Worker Declaration"),
+        div({key:"body",style:{border:"1px solid #ccc",borderTop:"none",padding:"8px 10px",marginBottom:4}},[
+          div({key:"q",style:{fontSize:10,marginBottom:8}},"Since the last certificate, have you been involved in any voluntary work or employment (paid or unpaid)?"),
+          div({key:"opts",style:{display:"flex",gap:24,fontSize:10,marginBottom:8}},[
+            div({key:"y",style:{display:"flex",gap:6,alignItems:"center"}},["☐ ",span({key:"t",style:{fontWeight:600}},"Yes")]),
+            div({key:"n",style:{display:"flex",gap:6,alignItems:"center"}},["☐ ",span({key:"t",style:{fontWeight:600}},"No")]),
+          ]),
+          div({key:"det",style:{fontSize:10,marginBottom:8}},"If yes, provide details: "),
+          div({key:"det-line",style:{borderBottom:"1px solid #ccc",minHeight:20,marginBottom:12}}),
+          div({key:"sig",style:{display:"grid",gridTemplateColumns:"2fr 1fr",gap:16}},[
+            div({key:"s",style:{borderBottom:"1px solid #333",minHeight:40,fontSize:10,color:"#999"}},"Worker signature"),
+            div({key:"d",style:{borderBottom:"1px solid #333",minHeight:40,fontSize:10,color:"#555"}},"Date"),
+          ]),
+        ]),
+      ]),
+
+      div({key:"footer",style:{marginTop:12,fontSize:9,color:"#999",textAlign:"center",borderTop:"1px solid #ddd",paddingTop:8}},"Certificate of Capacity — WorkSafe Victoria FOR844/03/07.15 — Generated by ClaimBridge"),
+    ]);
+  }
+
+  // ── NORMAL EDIT VIEW ───────────────────────────────────────────────────────
+  return div({className:"no-print"},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Certificate of Capacity"),
-    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"WorkSafe Victoria COC - auto-filled from diagnosis and capacity assessment."),
-    e(OK,{key:"ok"},"Capacity limitations imported from Diagnosis screen. Review and adjust below."),
-    div({key:"det",style:S.card},[
-      div({key:"hdr",style:{...S.fb,marginBottom:14}},[
+    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Official WorkSafe VIC form (FOR844/03/07.15) — auto-populated from all clinical screens."),
+
+    // Print button
+    div({key:"print-btn",style:{marginBottom:20}},[
+      btn({key:"p",style:{...S.btnP,display:"inline-flex",alignItems:"center",gap:8},onClick:()=>setPrintMode(true)},"🖨️ Preview & Print COC"),
+      span({key:"hint",style:{marginLeft:12,fontSize:"0.78rem",color:"#5B7A99"}},"Opens official form layout ready to print or save as PDF"),
+    ]),
+
+    // Overview of auto-populated fields
+    e(OK,{key:"ok1"},"Patient, diagnosis and capacity details auto-populated from clinical screens."),
+    latestOutcomes.length>0&&e(OK,{key:"ok2"},"Outcome measure scores imported: "+latestOutcomes.map(o=>o.measure).join(", ")),
+
+    // Certificate details
+    div({key:"cert-det",style:S.card},[
+      div({key:"h",style:{...S.fb,marginBottom:14}},[
         div({key:"t",style:{fontWeight:700}},"Certificate details"),
-        span({key:"cnt",style:{...S.pill,...S.pillT,cursor:"default"}},"Certificate #"+cnt),
+        span({key:"cnt",style:{...S.pill,...S.pillT,cursor:"default"}},"Certificate #"+cocNum),
       ]),
       div({key:"g",style:S.g2},[
         div({key:"type"},[
           e("label",{key:"l",style:S.label},"Certificate type"),
-          div({key:"btns",style:{display:"flex",gap:8,marginBottom:16}},
+          div({key:"btns",style:{display:"flex",gap:8,marginBottom:8}},
             ["First","Subsequent"].map(t=>btn({key:t,onClick:()=>up("cocType",t),style:{...S.pill,...((claim.cocType===t||(!claim.cocType&&t==="First"))?S.pillT:S.pillM),fontSize:"0.85rem",padding:"10px 20px"}},t))
           ),
-          div({key:"hint",style:{fontSize:"0.76rem",color:"#5B7A99",marginBottom:14}},(!claim.cocType||claim.cocType==="First")?"First certificate: typically 14 days":"Subsequent: typically 28 days"),
         ]),
         div({key:"num"},[
           e("label",{key:"l",style:S.label},"Certificate number"),
-          div({key:"ctrl",style:{display:"flex",alignItems:"center",gap:10,marginBottom:16}},[
+          div({key:"ctrl",style:{display:"flex",alignItems:"center",gap:10,marginBottom:8}},[
             btn({key:"m",style:{...S.btnS,padding:"8px 14px"},onClick:()=>up("cocCount",Math.max(1,(claim.cocCount||1)-1))},"-"),
-            span({key:"n",style:{fontFamily:"monospace",fontSize:"1.2rem",fontWeight:700,color:"#00C9A7",minWidth:28,textAlign:"center"}},cnt),
+            span({key:"n",style:{fontFamily:"monospace",fontSize:"1.2rem",fontWeight:700,color:"#00C9A7",minWidth:28,textAlign:"center"}},cocNum),
             btn({key:"p",style:{...S.btnS,padding:"8px 14px"},onClick:()=>up("cocCount",(claim.cocCount||1)+1)},"+"),
           ]),
         ]),
       ]),
+      e(Inp,{key:"de",label:"Date examined",value:claim.dateExamined,onChange:v=>up("dateExamined",v),type:"date"}),
       div({key:"dates",style:S.g2},[
-        e(Inp,{key:"f",label:"Valid from",value:claim.cocFrom,onChange:v=>up("cocFrom",v),type:"date",required:true}),
-        e(Inp,{key:"t",label:"Valid to",value:claim.cocTo,onChange:v=>up("cocTo",v),type:"date",required:true}),
+        e(Inp,{key:"f",label:"Valid from",value:claim.cocFrom,onChange:v=>up("cocFrom",v),type:"date",required:true,mb:0}),
+        e(Inp,{key:"t",label:"Valid to",value:claim.cocTo,onChange:v=>up("cocTo",v),type:"date",required:true,mb:0}),
       ]),
     ]),
+
+    // Fitness for work
     div({key:"fit",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Fitness for work"),
-      div({key:"opts",style:{display:"flex",gap:10,flexWrap:"wrap"}},
+      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Section 4 — Fitness for work certification"),
+      div({key:"opts",style:{display:"flex",gap:10,flexWrap:"wrap",marginBottom:14}},
         ["Fit for normal duties","Fit with restrictions","Unfit for all work"].map(o=>btn({key:o,onClick:()=>up("fitnessForWork",o),style:{...S.pill,...(claim.fitnessForWork===o?S.pillT:S.pillM),fontSize:"0.87rem",padding:"11px 18px"}},o))
       ),
-      claim.fitnessForWork==="Fit with restrictions"&&e(Ta,{key:"res",label:"Restrictions detail",value:claim.fitnessRestrictions,onChange:v=>up("fitnessRestrictions",v),placeholder:"Detail specific restrictions..."}),
+      claim.fitnessForWork==="Fit with restrictions"&&e(Ta,{key:"res",label:"Restrictions / suitable employment detail",value:claim.fitnessRestrictions,onChange:v=>up("fitnessRestrictions",v),placeholder:"Detail specific restrictions and suitable employment conditions..."}),
+      div({key:"dates2",style:S.g2},[
+        e(Inp,{key:"nrd",label:"Next review date",value:claim.nextReviewDate,onChange:v=>up("nextReviewDate",v),type:"date",mb:0}),
+        e(Inp,{key:"rtw",label:"Estimated RTW (normal duties)",value:claim.rtwNormalDate,onChange:v=>up("rtwNormalDate",v),type:"date",mb:0}),
+      ]),
     ]),
+
+    // Physical capacity summary (read-only)
     div({key:"phys",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:6}},"Physical capacity summary"),
-      div({key:"s",style:{fontSize:"0.8rem",color:"#5B7A99",marginBottom:12}},"Auto-populated from Diagnosis screen"),
-      ...PHYSICAL_FUNCTIONS.map(f=>{const c=(claim.capacity||{})[f.id];if(!c)return null;return div({key:f.id,style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[div({key:"l",style:{fontSize:"0.87rem"}},f.label),span({key:"c",style:{...S.pill,...(c==="Can"?S.pillT:c==="Modified"?S.pillA:S.pillR),fontSize:"0.73rem",padding:"3px 10px",cursor:"default"}},c)]);}),
-      !Object.values(claim.capacity||{}).some(v=>v)&&div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem"}},"No capacity assessments yet. Complete the Diagnosis screen first."),
+      div({key:"h",style:{...S.fb,marginBottom:6}},[
+        div({key:"t",style:{fontWeight:700}},"Section 3 — Physical capacity"),
+        div({key:"s",style:{fontSize:"0.76rem",color:"#5B7A99"}},"Auto-populated from Diagnosis screen"),
+      ]),
+      !Object.values(claim.capacity||{}).some(v=>v)
+        ?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",padding:"12px 0"}},"No capacity assessments yet. Complete the Diagnosis tab first.")
+        :div({key:"table",style:{overflowX:"auto"}},[
+          div({key:"hdr",style:{display:"grid",gridTemplateColumns:"1fr 80px 80px 80px",gap:4,marginBottom:6,padding:"0 4px"}},[
+            div({key:"f",style:{fontSize:"0.7rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#5B7A99"}},"Function"),
+            ...["Can","Modified","Cannot"].map(o=>div({key:o,style:{fontSize:"0.7rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#5B7A99",textAlign:"center"}},o)),
+          ]),
+          ...PHYSICAL_FUNCTIONS.map(f=>{const c=(claim.capacity||{})[f.id];if(!c)return null;const colors={Can:"#00C9A7",Modified:"#FFB830",Cannot:"#FF4D6D"};return div({key:f.id,style:{display:"grid",gridTemplateColumns:"1fr 80px 80px 80px",gap:4,alignItems:"center",padding:"5px 4px",borderBottom:"1px solid rgba(255,255,255,0.04)"}},[
+            div({key:"l",style:{fontSize:"0.85rem"}},f.label),
+            ...["Can","Modified","Cannot"].map(o=>div({key:o,style:{textAlign:"center",fontSize:"0.8rem",fontWeight:c===o?700:400,color:c===o?colors[o]:"rgba(255,255,255,0.2)"}},c===o?"☑":"☐")),
+          ]);})
+        ]),
+      e(Ta,{key:"pn",label:"Physical function notes",value:claim.physicalNotes,onChange:v=>up("physicalNotes",v),placeholder:"Additional notes auto-populate from Diagnosis screen...",rows:2}),
     ]),
+
+    // Mental function
     div({key:"mental",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:8}},"Mental function"),
-      span({key:"s",style:{...S.pill,...(claim.mentalStatus==="Not affected"?S.pillT:S.pillA),cursor:"default",marginBottom:claim.mentalStatus==="Affected"?14:0}},claim.mentalStatus||"Not assessed"),
-      claim.mentalStatus==="Affected"&&div({key:"d"},[
-        ...MENTAL_FUNCTIONS.map(f=>{const s=(claim.mentalSeverity||{})[f.id];if(!s)return null;return div({key:f.id,style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[div({key:"l",style:{fontSize:"0.87rem"}},f.label),span({key:"s",style:{...S.pill,...S.pillA,fontSize:"0.73rem",padding:"3px 10px",cursor:"default"}},s)]);})
+      span({key:"s",style:{...S.pill,...(claim.mentalStatus==="Not affected"?S.pillT:S.pillM),cursor:"default",marginBottom:14}},claim.mentalStatus||"Not assessed"),
+      claim.mentalStatus==="Affected"&&div({key:"d",style:{marginTop:12}},[
+        ...MENTAL_FUNCTIONS.map(f=>{const s=(claim.mentalSeverity||{})[f.id];if(!s)return null;return div({key:f.id,style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[div({key:"l",style:{fontSize:"0.87rem"}},f.label),span({key:"s",style:{...S.pill,...S.pillA,fontSize:"0.73rem",padding:"3px 10px",cursor:"default"}},s)]);}),
+        e(Ta,{key:"mn",label:"Mental function notes",value:claim.mentalNotes,onChange:v=>up("mentalNotes",v),placeholder:"Additional mental function notes...",rows:2}),
       ]),
-      div({key:"notes",style:{marginTop:14}},[
-        e(Ta,{key:"cn",label:"Additional COC notes",value:claim.cocNotes,onChange:v=>up("cocNotes",v),placeholder:"Additional notes for the Certificate of Capacity..."}),
-        e(Ta,{key:"oc",label:"Other considerations",value:claim.otherConsiderations,onChange:v=>up("otherConsiderations",v),placeholder:"Medications affecting work capacity, specific workplace considerations..."}),
-      ]),
+    ]),
+
+    // Outcome measures summary
+    latestOutcomes.length>0&&div({key:"om-summary",style:S.card},[
+      div({key:"h",style:{fontWeight:700,marginBottom:10}},"Outcome measures (latest scores)"),
+      div({key:"scores",style:{display:"flex",flexWrap:"wrap",gap:10}},
+        latestOutcomes.map(o=>div({key:o.measure,style:{...S.cardSm,flex:"1 0 120px",textAlign:"center"}},[
+          div({key:"m",style:{fontSize:"0.7rem",color:"#5B7A99",marginBottom:2}},o.measure),
+          div({key:"s",style:{fontWeight:800,fontSize:"1.2rem",color:"#EFF6FF"}},o.score+o.unit),
+          div({key:"d",style:{fontSize:"0.7rem",color:"#5B7A99"}},fmtDate(o.date)),
+        ]))
+      ),
+    ]),
+
+    // COC notes
+    div({key:"notes",style:S.card},[
+      e(Ta,{key:"cn",label:"Additional COC notes",value:claim.cocNotes,onChange:v=>up("cocNotes",v),placeholder:"Additional notes for the Certificate of Capacity..."}),
+      e(Ta,{key:"oc",label:"Other functional considerations",value:claim.otherConsiderations,onChange:v=>up("otherConsiderations",v),placeholder:"Medications affecting work capacity, specific workplace considerations..."}),
     ]),
   ]);
 }
@@ -1100,22 +1444,21 @@ function Tab6({claim,up}){
     ]),
     sel==="ps604"&&div({key:"ps604",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:4}},"PS604 - Psychology Treatment Planning Form"),
-      div({key:"s",style:{fontSize:"0.76rem",color:"#5B7A99",marginBottom:14}},"Item code PS604 - Fee $203.91 excl. GST - Complete early in treatment"),
+      div({key:"s",style:{fontSize:"0.76rem",color:"#5B7A99",marginBottom:14}},"Item code PS604 — Complete early in treatment"),
       e(Ta,{key:"d",label:"Psychological diagnosis (DSM-5)",value:claim.ps604Diagnosis,onChange:v=>up("ps604Diagnosis",v),placeholder:"e.g. Adjustment Disorder with Mixed Anxiety and Depressed Mood (309.28)"}),
       e(Ta,{key:"r",label:"Relationship to compensable injury",value:claim.ps604Relationship,onChange:v=>up("ps604Relationship",v),placeholder:"How does the condition relate to the injury..."}),
       e(Ta,{key:"s",label:"Current symptoms",value:claim.ps604Symptoms,onChange:v=>up("ps604Symptoms",v),placeholder:"Current presenting symptoms...",rows:4}),
       e(Ta,{key:"i",label:"Impact on daily functioning",value:claim.ps604Impact,onChange:v=>up("ps604Impact",v),placeholder:"Impact on work, social, domestic activities..."}),
       e(Ta,{key:"g",label:"Treatment goals",value:claim.ps604Goals,onChange:v=>up("ps604Goals",v),placeholder:"Specific treatment goals..."}),
       div({key:"gr",style:S.g2},[
-        e(Inp,{key:"ses",label:"Anticipated sessions (3-6 months)",value:claim.ps604Sessions,onChange:v=>up("ps604Sessions",v),placeholder:"e.g. 12-16 sessions"}),
+        e(Inp,{key:"ses",label:"Anticipated sessions",value:claim.ps604Sessions,onChange:v=>up("ps604Sessions",v),placeholder:"e.g. 12-16 sessions"}),
         e(Inp,{key:"f",label:"Frequency",value:claim.ps604Frequency,onChange:v=>up("ps604Frequency",v),placeholder:"e.g. Weekly"}),
       ]),
       e(Ta,{key:"m",label:"Treatment modality & rationale",value:claim.ps604Modality,onChange:v=>up("ps604Modality",v),placeholder:"e.g. CBT, ACT and clinical rationale..."}),
     ]),
     sel==="ps109"&&div({key:"ps109",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:4}},"PS109 - Psychology Treatment Review Form"),
-      div({key:"s",style:{fontSize:"0.76rem",color:"#5B7A99",marginBottom:14}},"Item code PS109 - Fee $203.91 excl. GST - Complete within first 9 months"),
-      e(OK,{key:"ok"},"References PS604 treatment planning data where available"),
+      div({key:"s",style:{fontSize:"0.76rem",color:"#5B7A99",marginBottom:14}},"Item code PS109 — Complete within first 9 months"),
       e(Ta,{key:"p",label:"Treatment progress to date",value:claim.ps109Progress,onChange:v=>up("ps109Progress",v),placeholder:"Progress against PS604 goals..."}),
       e(Ta,{key:"o",label:"Outcome measure results",value:claim.ps109Outcomes,onChange:v=>up("ps109Outcomes",v),placeholder:"DASS-21 scores and comparison to baseline..."}),
       e(Ta,{key:"b",label:"Ongoing barriers",value:claim.ps109Barriers,onChange:v=>up("ps109Barriers",v),placeholder:"Remaining barriers to recovery..."}),
@@ -1128,27 +1471,162 @@ function Tab6({claim,up}){
   ]);
 }
 
-// ── TAB 7: RTW & REHAB PLAN ───────────────────────────────────────────────────
+// ── TAB 7: RTW & REHAB PLAN (EVIDENCE-BASED ENGINE) ──────────────────────────
 function Tab7({claim,up}){
+  const[overrides,setOverrides]=useState(claim.rtwOverrides||{});
+  const diags=claim.diagnoses||[];
+  const psychosocial=claim.psychosocial||{};
+  const allFlags=[...(psychosocial.yellow||[]),...(psychosocial.blue||[]),...(psychosocial.black||[]),...(psychosocial.orange||[])];
+
+  // Compute adjustments
+  const adjustments=PSYCH_ADJUSTMENTS.filter(a=>allFlags.includes(a.flag));
+  const totalMultAdj=adjustments.filter(a=>a.category==="mult").reduce((acc,a)=>acc+a.mult,0);
+  const totalFlatAdj=adjustments.filter(a=>a.category==="flat").reduce((acc,a)=>acc+a.flat,0);
+
+  // Per-diagnosis RTW calculations
+  const calcRTW=(label)=>{
+    const db=RTW_DB[label];
+    if(!db)return null;
+    const baseModMin=db.mod[0],baseModMax=db.mod[1];
+    const baseNormMin=db.normal[0],baseNormMax=db.normal[1];
+    const adjModMin=Math.round(baseModMin*(1+totalMultAdj)+totalFlatAdj/2);
+    const adjModMax=Math.round(baseModMax*(1+totalMultAdj)+totalFlatAdj/2);
+    const adjNormMin=Math.round(baseNormMin*(1+totalMultAdj)+totalFlatAdj);
+    const adjNormMax=Math.round(baseNormMax*(1+totalMultAdj)+totalFlatAdj);
+    return{baseModMin,baseModMax,baseNormMin,baseNormMax,adjModMin,adjModMax,adjNormMin,adjNormMax,notes:db.notes};
+  };
+
+  const setOverride=(diagLabel,field,val)=>{
+    const up={...overrides,[diagLabel]:{...(overrides[diagLabel]||{}),[field]:val}};
+    setOverrides(up);up_claim("rtwOverrides",up);
+  };
+  const up_claim=up; // alias
+
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"RTW & Rehabilitation Plan"),
-    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Return to work planning. Complete after all clinical assessments above."),
-    e(WARN,{key:"w"},"RTW timeframes are research-based guidelines for your consideration - clinical judgement applies."),
-    div({key:"rtw",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"RTW assessment"),
-      div({key:"g",style:S.g2},[
-        e(Inp,{key:"nd",label:"Estimated RTW - normal duties",value:claim.rtwNormalDate,onChange:v=>up("rtwNormalDate",v),type:"date"}),
-        e(Inp,{key:"md",label:"Estimated RTW - modified duties",value:claim.rtwModifiedDate,onChange:v=>up("rtwModifiedDate",v),type:"date"}),
+    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Evidence-based RTW timeframes. You can override any estimate below."),
+    e(WARN,{key:"w"},"RTW timeframes are research-based guidelines. Clinical judgement always applies — override any estimate below."),
+
+    // Psychosocial adjustments summary
+    adjustments.length>0&&div({key:"adj-summary",style:{...S.card,marginBottom:20}},[
+      div({key:"h",style:{fontWeight:700,marginBottom:10}},"🚩 Psychosocial adjustments applied"),
+      div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:12}},"These flags from the Diagnosis screen have extended the base timeframes:"),
+      ...adjustments.map(a=>div({key:a.flag,style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
+        div({key:"l"},[
+          div({key:"n",style:{fontSize:"0.87rem",fontWeight:500}},a.flag),
+          div({key:"d",style:{fontSize:"0.75rem",color:"#FFB830"}},a.desc),
+        ]),
+        span({key:"v",style:{...S.pill,...S.pillA,fontSize:"0.72rem",cursor:"default"}},a.category==="flat"?"+"+a.flat+"w flat":"+"+Math.round(a.mult*100)+"% base"),
+      ])),
+      adjustments.length>0&&div({key:"total",style:{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
+        div({key:"r",style:{display:"flex",gap:16,fontSize:"0.82rem"}},[
+          div({key:"m"},[span({key:"l",style:{color:"#5B7A99"}},"Total multiplier: "),span({key:"v",style:{fontWeight:700,color:"#FFB830"}},"+"+Math.round(totalMultAdj*100)+"%")]),
+          div({key:"f"},[span({key:"l",style:{color:"#5B7A99"}},"Flat addition to normal duties: "),span({key:"v",style:{fontWeight:700,color:"#FFB830"}},totalFlatAdj>0?"+"+totalFlatAdj+"w":"None")]),
+        ]),
       ]),
-      e(Ta,{key:"plan",label:"RTW plan / graded return",value:claim.rtwPlan,onChange:v=>up("rtwPlan",v),placeholder:"Graduated return to work approach...",rows:4}),
-      e(Ta,{key:"mod",label:"Modified duties recommendations",value:claim.modifiedDuties,onChange:v=>up("modifiedDuties",v),placeholder:"Specific modified duties available..."}),
     ]),
-    div({key:"rehab",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Suggested treatment & recovery plan"),
-      e(Ta,{key:"p1",label:"Phase 1 - Acute (Week 1-4)",value:claim.rehabPhase1,onChange:v=>up("rehabPhase1",v),placeholder:"Goals and interventions..."}),
-      e(Ta,{key:"p2",label:"Phase 2 - Rehabilitation (Week 4-12)",value:claim.rehabPhase2,onChange:v=>up("rehabPhase2",v),placeholder:"Goals and interventions..."}),
-      e(Ta,{key:"p3",label:"Phase 3 - Return to work (Week 12+)",value:claim.rehabPhase3,onChange:v=>up("rehabPhase3",v),placeholder:"Goals and work reintegration..."}),
+
+    // Per-diagnosis RTW cards
+    diags.length===0&&div({key:"empty",style:{...S.card,textAlign:"center",padding:"40px",color:"#5B7A99"}},[
+      div({key:"i",style:{fontSize:"2rem",marginBottom:12}},"📋"),
+      div({key:"t",style:{fontWeight:600,marginBottom:8}},"No diagnoses added"),
+      div({key:"s",style:{fontSize:"0.84rem"}},"Add conditions in the Diagnosis tab to see evidence-based RTW timeframes."),
     ]),
+
+    ...diags.map(d=>{
+      const calc=calcRTW(d.label);
+      const ovr=overrides[d.label]||{};
+      const hasAdj=adjustments.length>0;
+      return div({key:d.icd10,style:{...S.card,marginBottom:16}},[
+        div({key:"hdr",style:{...S.fb,marginBottom:12}},[
+          div({key:"l"},[
+            div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},d.label),
+            div({key:"c",style:{fontSize:"0.73rem",fontFamily:"monospace",color:"#5B7A99",marginTop:2}},d.icd10),
+          ]),
+          span({key:"cat",style:{...S.pill,...S.pillM,fontSize:"0.7rem",cursor:"default"}},d.cat),
+        ]),
+        calc?div({key:"calc"},[
+          // Base timeframes
+          div({key:"base",style:{background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"12px 14px",marginBottom:10}},[
+            div({key:"l",style:{fontSize:"0.74rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#5B7A99",marginBottom:8}},"Evidence-based base timeframes"),
+            div({key:"grid",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}},[
+              div({key:"mod"},[
+                div({key:"l",style:{fontSize:"0.74rem",color:"#5B7A99",marginBottom:3}},"Modified duties"),
+                div({key:"v",style:{fontWeight:700,fontSize:"1.1rem",color:"#FFB830"}},calc.baseModMin+"-"+calc.baseModMax+" weeks"),
+              ]),
+              div({key:"norm"},[
+                div({key:"l",style:{fontSize:"0.74rem",color:"#5B7A99",marginBottom:3}},"Normal duties"),
+                div({key:"v",style:{fontWeight:700,fontSize:"1.1rem",color:"#00C9A7"}},calc.baseNormMin+"-"+calc.baseNormMax+" weeks"),
+              ]),
+            ]),
+            calc.notes&&div({key:"n",style:{fontSize:"0.78rem",color:"#5B7A99",marginTop:8,fontStyle:"italic"}},calc.notes),
+          ]),
+
+          // Adjusted timeframes (only if adjustments)
+          hasAdj&&div({key:"adj",style:{background:"rgba(255,184,48,0.06)",border:"1px solid rgba(255,184,48,0.2)",borderRadius:8,padding:"12px 14px",marginBottom:10}},[
+            div({key:"l",style:{fontSize:"0.74rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#FFB830",marginBottom:8}},"⚠️ Adjusted for psychosocial factors"),
+            div({key:"grid",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}},[
+              div({key:"mod"},[
+                div({key:"l",style:{fontSize:"0.74rem",color:"#5B7A99",marginBottom:3}},"Modified duties"),
+                div({key:"v",style:{fontWeight:700,fontSize:"1.1rem",color:"#FFB830"}},calc.adjModMin+"-"+calc.adjModMax+" weeks"),
+                div({key:"d",style:{fontSize:"0.72rem",color:"rgba(255,184,48,0.7)",marginTop:2}},"+"+Math.round(((calc.adjModMax-calc.baseModMax)/calc.baseModMax)*100)+"%"),
+              ]),
+              div({key:"norm"},[
+                div({key:"l",style:{fontSize:"0.74rem",color:"#5B7A99",marginBottom:3}},"Normal duties"),
+                div({key:"v",style:{fontWeight:700,fontSize:"1.1rem",color:"#FFB830"}},calc.adjNormMin+"-"+calc.adjNormMax+" weeks"),
+                div({key:"d",style:{fontSize:"0.72rem",color:"rgba(255,184,48,0.7)",marginTop:2}},"+"+Math.round(((calc.adjNormMax-calc.baseNormMax)/calc.baseNormMax)*100)+"%"),
+              ]),
+            ]),
+            div({key:"calc-note",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:8}},"Calculation: base × (1+"+(Math.round(totalMultAdj*100))+"%)"+(totalFlatAdj>0?" + "+totalFlatAdj+"w flat":"")),
+          ]),
+
+          // Practitioner override
+          div({key:"override",style:{borderTop:"1px solid rgba(255,255,255,0.07)",paddingTop:12,marginTop:4}},[
+            div({key:"h",style:{fontSize:"0.78rem",fontWeight:600,color:"#5B7A99",marginBottom:10,display:"flex",alignItems:"center",gap:8}},["✏️ Practitioner estimate ",span({key:"s",style:{fontWeight:400}},"(overrides guideline ranges)")]),
+            div({key:"g",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}},[
+              div({key:"mod"},[
+                e("label",{key:"l",style:{...S.label,marginBottom:5}},"Modified duties from"),
+                inp({key:"i",className:"cb-input",style:S.inp,type:"date",value:ovr.modFrom||"",onChange:ev=>setOverride(d.label,"modFrom",ev.target.value)}),
+              ]),
+              div({key:"norm"},[
+                e("label",{key:"l",style:{...S.label,marginBottom:5}},"Normal duties from"),
+                inp({key:"i",className:"cb-input",style:S.inp,type:"date",value:ovr.normFrom||"",onChange:ev=>setOverride(d.label,"normFrom",ev.target.value)}),
+              ]),
+            ]),
+            e(Ta,{key:"plan",label:"RTW plan for this diagnosis",value:ovr.plan||"",onChange:v=>setOverride(d.label,"plan",v),placeholder:"Graduated RTW approach for this condition...",rows:2,mb:0}),
+          ]),
+        ]):div({key:"no-db",style:{color:"#5B7A99",fontSize:"0.82rem",fontStyle:"italic",padding:"8px 0"}},[
+          "No guideline data for this diagnosis. ",
+          div({key:"custom",style:{marginTop:10}},[
+            div({key:"g",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:8}},[
+              div({key:"mod"},[e("label",{key:"l",style:{...S.label,marginBottom:5}},"Modified duties estimate"),inp({key:"i",className:"cb-input",style:{...S.inp,color:"#EFF6FF"},type:"date",value:(overrides[d.label]||{}).modFrom||"",onChange:ev=>setOverride(d.label,"modFrom",ev.target.value)})]),
+              div({key:"norm"},[e("label",{key:"l",style:{...S.label,marginBottom:5}},"Normal duties estimate"),inp({key:"i",className:"cb-input",style:{...S.inp,color:"#EFF6FF"},type:"date",value:(overrides[d.label]||{}).normFrom||"",onChange:ev=>setOverride(d.label,"normFrom",ev.target.value)})]),
+            ]),
+          ]),
+        ]),
+      ]);
+    }),
+
+    // Overall RTW plan
+    div({key:"overall",style:S.card},[
+      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Overall RTW plan"),
+      div({key:"g",style:S.g2},[
+        e(Inp,{key:"nd",label:"Estimated RTW — normal duties",value:claim.rtwNormalDate,onChange:v=>up("rtwNormalDate",v),type:"date",mb:0}),
+        e(Inp,{key:"md",label:"Estimated RTW — modified duties",value:claim.rtwModifiedDate,onChange:v=>up("rtwModifiedDate",v),type:"date",mb:0}),
+      ]),
+      div({key:"sp",style:{height:14}}),
+      e(Ta,{key:"plan",label:"Graduated RTW plan",value:claim.rtwPlan,onChange:v=>up("rtwPlan",v),placeholder:"Describe the graded return to work approach, phases, and timeline...",rows:4}),
+      e(Ta,{key:"mod",label:"Modified duties recommendations",value:claim.modifiedDuties,onChange:v=>up("modifiedDuties",v),placeholder:"Specific modified duties available at the workplace..."}),
+    ]),
+
+    // Rehab phases
+    e(Collapsible,{key:"phases",title:"Detailed rehabilitation phases",icon:"📈",defaultOpen:false},
+      div({},[
+        e(Ta,{key:"p1",label:"Phase 1 — Acute (Week 1-4)",value:claim.rehabPhase1,onChange:v=>up("rehabPhase1",v),placeholder:"Goals and interventions..."}),
+        e(Ta,{key:"p2",label:"Phase 2 — Rehabilitation (Week 4-12)",value:claim.rehabPhase2,onChange:v=>up("rehabPhase2",v),placeholder:"Goals and interventions..."}),
+        e(Ta,{key:"p3",label:"Phase 3 — Return to work (Week 12+)",value:claim.rehabPhase3,onChange:v=>up("rehabPhase3",v),placeholder:"Goals and work reintegration..."}),
+      ])
+    ),
   ]);
 }
 
@@ -1176,11 +1654,7 @@ function Tab8({claim,up,clinic,practitioners}){
     if(!tmpl)return;setGen(true);
     const t=TMPLS.find(x=>x.id===tmpl);
     try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:(()=>{
-        const travelSection=claim.travelRequired==="yes"?"\n\nTRAVEL REQUEST: I am also requesting approval for funded travel for this patient. "+claim.travelReasoning:"";
-        const accSection=claim.accommodationRequired==="yes"?"\n\nACCOMMODATION REQUEST: Accommodation for "+(claim.accommodationNights||"[X]")+" nights is also requested. "+claim.accommodationReasoning:"";
-        return "Generate a professional "+claim.scheme+" referral letter for: "+t.label+travelSection+accSection;
-      })()+". Patient: "+(claim.patientName||"[Patient]")+", DOB: "+(claim.dob||"[DOB]")+", Claim: "+(claim.claimNumber||"[Claim No]")+". Diagnosis: "+diags+". Referring: "+(prac&&prac.name||"[Practitioner]")+", "+(prac&&prac.profession||"")+", Provider: "+(prac&&prac.providerNo||"[No]")+", Clinic: "+clinic.name+". Referred to: "+(firstRef.name||"[Colleague]")+", "+(firstRef.specialty||"")+". Priority: "+(firstRef.priority||"Routine")+". Treatment: "+(claim.treatmentPlan||"As per clinical assessment")+". Scheme: "+claim.scheme+". Start with Dear "+(firstRef.name||"Colleague")+" and include: thank you for accepting, patient details, reason for referral, clinical summary including causation and pathophysiology, specific request. Close professionally. Australian medical letter format."}]})});
+      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:"Generate a professional "+claim.scheme+" referral letter for: "+t.label+". Patient: "+(claim.patientName||"[Patient]")+", DOB: "+(claim.dob||"[DOB]")+", Claim: "+(claim.claimNumber||"[Claim No]")+". Diagnosis: "+diags+". Referring: "+(prac&&prac.name||"[Practitioner]")+", "+(prac&&prac.profession||"")+", Provider: "+(prac&&prac.providerNo||"[No]")+", Clinic: "+clinic.name+". Referred to: "+(firstRef.name||"[Colleague]")+", "+(firstRef.specialty||"")+". Priority: "+(firstRef.priority||"Routine")+". Treatment: "+(claim.treatmentPlan||"As per clinical assessment")+". Scheme: "+claim.scheme+". Start with Dear "+(firstRef.name||"Colleague")+" and include: thank you for accepting, patient details, reason for referral, clinical summary, specific request. Close professionally. Australian medical letter format."}]})});
       const d=await r.json();setLetter(d.content&&d.content[0]&&d.content[0].text||"Error generating letter");
     }catch{setLetter("Unable to generate letter. Please try again.");}
     setGen(false);
@@ -1192,7 +1666,7 @@ function Tab8({claim,up,clinic,practitioners}){
       div({key:"h",style:{fontWeight:700,marginBottom:12}},"Referrals from treatment plan"),
       ...refs.map(r=>div({key:r.id,style:{...S.cardSm,marginBottom:8}},[
         div({key:"n",style:{fontWeight:600,fontSize:"0.87rem"}},r.specialty.replace(" (GP referral required)","")),
-        r.name&&div({key:"d",style:{fontSize:"0.76rem",color:"#5B7A99",marginTop:2}},r.name+(r.clinic?" - "+r.clinic:"")+(r.email?" - "+r.email:"")),
+        r.name&&div({key:"d",style:{fontSize:"0.76rem",color:"#5B7A99",marginTop:2}},r.name+(r.clinic?" - "+r.clinic:"")),
       ])),
     ]),
     div({key:"gen",style:S.card},[
@@ -1202,38 +1676,10 @@ function Tab8({claim,up,clinic,practitioners}){
       letter&&div({key:"letter",style:{marginTop:20}},[
         div({key:"hdr",style:{...S.fb,marginBottom:10}},[
           div({key:"t",style:{fontWeight:600,fontSize:"0.87rem"}},"Generated letter"),
-          btn({key:"copy",style:S.btnS,onClick:()=>{navigator.clipboard.writeText(letter).then(()=>alert("Copied!"));}},  "Copy"),
+          btn({key:"copy",style:S.btnS,onClick:()=>navigator.clipboard.writeText(letter).then(()=>alert("Copied!"))},"Copy"),
         ]),
         div({key:"body",style:{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"20px",fontFamily:"Georgia,serif",fontSize:"0.9rem",lineHeight:1.8,whiteSpace:"pre-wrap",color:"rgba(239,246,255,0.9)",maxHeight:480,overflow:"auto"}},letter),
-        div({key:"btns",style:{marginTop:12,display:"flex",gap:8,flexWrap:"wrap"}},[
-          btn({key:"prac",style:{...S.btnP,fontSize:"0.83rem",padding:"9px 16px"}},"Send to practitioner"),
-          btn({key:"ins",style:{...S.btnS,fontSize:"0.83rem",padding:"9px 16px"}},"Send to insurer"),
-          btn({key:"pat",style:{...S.btnS,fontSize:"0.83rem",padding:"9px 16px"}},"CC patient"),
-        ]),
       ]),
-    ]),
-    div({key:"travel",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Travel & accommodation"),
-      div({key:"trav-row",style:{marginBottom:16}},[
-        e("label",{key:"l",style:S.label},"Travel required?"),
-        div({key:"btns",style:{display:"flex",gap:10,marginBottom:10}},[
-          btn({key:"y",onClick:()=>up("travelRequired","yes"),style:{...S.pill,...(claim.travelRequired==="yes"?S.pillT:S.pillM),padding:"9px 20px"}},"Yes - travel required"),
-          btn({key:"n",onClick:()=>up("travelRequired","no"),style:{...S.pill,...(claim.travelRequired==="no"?S.pillT:S.pillM),padding:"9px 20px"}},"No"),
-        ]),
-        claim.travelRequired==="yes"&&e(Ta,{key:"tr",label:"Clinical reasoning for funded travel",value:claim.travelReasoning,onChange:v=>up("travelReasoning",v),placeholder:"e.g. Patient is unable to travel by private vehicle due to cervical injury preventing safe head rotation. Public transport is not accessible due to inability to stand for extended periods..."}),
-      ]),
-      div({key:"acc-row"},[
-        e("label",{key:"l",style:S.label},"Accommodation required?"),
-        div({key:"btns",style:{display:"flex",gap:10,marginBottom:10}},[
-          btn({key:"y",onClick:()=>up("accommodationRequired","yes"),style:{...S.pill,...(claim.accommodationRequired==="yes"?S.pillT:S.pillM),padding:"9px 20px"}},"Yes - accommodation required"),
-          btn({key:"n",onClick:()=>up("accommodationRequired","no"),style:{...S.pill,...(claim.accommodationRequired==="no"?S.pillT:S.pillM),padding:"9px 20px"}},"No"),
-        ]),
-        claim.accommodationRequired==="yes"&&div({key:"acc-det"},[
-          e(Inp,{key:"nights",label:"Number of nights required",value:claim.accommodationNights,onChange:v=>up("accommodationNights",v),placeholder:"e.g. 2 nights"}),
-          e(Ta,{key:"ar",label:"Clinical reasoning for accommodation",value:claim.accommodationReasoning,onChange:v=>up("accommodationReasoning",v),placeholder:"Clinical reasoning for funded accommodation..."}),
-        ]),
-      ]),
-      (claim.travelRequired==="yes"||claim.accommodationRequired==="yes")&&e(OK,{key:"ok"},"Travel/accommodation details will be included in the generated referral letter."),
     ]),
     div({key:"summary",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:14}},"Claim summary"),
@@ -1249,11 +1695,11 @@ function App(){
   const[nav,setNav]=useState("dashboard");
   const[activeClaim,setActiveClaim]=useState(null);
   const[collapsed,setCollapsed]=useState(false);
-  useEffect(()=>{sget("session9:current").then(s=>{if(s){setClinic(s.clinic);loadClaims(s.clinic.id);}});},[]);
-  const loadClaims=async cid=>{const s=await sget("claims9:"+cid)||[];setClaims(s);};
-  const handleLogin=async c=>{setClinic(c);await sset("session9:current",{clinic:c});await loadClaims(c.id);setNav("dashboard");};
-  const handleLogout=async()=>{await sdel("session9:current");setClinic(null);setClaims([]);setActiveClaim(null);setNav("dashboard");};
-  const handleSave=async claim=>{const up=claims.find(c=>c.id===claim.id)?claims.map(c=>c.id===claim.id?claim:c):[...claims,claim];setClaims(up);await sset("claims9:"+clinic.id,up);setActiveClaim(claim);};
+  useEffect(()=>{sget("session10:current").then(s=>{if(s){setClinic(s.clinic);loadClaims(s.clinic.id);}});},[]);
+  const loadClaims=async cid=>{const s=await sget("claims10:"+cid)||[];setClaims(s);};
+  const handleLogin=async c=>{setClinic(c);await sset("session10:current",{clinic:c});await loadClaims(c.id);setNav("dashboard");};
+  const handleLogout=async()=>{await sdel("session10:current");setClinic(null);setClaims([]);setActiveClaim(null);setNav("dashboard");};
+  const handleSave=async claim=>{const up=claims.find(c=>c.id===claim.id)?claims.map(c=>c.id===claim.id?claim:c):[...claims,claim];setClaims(up);await sset("claims10:"+clinic.id,up);setActiveClaim(claim);};
   const handleNav=n=>{if(n==="new_claim"){setActiveClaim(null);setNav("claim");}else setNav(n);};
   const handleOpen=c=>{setActiveClaim(c);setNav("claim");};
   const handleBack=()=>{setNav("dashboard");loadClaims(clinic.id);};
@@ -1277,7 +1723,13 @@ function App(){
         div({key:"h",style:{fontWeight:800,fontSize:"1.2rem",marginBottom:20}},"Help & Support"),
         div({key:"c",style:S.card},[
           div({key:"h",style:{fontWeight:700,marginBottom:14}},"Quick guide"),
-          ...[["1","Select scheme first","Always choose WorkCover or TAC at the top of Patient & Claim."],["2","Add practitioners","Go to Practitioners in the sidebar to add staff and provider numbers."],["3","Work through each tab","Complete tabs in order. Use Next at the bottom."],["4","Save often","Use Save draft to preserve progress at any time."],["5","Generate referral letters","On the Referral & Export tab, select a template and click Generate."]].map(([n,t,d])=>div({key:n,style:{display:"flex",gap:14,marginBottom:16}},[
+          ...[
+            ["1","Complete Patient & Claim first","Select scheme (WorkCover/TAC), insurer and add patient details."],
+            ["2","Add diagnoses in the Diagnosis tab","Search conditions. Complete physical & mental capacity assessments."],
+            ["3","Track outcome measures","In Treatment Plan → Outcome Measures, add PSFS, DASS-21, Oswestry etc. Scores appear in the COC."],
+            ["4","Certificate of Capacity","Click 'Preview & Print COC' to see the official WorkSafe VIC form, ready to print."],
+            ["5","RTW & Rehab Plan","Evidence-based timeframes auto-calculate from your diagnoses + psychosocial flags. Override any estimate."],
+          ].map(([n,t,d])=>div({key:n,style:{display:"flex",gap:14,marginBottom:16}},[
             div({key:"num",style:{width:28,height:28,borderRadius:"50%",background:"rgba(0,201,167,0.15)",border:"1px solid rgba(0,201,167,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"monospace",fontWeight:700,color:"#00C9A7",fontSize:"0.84rem",flexShrink:0}},n),
             div({key:"text"},[div({key:"t",style:{fontWeight:600,fontSize:"0.9rem",marginBottom:3}},t),div({key:"d",style:{fontSize:"0.82rem",color:"#5B7A99",lineHeight:1.5}},d)]),
           ])),
