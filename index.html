@@ -75,15 +75,15 @@ const DEMO_PRACTITIONERS={
 };
 const INSURERS={
   WorkCover:[
-    {id:"allianz",name:"Allianz Workers Compensation",phone:"1300 130 664",address:"2 Market St, Sydney NSW 2000"},
-    {id:"eml",name:"EML VIC Pty Ltd",phone:"1300 365 435",address:"Level 3, 60 City Rd, Southbank VIC 3006"},
-    {id:"gallagher",name:"Gallagher Bassett Services",phone:"1300 362 217",address:"Level 7, 535 Bourke St, Melbourne VIC 3000"},
-    {id:"dxc",name:"DXC Claims Management Services",phone:"1300 369 388",address:"Level 12, 360 Collins St, Melbourne VIC 3000"},
-    {id:"other",name:"Other / Not listed",phone:"",address:""},
+    {id:"allianz",name:"Allianz Workers Compensation",short:"Allianz",phone:"1300 130 664",address:"2 Market St, Sydney NSW 2000"},
+    {id:"eml",name:"EML VIC Pty Ltd",short:"EML",phone:"1300 365 435",address:"Level 3, 60 City Rd, Southbank VIC 3006"},
+    {id:"gallagher",name:"Gallagher Bassett Services",short:"Gallagher Bassett",phone:"1300 362 217",address:"Level 7, 535 Bourke St, Melbourne VIC 3000"},
+    {id:"dxc",name:"DXC Claims Management Services",short:"DXC",phone:"1300 369 388",address:"Level 12, 360 Collins St, Melbourne VIC 3000"},
+    {id:"other",name:"Other / Not listed",short:"Other",phone:"",address:""},
   ],
   TAC:[
-    {id:"tac",name:"Transport Accident Commission (TAC)",phone:"1300 654 329",address:"60 Brougham St, Geelong VIC 3220"},
-    {id:"other",name:"Other / Not listed",phone:"",address:""},
+    {id:"tac",name:"Transport Accident Commission (TAC)",short:"TAC",phone:"1300 654 329",address:"60 Brougham St, Geelong VIC 3220"},
+    {id:"other",name:"Other / Not listed",short:"Other",phone:"",address:""},
   ],
 };
 const PHYSICAL_FUNCTIONS=[
@@ -549,7 +549,7 @@ function Tab1({claim,up,practitioners}){
       ),
       e("label",{key:"ins-label",style:{...S.label,marginBottom:10}},"Insurer *"),
       div({key:"ins-pills",style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}},
-        (INSURERS[claim.scheme]||INSURERS.WorkCover).map(ins=>e("button",{key:ins.id,onClick:()=>selIns(ins.id),style:{...S.pill,...(claim.insurerId===ins.id?S.pillT:S.pillM),fontSize:"0.8rem",padding:"7px 16px"}},ins.name))
+        (INSURERS[claim.scheme]||INSURERS.WorkCover).map(ins=>e("button",{key:ins.id,onClick:()=>selIns(ins.id),style:{...S.pill,...(claim.insurerId===ins.id?S.pillT:S.pillM),fontSize:"0.82rem",padding:"8px 18px"}},ins.short||ins.name))
       ),
       si&&si.id!=="other"&&div({key:"ins-det",style:{background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"10px 14px",marginTop:4,display:"flex",gap:24,flexWrap:"wrap"}},[
         si.phone&&div({key:"ph",style:{fontSize:"0.8rem",color:"#5B7A99"}},"Tel: "+si.phone),
@@ -622,7 +622,7 @@ function Tab2({claim,up}){
   const[show,setShow]=useState(false);
   const[diags,setDiags]=useState(claim.diagnoses||[]);
   const[dSubTab,setDSubTab]=useState(0);
-  const DSUB=["Diagnosis & Capacity","Psychosocial","Clinical Assessment"];
+  const DSUB=["Diagnosis & Capacity","Clinical Assessment","Psychosocial Barriers"];
   const dSubStyle=i=>({padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:dSubTab===i?"rgba(0,201,167,0.1)":"transparent",color:dSubTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:dSubTab===i?"2px solid #00C9A7":"none"});
   const sugg=useMemo(()=>{
     if(!q||q.length<2)return[];
@@ -703,7 +703,8 @@ function Tab2({claim,up}){
         e(Ta,{key:"mn",label:"Mental function notes",value:claim.mentalNotes,onChange:v=>up("mentalNotes",v),placeholder:"Additional mental function notes..."}),
       ]),
     ]),
-    dSubTab===1&&e(Collapsible,{key:"psych",title:"Psychosocial flags",icon:"🚩",defaultOpen:true},
+    dSubTab===2&&div({key:"psych-wrap"},[
+      e(Collapsible,{key:"psych",title:"Psychosocial flags",icon:"🚩",defaultOpen:true},
       div({},[
         div({key:"s",style:{fontSize:"0.83rem",color:"#5B7A99",marginBottom:14}},"Identify barriers to recovery that inform the RTW plan."),
         ...PSYCH_FLAGS.map(({key,label,color,desc,items})=>div({key},[
@@ -716,10 +717,19 @@ function Tab2({claim,up}){
             })
           ),
         ])),
+        div({key:"spacer",style:{height:24}}),
         e(Ta,{key:"pn",label:"Psychosocial notes",value:claim.psychosocialNotes,onChange:v=>up("psychosocialNotes",v),placeholder:"Additional observations..."}),
       ])
     ),
-    dSubTab===2&&div({key:"clin"},[div({key:"h",style:{fontWeight:700,marginBottom:14}},"Clinical assessment"),e(Collapsible,{key:"clin-inner",title:"Allied health clinical findings",icon:"🩺",defaultOpen:true},
+    div({key:"barriers-diag",style:{...S.card,marginTop:0}},[
+      div({key:"h",style:{fontWeight:700,marginBottom:6}},"Work & activity barriers"),
+      div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:14}},"These auto-populate into the COC and Treatment Plan."),
+      e(Ta,{key:"wr",label:"Work restrictions",value:claim.workRestrictions,onChange:v=>up("workRestrictions",v),placeholder:"e.g. No lifting >5kg, avoid prolonged sitting >30 min..."}),
+      e(Ta,{key:"ar",label:"Activity restrictions",value:claim.activityRestrictions,onChange:v=>up("activityRestrictions",v),placeholder:"e.g. No driving, avoid stairs..."}),
+      e(Ta,{key:"we",label:"Work environment considerations",value:claim.workEnvironment,onChange:v=>up("workEnvironment",v),placeholder:"e.g. Temperature, noise, lighting considerations..."}),
+    ]),
+    ],),
+    dSubTab===1&&div({key:"clin"},[div({key:"h",style:{fontWeight:700,marginBottom:14}},"Clinical assessment"),e(Collapsible,{key:"clin-inner",title:"Allied health clinical findings",icon:"🩺",defaultOpen:true},
       div({},[
         e(Ta,{key:"cp",label:"Clinical presentation",value:claim.clinicalPresentation,onChange:v=>up("clinicalPresentation",v),placeholder:"Describe clinical presentation...",rows:4}),
         e(Ta,{key:"ot",label:"Orthopaedic test results",value:claim.orthoTests,onChange:v=>up("orthoTests",v),placeholder:"e.g. Positive Spurlings, SLR 45 degrees..."}),
