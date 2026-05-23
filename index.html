@@ -532,49 +532,42 @@ function Tab1({claim,up,practitioners}){
   const si=(INSURERS[claim.scheme]||INSURERS.WorkCover).find(i=>i.id===claim.insurerId);
   const selPrac=id=>{const p=practitioners.find(x=>x.id===id);up("practitionerId",id);up("practitionerName",p&&p.name||"");up("practitionerProviderNo",p&&p.providerNo||"");up("practitionerProfession",p&&p.profession||"");};
   const selIns=id=>{const ins=(INSURERS[claim.scheme]||INSURERS.WorkCover).find(i=>i.id===id);up("insurerId",id);up("insurerName",ins&&ins.name||"");up("insurerPhone",ins&&ins.phone||"");up("insurerAddress",ins&&ins.address||"");};
-  const jurs=["vic","nsw","qld","sa","wa","act","tas","nt","federal"];
-  const jurLabels={vic:"Victoria",nsw:"NSW",qld:"QLD",sa:"SA",wa:"WA",act:"ACT",tas:"TAS",nt:"NT",federal:"Federal (Comcare)"};
   return div({},[
-    div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Patient & Claim Details"),
-    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Select the scheme and insurer first — this drives fee schedules, forms and item codes throughout the claim."),
+    div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:20}},"Patient & Claim Details"),
 
-    // ── Row 1: Scheme + Insurer side by side ──
-    div({key:"row1",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:0}},[
-      div({key:"scheme",style:S.card},[
-        e("label",{key:"l",style:S.label},"Claim scheme *"),
-        div({key:"jur",style:{marginBottom:14}},[
-          div({key:"pills",style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}},
-            jurs.map(j=>{
-              const active=claim.jurisdiction===j||(j==="vic"&&!claim.jurisdiction);
-              const isActive=j==="vic";
-              return e("button",{key:j,onClick:()=>isActive?up("jurisdiction",j):alert(jurLabels[j]+" coming soon!"),style:{...S.pill,...(active?S.pillT:S.pillM),fontSize:"0.72rem",padding:"5px 10px",...(!isActive?{opacity:0.4}:{})}},jurLabels[j]+(isActive?"":" soon"));
+    // ── Scheme + Insurer in one card, side by side ──
+    div({key:"scheme-ins",style:S.card},[
+      div({key:"row",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,alignItems:"start"}},[
+        div({key:"scheme"},[
+          e("label",{key:"l",style:S.label},"Claim scheme *"),
+          div({key:"jur",style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}},
+            [{id:"vic",label:"Victoria",on:true},{id:"nsw",label:"NSW"},{id:"qld",label:"QLD"},{id:"sa",label:"SA"},{id:"wa",label:"WA"},{id:"act",label:"ACT"},{id:"tas",label:"TAS"},{id:"nt",label:"NT"}].map(j=>{
+              const active=claim.jurisdiction===j.id||(j.id==="vic"&&!claim.jurisdiction);
+              return e("button",{key:j.id,onClick:()=>j.on?up("jurisdiction",j.id):alert(j.label+" coming soon"),style:{...S.pill,...(active?S.pillT:S.pillM),fontSize:"0.72rem",padding:"4px 10px",...(!j.on?{opacity:0.4}:{})}},j.label+(j.on?"":" soon"));
             })
           ),
+          div({key:"tog",style:{display:"flex",gap:6,padding:"4px",background:"rgba(255,255,255,0.04)",borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",width:"fit-content"}},[
+            e("button",{key:"wc",onClick:()=>{up("scheme","WorkCover");up("insurerId","");},style:{padding:"9px 22px",borderRadius:9,border:"none",fontWeight:700,fontSize:"0.88rem",cursor:"pointer",background:claim.scheme==="WorkCover"?"#0057A8":"transparent",color:claim.scheme==="WorkCover"?"#fff":"rgba(255,255,255,0.4)"}},"WorkCover"),
+            e("button",{key:"tac",onClick:()=>{up("scheme","TAC");up("insurerId","");},style:{padding:"9px 22px",borderRadius:9,border:"none",fontWeight:700,fontSize:"0.88rem",cursor:"pointer",background:claim.scheme==="TAC"?"#C0392B":"transparent",color:claim.scheme==="TAC"?"#fff":"rgba(255,255,255,0.4)"}},"TAC"),
+          ]),
         ]),
-        div({key:"tog",style:{display:"flex",gap:8,padding:"4px",background:"rgba(255,255,255,0.04)",borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",width:"fit-content",marginBottom:12}},[
-          e("button",{key:"wc",onClick:()=>up("scheme","WorkCover"),style:{padding:"10px 24px",borderRadius:9,border:"none",fontWeight:700,fontSize:"0.9rem",cursor:"pointer",background:claim.scheme==="WorkCover"?"#0057A8":"transparent",color:claim.scheme==="WorkCover"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"WorkCover"),
-          e("button",{key:"tac",onClick:()=>up("scheme","TAC"),style:{padding:"10px 24px",borderRadius:9,border:"none",fontWeight:700,fontSize:"0.9rem",cursor:"pointer",background:claim.scheme==="TAC"?"#C0392B":"transparent",color:claim.scheme==="TAC"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"TAC"),
-        ]),
-        claim.scheme==="WorkCover"&&e(WARN,{key:"wc"},"WorkSafe Victoria — WorkSafe fee schedule and forms apply"),
-        claim.scheme==="TAC"&&div({key:"tac",style:{background:"rgba(192,57,43,0.08)",border:"1px solid rgba(192,57,43,0.25)",borderRadius:12,padding:"12px 16px",color:"#E67E22",fontSize:"0.82rem"}},"TAC — Transport Accident Commission fees and forms apply"),
-      ]),
-      div({key:"ins",style:S.card},[
-        div({key:"h",style:{fontWeight:700,marginBottom:14}},"Insurer"),
-        e(Sel,{key:"is",label:"Select insurer",value:claim.insurerId,onChange:selIns,options:(INSURERS[claim.scheme]||INSURERS.WorkCover).map(i=>({value:i.id,label:i.name})),required:true}),
-        si&&si.id!=="other"&&div({key:"det",style:{...S.cardSm,marginTop:4}},[
-          div({key:"ph",style:{fontSize:"0.8rem",color:"#5B7A99"}},si.phone),
-          div({key:"ad",style:{fontSize:"0.78rem",color:"#5B7A99",marginTop:3}},si.address),
-        ]),
-        claim.insurerId==="other"&&div({key:"custom",style:{marginTop:10}},[
-          e(Inp,{key:"n",label:"Insurer name",value:claim.insurerNameCustom,onChange:v=>up("insurerNameCustom",v),placeholder:"Enter insurer name"}),
-          e(Inp,{key:"e",label:"Accounts payable email",value:claim.insurerEmail,onChange:v=>up("insurerEmail",v),type:"email",placeholder:"ap@insurer.com.au"}),
-          e("button",{key:"req",style:{...S.pill,...S.pillA,fontSize:"0.78rem"},onClick:()=>alert("Request submitted!")},"Request to add this insurer"),
+        div({key:"ins"},[
+          e(Sel,{key:"is",label:"Insurer *",value:claim.insurerId,onChange:selIns,options:(INSURERS[claim.scheme]||INSURERS.WorkCover).map(i=>({value:i.id,label:i.name})),required:true}),
+          si&&si.id!=="other"&&div({key:"det",style:{background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"10px 12px",marginTop:-8}},[
+            div({key:"ph",style:{fontSize:"0.78rem",color:"#5B7A99"}},si.phone),
+            div({key:"ad",style:{fontSize:"0.76rem",color:"#5B7A99",marginTop:2}},si.address),
+          ]),
+          claim.insurerId==="other"&&div({key:"custom",style:{marginTop:8}},[
+            e(Inp,{key:"n",label:"Insurer name",value:claim.insurerNameCustom,onChange:v=>up("insurerNameCustom",v),placeholder:"Enter insurer name",mb:8}),
+            e(Inp,{key:"e",label:"AP email",value:claim.insurerEmail,onChange:v=>up("insurerEmail",v),type:"email",placeholder:"ap@insurer.com.au",mb:8}),
+            e("button",{key:"req",style:{...S.pill,...S.pillA,fontSize:"0.74rem"},onClick:()=>alert("Request submitted! We will add this insurer soon.")},"Request to add insurer"),
+          ]),
         ]),
       ]),
     ]),
 
-    // ── Row 2: Patient info + Practitioner side by side ──
-    div({key:"row2",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:0}},[
+    // ── Patient + Practitioner side by side ──
+    div({key:"pat-prac",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},[
       div({key:"pat",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:14}},"Patient information"),
         e(Inp,{key:"n",label:"Full name",value:claim.patientName,onChange:v=>up("patientName",v),placeholder:"Jane Smith",required:true}),
@@ -586,44 +579,46 @@ function Tab1({claim,up,practitioners}){
       div({key:"prac",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:14}},"Treating practitioner"),
         e(Sel,{key:"ps",label:"Select practitioner",value:claim.practitionerId,onChange:selPrac,options:practitioners.map(p=>({value:p.id,label:p.name+" - "+p.profession})),required:true}),
-        sp&&e(OK,{key:"ok"},"Provider No: "+sp.providerNo+" - "+sp.profession),
+        sp&&e(OK,{key:"ok"},"Provider No: "+(sp.providerNo||"Not set")+" | "+sp.profession),
         practitioners.length===0&&e(WARN,{key:"warn"},"No practitioners added. Go to Practitioners in the sidebar."),
         e(Inp,{key:"nrd",label:"Next review date",value:claim.nextReviewDate,onChange:v=>up("nextReviewDate",v),type:"date"}),
-        div({key:"div",style:{borderTop:"1px solid rgba(255,255,255,0.07)",margin:"16px 0"}}),
-        div({key:"ch",style:{fontWeight:600,fontSize:"0.85rem",marginBottom:12}},"Claim information"),
+      ]),
+    ]),
+
+    // ── Claim info + Injury side by side ──
+    div({key:"claim-inj",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},[
+      div({key:"claim",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:14}},"Claim information"),
         e(Inp,{key:"cn",label:"Claim number",value:claim.claimNumber,onChange:v=>up("claimNumber",v),placeholder:"WC-2025-XXXXX"}),
         e(Inp,{key:"doi",label:"Date of injury",value:claim.dateOfInjury,onChange:v=>up("dateOfInjury",v),type:"date",required:true}),
         e(Sel,{key:"st",label:"Claim status",value:claim.status,onChange:v=>up("status",v),options:["Active","Pending Approval","Approved","Closed","Disputed"]}),
         claim.scheme==="WorkCover"&&e(Inp,{key:"en",label:"Employer name",value:claim.employerName,onChange:v=>up("employerName",v),placeholder:"ABC Company Pty Ltd"}),
         claim.scheme==="WorkCover"&&e(Inp,{key:"ec",label:"Employer contact",value:claim.employerContact,onChange:v=>up("employerContact",v),placeholder:"HR Manager - 03 XXXX XXXX"}),
       ]),
+      div({key:"inj",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:14}},"Injury details"),
+        e(Sel,{key:"moi",label:"Mechanism of injury",value:claim.injuryMechanism,onChange:v=>up("injuryMechanism",v),options:["Lifting / manual handling","Repetitive strain / overuse","Fall from height","Fall on same level / slip / trip","Struck by object","Motor vehicle accident","Psychological - workplace stress","Psychological - workplace bullying / harassment","Psychological - traumatic event witnessed","Noise exposure","Other - see notes"]}),
+        e(Sel,{key:"bp",label:"Body part (primary)",value:claim.injuryBodyPart,onChange:v=>up("injuryBodyPart",v),options:["Head / skull","Neck / cervical spine","Shoulder - left","Shoulder - right","Elbow - left","Elbow - right","Wrist - left","Wrist - right","Hand - left","Hand - right","Thoracic spine","Lumbar spine / lower back","Hip - left","Hip - right","Knee - left","Knee - right","Ankle - left","Ankle - right","Foot - left","Foot - right","Multiple body parts","Psychological / mental health","Other"]}),
+        e(Sel,{key:"it",label:"Injury type",value:claim.injuryType,onChange:v=>up("injuryType",v),options:["Sprain / strain","Fracture","Dislocation","Soft tissue tear","Contusion / bruising","Nerve injury","Disc injury","Concussion / head injury","Psychological / psychiatric","Cumulative / gradual onset","Aggravation of pre-existing condition","Other"]}),
+        e(Sel,{key:"io",label:"Onset type",value:claim.injuryOnset,onChange:v=>up("injuryOnset",v),options:["Sudden / acute - single incident","Gradual onset - over days","Gradual onset - over weeks","Gradual onset - over months","Aggravation of pre-existing condition","Recurrence of previous injury"]}),
+        e(Ta,{key:"desc",label:"Description",value:claim.injuryDescription,onChange:v=>up("injuryDescription",v),placeholder:"How did the injury occur?",rows:2}),
+        e(Ta,{key:"caus",label:"Causation / pathophysiology",value:claim.injuryCausation,onChange:v=>up("injuryCausation",v),placeholder:"Clinical opinion on causation...",rows:2}),
+      ]),
     ]),
 
-    // ── Injury details ──
-    div({key:"inj",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:6}},"Injury details"),
-      div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"These details auto-populate referral letters and treatment plan templates."),
-      e(Sel,{key:"moi",label:"Mechanism of injury",value:claim.injuryMechanism,onChange:v=>up("injuryMechanism",v),options:["Lifting / manual handling","Repetitive strain / overuse","Fall from height","Fall on same level / slip / trip","Struck by object","Motor vehicle accident","Psychological - workplace stress","Psychological - workplace bullying / harassment","Psychological - traumatic event witnessed","Noise exposure","Other - see notes"]}),
-      div({key:"g",style:S.g2},[
-        e(Sel,{key:"bp",label:"Body part injured (primary)",value:claim.injuryBodyPart,onChange:v=>up("injuryBodyPart",v),options:["Head / skull","Neck / cervical spine","Shoulder - left","Shoulder - right","Elbow - left","Elbow - right","Wrist - left","Wrist - right","Hand - left","Hand - right","Thoracic spine / upper back","Lumbar spine / lower back","Hip - left","Hip - right","Knee - left","Knee - right","Ankle - left","Ankle - right","Foot - left","Foot - right","Multiple body parts","Psychological / mental health","Other"]}),
-        e(Sel,{key:"bp2",label:"Body part injured (secondary)",value:claim.injuryBodyPartSecondary,onChange:v=>up("injuryBodyPartSecondary",v),options:["None","Head / skull","Neck / cervical spine","Shoulder - left","Shoulder - right","Elbow - left","Elbow - right","Wrist - left","Wrist - right","Thoracic spine / upper back","Lumbar spine / lower back","Hip - left","Hip - right","Knee - left","Knee - right","Ankle - left","Ankle - right","Other"]}),
+    // ── Pre-existing + Consent ──
+    div({key:"pre-con",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},[
+      div({key:"pre",style:S.card},[
+        e(Ta,{key:"pre",label:"Pre-existing conditions / relevant history",value:claim.preExisting,onChange:v=>up("preExisting",v),placeholder:"Relevant prior injuries or pre-existing conditions...",rows:3}),
       ]),
-      div({key:"g2",style:S.g2},[
-        e(Sel,{key:"it",label:"Injury type",value:claim.injuryType,onChange:v=>up("injuryType",v),options:["Sprain / strain","Fracture","Dislocation","Soft tissue tear","Contusion / bruising","Laceration / wound","Nerve injury","Disc injury","Concussion / head injury","Psychological / psychiatric","Cumulative / gradual onset","Aggravation of pre-existing condition","Other"]}),
-        e(Sel,{key:"io",label:"Onset type",value:claim.injuryOnset,onChange:v=>up("injuryOnset",v),options:["Sudden / acute - single incident","Gradual onset - over days","Gradual onset - over weeks","Gradual onset - over months (cumulative)","Aggravation of pre-existing condition","Recurrence of previous injury"]}),
+      div({key:"consent",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:14}},"Consent"),
+        div({style:{display:"flex",alignItems:"flex-start",gap:12,cursor:"pointer"},onClick:()=>up("consent",!claim.consent)},[
+          div({key:"cb",style:{width:20,height:20,borderRadius:6,border:claim.consent?"none":"1.5px solid #5B7A99",background:claim.consent?"#00C9A7":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#07101E",fontWeight:700,fontSize:"0.75rem",flexShrink:0,marginTop:2}},claim.consent?"v":""),
+          div({key:"t",style:{fontSize:"0.88rem",lineHeight:1.5}},"The patient has consented to their information being shared with the insurer, referred practitioners and other treating providers."),
+        ]),
       ]),
-      e(Ta,{key:"desc",label:"Mechanism of injury - detailed description",value:claim.injuryDescription,onChange:v=>up("injuryDescription",v),placeholder:"Describe exactly how the injury occurred...",rows:3}),
-      e(Ta,{key:"caus",label:"Causation / pathophysiology",value:claim.injuryCausation,onChange:v=>up("injuryCausation",v),placeholder:"Clinical opinion on causation - how did the mechanism cause this specific injury? Include pathophysiology and sequelae...",rows:3}),
-      e(Ta,{key:"pre",label:"Pre-existing conditions / relevant history",value:claim.preExisting,onChange:v=>up("preExisting",v),placeholder:"Relevant prior injuries or pre-existing conditions..."}),
     ]),
-
-    // ── Consent ──
-    div({key:"consent",style:S.card},
-      div({style:{display:"flex",alignItems:"center",gap:12,cursor:"pointer"},onClick:()=>up("consent",!claim.consent)},[
-        div({key:"cb",style:{width:20,height:20,borderRadius:6,border:claim.consent?"none":"1.5px solid #5B7A99",background:claim.consent?"#00C9A7":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#07101E",fontWeight:700,fontSize:"0.75rem",flexShrink:0}},claim.consent?"v":""),
-        div({key:"t",style:{fontSize:"0.88rem",lineHeight:1.5}},"The patient has consented to their information being shared with the insurer, referred practitioners and other treating providers involved in their care."),
-      ])
-    ),
   ]);
 }
 
@@ -649,7 +644,10 @@ function Tab2({claim,up}){
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Diagnosis"),
     NO_DIAG_PROFS&&NO_DIAG_PROFS.includes(claim.practitionerProfession)&&e(WARN,{key:"nd"},"Diagnosis is completed by the referring medical practitioner or allied health practitioner. OTs and Exercise Physiologists cannot diagnose conditions."),
-    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Search and add conditions. Capacity limitations auto-populate the Certificate of Capacity."),
+    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:12}},"Search and add conditions. Capacity limitations auto-populate the Certificate of Capacity."),
+    div({key:"dsubtabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:24}},
+      DSUB.map((t,i)=>e("button",{key:t,onClick:()=>setDSubTab(i),style:{padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:dSubTab===i?"rgba(0,201,167,0.1)":"transparent",color:dSubTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:dSubTab===i?"2px solid #00C9A7":"none"}},(i+1)+". "+t))
+    ),
     dSubTab===0&&div({key:"diag",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:14}},"Conditions / Diagnosis"),
       div({key:"sw",style:{position:"relative"}},[
