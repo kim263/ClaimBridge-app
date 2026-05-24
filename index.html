@@ -1098,9 +1098,9 @@ function Tab5({claim,up,clinic,practitioners}){
     const mentalFns=MENTAL_FUNCTIONS;
 
     return div({className:"coc-print-page",style:{background:"white",color:"black",fontFamily:"Arial,sans-serif",fontSize:11,padding:24,maxWidth:760,margin:"0 auto"}},[
-      div({key:"pbtns",className:"no-print",style:{display:"flex",gap:10,marginBottom:20}},[
+      div({key:"pbtns",className:"no-print",style:{position:"sticky",top:0,zIndex:10,background:"rgba(12,26,46,0.97)",borderBottom:"1px solid rgba(255,255,255,0.1)",display:"flex",gap:10,padding:"10px 0",marginBottom:20}},[
+        btn({key:"b",onClick:()=>setPrintMode(false),style:{...S.btnS,fontSize:"0.85rem"}},"← Close preview"),
         btn({key:"p",onClick:()=>window.print(),style:{...S.btnP,fontSize:"0.85rem"}},"🖨️ Print / Save PDF"),
-        btn({key:"b",onClick:()=>setPrintMode(false),style:{...S.btnS,fontSize:"0.85rem"}},"← Back to edit"),
       ]),
       div({key:"hdr",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",borderBottom:"2px solid #1a1a1a",paddingBottom:12,marginBottom:8}},[
         div({key:"logos",style:{display:"flex",alignItems:"center",gap:16}},[
@@ -2205,19 +2205,22 @@ function Tab6({claim,up,clinic,practitioners}){
           btn({key:"print",style:{...S.btnP,fontSize:"0.82rem",display:"flex",alignItems:"center",gap:6},onClick:()=>setPrintForm("ahrmp")},"🖨️ Print Form"),
         ]),
         e(OK,{key:"ok"},"Patient, diagnosis and capacity details pre-populated"),
-        // Auto-populate goals from Tab4 SMART goals (allied health)
+        // Auto-populate goals from Tab4 — SMART goals (allied health) OR short/long goals (GP)
         (()=>{
           const smartGoals=[1,2,3].map(n=>{
             const lim=claim["ahGoalLim"+n];const target=claim["ahGoalTarget"+n];const date=claim["ahGoalDate"+n];
             if(!lim&&!target)return null;
             return (lim||"")+(target?" → "+target:"")+(date?" (by "+new Date(date).toLocaleDateString("en-AU")+")":"");
           }).filter(Boolean).join("\n");
-          const autoGoals=smartGoals||(claim.goalsShort?"Short-term: "+claim.goalsShort+(claim.goalsLong?"\nLong-term: "+claim.goalsLong:""):"");
-          return e(Ta,{key:"g",label:"Specific goals for this referral",value:ah.goals||(ah._goalsSet?"":autoGoals)||"",onChange:v=>{upAH("goals")(v);upAH("_goalsSet")(true);},placeholder:"Goals specific to this allied health referral (auto-populated from Treatment Plan)...",rows:4});
+          const gpGoals=[claim.goalsShort&&"Short-term: "+claim.goalsShort,claim.goalsLong&&"Long-term: "+claim.goalsLong].filter(Boolean).join("\n");
+          const treatPlan=claim.treatmentPlan||"";
+          const autoGoals=smartGoals||gpGoals||"";
+          const displayVal=ah.goals||(ah._goalsSet?"":autoGoals)||"";
+          return e(Ta,{key:"g",label:"Specific goals for this referral",value:displayVal,onChange:v=>{upAH("goals")(v);upAH("_goalsSet")(true);},placeholder:"Goals (auto-populated from Treatment Plan)...",rows:4});
         })(),
         (()=>{
-          const hasSmartGoals=[1,2,3].some(n=>claim["ahGoalLim"+n]||claim["ahGoalTarget"+n]);
-          return hasSmartGoals&&!ah._goalsSet&&div({key:"goals-src",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:-10,marginBottom:14}},"↑ Auto-populated from Treatment Plan SMART goals — edit above to customise");
+          const hasGoalSrc=[1,2,3].some(n=>claim["ahGoalLim"+n]||claim["ahGoalTarget"+n])||(claim.goalsShort||claim.goalsLong);
+          return hasGoalSrc&&!ah._goalsSet&&div({key:"goals-src",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:-10,marginBottom:14}},"↑ Auto-populated from Treatment Plan — edit above to customise");
         })(),
         div({key:"gr",style:S.g2},[
           e(Inp,{key:"t",label:"Treatment type",value:ah.treatment||(claim.practitionerProfession||""),onChange:upAH("treatment"),placeholder:"e.g. Physiotherapy, Occupational Therapy"}),
