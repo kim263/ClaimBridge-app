@@ -165,6 +165,8 @@ const OUTCOME_MEASURES={
   "DASS-21":{name:"Depression Anxiety Stress Scales (DASS-21)",min:0,max:63,higherBetter:false,desc:"Psychological distress. Depression+Anxiety+Stress (x2 for full score).",unit:"/ 63",interpretation:{good:14,moderate:28}},
   "Orebro Short":{name:"Orebro Musculoskeletal Pain Questionnaire - Short",min:10,max:100,higherBetter:false,desc:"Screening for risk of prolonged disability.",unit:"/ 100",interpretation:{good:30,moderate:50}},
   "Orebro Long":{name:"Orebro Musculoskeletal Pain Questionnaire - Long",min:21,max:210,higherBetter:false,desc:"Full risk assessment for prolonged disability.",unit:"/ 210",interpretation:{good:63,moderate:105}},
+  "UEFI":{name:"Upper Extremity Functional Index (UEFI-20)",min:0,max:80,higherBetter:true,desc:"Rate ability to perform 20 upper limb activities (0=extremely difficult/unable, 4=no difficulty). Higher = better function.",unit:"/ 80",interpretation:{good:60,moderate:40}},
+  "LEFS":{name:"Lower Extremity Functional Scale (LEFS)",min:0,max:80,higherBetter:true,desc:"Rate ability to perform 20 lower limb activities (0=extreme difficulty/unable, 4=no difficulty). Higher = better function.",unit:"/ 80",interpretation:{good:60,moderate:40}},
 };
 const DIAGNOSES_DB=[
   {icd10:"M54.5",label:"Low back pain",cat:"Spine"},{icd10:"M54.4",label:"Lumbago with sciatica",cat:"Spine"},
@@ -289,7 +291,10 @@ function LoginScreen({onLogin}){
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,fontSize:"1rem",marginBottom:20}},"Sign in to your clinic"),
         e(Inp,{key:"e",label:"Email address",value:email,onChange:setEmail,type:"email",placeholder:"clinic@example.com.au"}),
-        e(Inp,{key:"p",label:"Password",value:pw,onChange:setPw,type:"password",placeholder:"••••••••"}),
+        div({key:"pw",style:{marginBottom:16}},[
+          e("label",{key:"l",style:S.label},"Password"),
+          inp({key:"i",className:"cb-input",style:S.inp,type:"password",value:pw,onChange:ev=>setPw(ev.target.value),placeholder:"••••••••",onKeyDown:ev=>{if(ev.key==="Enter"&&email&&pw&&!loading)go();}}),
+        ]),
         err&&e(WARN,{key:"err"},err),
         btn({key:"b",style:{...S.btnP,width:"100%",justifyContent:"center",padding:"14px",display:"block"},onClick:go,disabled:loading},loading?"Signing in...":"Sign in ->"),
         div({key:"demo",style:{textAlign:"center",marginTop:14,fontSize:"0.75rem",color:"#5B7A99"}},"Demo: admin@baysidemedical.com.au / demo1234"),
@@ -2200,25 +2205,54 @@ function Tab6({claim,up,clinic,practitioners}){
           btn({key:"print",style:{...S.btnP,fontSize:"0.82rem",display:"flex",alignItems:"center",gap:6},onClick:()=>setPrintForm("ahrmp")},"🖨️ Print Form"),
         ]),
         e(OK,{key:"ok"},"Patient, diagnosis and capacity details pre-populated"),
-        e(Ta,{key:"g",label:"Specific goals for this referral",value:ah.goals||"",onChange:upAH("goals"),placeholder:"Goals specific to this allied health referral..."}),
+        // Auto-populate goals from Tab4 SMART goals (allied health)
+        (()=>{
+          const smartGoals=[1,2,3].map(n=>{
+            const lim=claim["ahGoalLim"+n];const target=claim["ahGoalTarget"+n];const date=claim["ahGoalDate"+n];
+            if(!lim&&!target)return null;
+            return (lim||"")+(target?" → "+target:"")+(date?" (by "+new Date(date).toLocaleDateString("en-AU")+")":"");
+          }).filter(Boolean).join("\n");
+          const autoGoals=smartGoals||(claim.goalsShort?"Short-term: "+claim.goalsShort+(claim.goalsLong?"\nLong-term: "+claim.goalsLong:""):"");
+          return e(Ta,{key:"g",label:"Specific goals for this referral",value:ah.goals||(ah._goalsSet?"":autoGoals)||"",onChange:v=>{upAH("goals")(v);upAH("_goalsSet")(true);},placeholder:"Goals specific to this allied health referral (auto-populated from Treatment Plan)...",rows:4});
+        })(),
+        (()=>{
+          const hasSmartGoals=[1,2,3].some(n=>claim["ahGoalLim"+n]||claim["ahGoalTarget"+n]);
+          return hasSmartGoals&&!ah._goalsSet&&div({key:"goals-src",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:-10,marginBottom:14}},"↑ Auto-populated from Treatment Plan SMART goals — edit above to customise");
+        })(),
         div({key:"gr",style:S.g2},[
-          e(Inp,{key:"t",label:"Treatment type",value:ah.treatment||"",onChange:upAH("treatment"),placeholder:"e.g. Physiotherapy, Occupational Therapy"}),
+          e(Inp,{key:"t",label:"Treatment type",value:ah.treatment||(claim.practitionerProfession||""),onChange:upAH("treatment"),placeholder:"e.g. Physiotherapy, Occupational Therapy"}),
           e(Inp,{key:"f",label:"Frequency",value:ah.frequency||"",onChange:upAH("frequency"),placeholder:"e.g. 2x per week",mb:0}),
         ]),
         div({key:"gr2",style:{...S.g2,marginTop:16}},[
-          e(Inp,{key:"d",label:"Duration",value:ah.duration||"",onChange:upAH("duration"),placeholder:"e.g. 6 weeks"}),
-          e(Inp,{key:"s",label:"Sessions requested",value:ah.sessions||"",onChange:upAH("sessions"),placeholder:"e.g. 12"}),
+          e(Inp,{key:"d",label:"Duration",value:ah.duration||(claim.txWeeks?claim.txWeeks+" weeks":""),onChange:upAH("duration"),placeholder:"e.g. 6 weeks"}),
+          e(Inp,{key:"s",label:"Sessions requested",value:ah.sessions||(claim.txNum||""),onChange:upAH("sessions"),placeholder:"e.g. 12"}),
+        ]),
+        div({key:"dates",style:S.g2},[
+          e(Inp,{key:"from",label:"Treatment from",value:ah.txFrom||(claim.txFrom||""),onChange:v=>upAH("txFrom")(v),type:"date",mb:0}),
+          e(Inp,{key:"to",label:"Treatment to",value:ah.txTo||(claim.txTo||""),onChange:v=>upAH("txTo")(v),type:"date",mb:0}),
         ]),
         e(Ta,{key:"o",label:"Expected outcomes",value:ah.outcomes||"",onChange:upAH("outcomes"),placeholder:"Expected functional improvements..."}),
-        e(Ta,{key:"j",label:"Clinical justification",value:ah.justification||"",onChange:upAH("justification"),placeholder:"Clinical reasoning for this referral...",rows:4}),
+        e(Ta,{key:"j",label:"Clinical justification / treatment methods",value:ah.justification||(ah._justSet?"":claim.treatmentPlan||""),onChange:v=>{upAH("justification")(v);upAH("_justSet")(true);},placeholder:"Clinical reasoning and treatment methods (auto-populated from Treatment Plan)...",rows:4}),
+        claim.treatmentPlan&&!ah._justSet&&div({key:"just-src",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:-10,marginBottom:14}},"↑ Auto-populated from Treatment Plan — edit above to customise"),
         (()=>{
           // Auto-populate barriers from psychosocial flags + treatment plan additional barriers
           const flags=claim.psychosocial||{};
           const flagBarriers=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
-          const addBarriers=claim.barriers||"";
-          const autoPop=[...flagBarriers,...(addBarriers?[addBarriers]:[])].join("; ");
+          const addBarriers=(claim.barriers||"").trim();
+          const parts=[];
+          if(flagBarriers.length>0)parts.push(flagBarriers.join(", "));
+          if(addBarriers)parts.push(addBarriers);
+          const autoPop=parts.join(".\n");
           const displayVal=ah.barriers||(ah._barriersSet?"":(autoPop||""));
           return e(Ta,{key:"b",label:"Barriers to recovery",value:displayVal,onChange:v=>{upAH("barriers")(v);upAH("_barriersSet")(true);},placeholder:"Identified barriers (auto-populated from psychosocial flags and treatment plan)...",rows:3});
+        })(),
+        (()=>{
+          const flags=claim.psychosocial||{};
+          const flagBarriers=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
+          const flags2=claim.psychosocial||{};
+          const flagBarriers2=[...(flags2.yellow||[]),...(flags2.blue||[]),...(flags2.black||[]),...(flags2.orange||[])];
+          const hasBarrierSrc=flagBarriers2.length>0||!!(claim.barriers||"").trim();
+          return hasBarrierSrc&&!ah._barriersSet&&div({key:"barriers-src",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:-10,marginBottom:12}},"↑ Auto-populated from psychosocial flags"+(claim.barriers?" and treatment plan barriers":"")+" — edit above to customise");
         })(),
         (()=>{
           const flags=claim.psychosocial||{};
