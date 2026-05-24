@@ -890,11 +890,18 @@ function Tab4({claim,up}){
           ]),
           e(Ta,{key:"tp",label:"Treatment methods / proposed treatment",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Describe treatment methods to be used...",rows:3}),
           e(Ta,{key:"sm",label:"Self-management strategies",value:claim.selfManagement,onChange:v=>up("selfManagement",v),placeholder:"Strategies the worker will use to manage their condition..."}),
-        ]:[
+        ]:[ 
           e(Ta,{key:"sg",label:"Short-term goals (0-4 weeks)",value:claim.goalsShort,onChange:v=>up("goalsShort",v),placeholder:"e.g. Pain reduction, restore ROM..."}),
           e(Ta,{key:"lg",label:"Long-term goals (4+ weeks)",value:claim.goalsLong,onChange:v=>up("goalsLong",v),placeholder:"e.g. Return to full duties..."}),
           e(Ta,{key:"tp",label:"Treatment plan / management approach",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Management approach...",rows:4}),
+          e(Ta,{key:"sg",label:"Short-term goals (0-4 weeks)",value:claim.goalsShort,onChange:v=>up("goalsShort",v),placeholder:"e.g. Pain reduction, restore ROM..."}),
+          e(Ta,{key:"lg",label:"Long-term goals (4+ weeks)",value:claim.goalsLong,onChange:v=>up("goalsLong",v),placeholder:"e.g. Return to full duties..."}),
         ],
+        div({key:"proc-section",style:{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
+          div({key:"h",style:{fontWeight:600,fontSize:"0.85rem",marginBottom:12}},"Proposed procedure / surgery"),
+          e(Sel,{key:"proc",label:"Proposed procedure (if applicable)",value:claim.proposedProcedure,onChange:v=>up("proposedProcedure",v),options:["Arthroscopic knee surgery (meniscectomy / chondroplasty)","ACL reconstruction","Total knee replacement (TKR)","Total hip replacement (THR)","Hip arthroscopy / labral repair","Rotator cuff repair","Shoulder arthroscopy / decompression","Shoulder stabilisation / Bankart repair","SLAP repair","Acromioclavicular joint reconstruction","Carpal tunnel release","Trigger finger release","Dupuytren's fasciectomy","Wrist arthroscopy / TFCC repair","Distal radius ORIF","Cervical spine discectomy / fusion (ACDF)","Lumbar discectomy / microdiscectomy","Lumbar spinal fusion","Lumbar laminectomy / decompression","Facet joint injection / denervation","Spinal cord stimulator implantation","Pain management program","Injection therapy (corticosteroid / PRP / hydrocortisone)","Nerve block / epidural steroid injection","Achilles tendon repair","Ankle arthroscopy","Plantar fascia release","Elbow arthroscopy","Cubital tunnel release (ulnar nerve transposition)","Other — see clinical notes"],mb:0}),
+          claim.proposedProcedure&&div({key:"proc-note",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:8}},"This will autopopulate to the Procedure / Surgery referral letter."),
+        ]),
         div({key:"barriers-section",style:{marginBottom:16}},[
           e("label",{key:"l",style:S.label},"Barriers to recovery"),
           (()=>{const flags=claim.psychosocial||{};const allFlags=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];return allFlags.length>0?div({key:"auto"},[div({key:"note",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:8}},"Auto-populated from psychosocial flags in Diagnosis screen:"),div({key:"pills",style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}},allFlags.map(f=>e("span",{key:f,style:{...S.pill,...S.pillA,cursor:"default",fontSize:"0.72rem"}},f)))]):null;})(),
@@ -2582,6 +2589,16 @@ function Tab8({claim,up,clinic,practitioners}){
   const reviewDate=fmtD(claim.nextReviewDate);
   const imagingSummary=(claim.imagingReports||[]).filter(r=>r.summary).map(r=>r.name+": "+r.summary.keyFindings).join("\n")||"";
   const referralList=(claim.referrals||[]).map(r=>r.specialty+(r.name?" — "+r.name:"")).join(", ")||"";
+  const proposedProcedure=claim.proposedProcedure||"";
+
+  // Build "current treatment strategy includes" summary from all filled fields
+  const treatmentStrategyParts=[];
+  if(claim.treatmentPlan)treatmentStrategyParts.push(claim.treatmentPlan);
+  if((claim.medications||[]).length>0)treatmentStrategyParts.push("medication management including: "+(claim.medications||[]).map(m=>m.name+(m.dosage?" "+m.dosage:"")).join(", "));
+  if((claim.referrals||[]).length>0)treatmentStrategyParts.push("allied health and specialist referrals: "+(claim.referrals||[]).map(r=>r.specialty+(r.name?" ("+r.name+")":"")).join(", "));
+  if((claim.imagingReports||[]).length>0)treatmentStrategyParts.push("radiological imaging: "+(claim.imagingReports||[]).map(r=>r.name).join(", "));
+  if(claim.imagingReferral)treatmentStrategyParts.push("imaging referral for "+claim.imagingReferral);
+  const treatmentStrategy=treatmentStrategyParts.length>0?"The current treatment strategy includes: "+treatmentStrategyParts.join("; ")+".":"The current treatment strategy is as per clinical assessment and management plan.";
   const ahrmTreatment=claim.ahrmData&&claim.ahrmData.treatment||pracProf||"";
   const ahrmSessions=claim.ahrmData&&claim.ahrmData.sessions||claim.txNum||"";
   const ahrmDuration=claim.ahrmData&&claim.ahrmData.duration||(claim.txWeeks?claim.txWeeks+" weeks":"")||"";
@@ -2612,7 +2629,7 @@ Date: ${today}
 
 ---
 This letter was generated by ClaimBridge — WorkCover & TAC Documentation Platform
-www.claimbridge.com.au`;
+project-jogrq-eight.vercel.app`;
 
     const hdr=(subj)=>`${today}
 
@@ -2643,8 +2660,11 @@ I am requesting a specialist opinion from ${firstRef.specialty||"an appropriate 
 - Clarification of diagnosis and causation
 - Specialist management recommendations
 - Opinion on prognosis and capacity for return to work
-${imagingSummary?"- Review of imaging: "+imagingSummary:""}
-
+${imagingSummary?"- Review of imaging findings attached":""}
+${imagingSummary?`
+**Imaging Reports:**
+${imagingSummary}
+`:""}
 **Current Fitness for Work:**
 ${fitnessStatus||"As per current Certificate of Capacity."}
 
@@ -2658,64 +2678,61 @@ I am writing to request approval for ongoing specialist management for my patien
   - ${diagList}
 
 **Clinical Background:**
-${patientName} has been receiving treatment for the above condition/s since ${doi}. ${treatPlan}
+${patientName} sustained the above injury on ${doi}${employer?" while employed with "+employer:""}. ${treatmentStrategy}
 
-**Request:**
+${imagingSummary?`**Imaging:**
+${imagingSummary}
+
+`:""}**Request:**
 I am requesting ongoing specialist management with ${firstRef.specialty||"a specialist"} to ensure continuity of care and optimise recovery outcomes. The treating team believes ongoing specialist input is clinically necessary at this stage of rehabilitation.
 
-${imagingSummary?"\n**Imaging:**\n"+imagingSummary+"\n":""}**Current Status:**
+**Current Status:**
 Fitness for work: ${fitnessStatus||"As per Certificate of Capacity."}
 Work restrictions: ${workRestrictions}
 ${reviewDate!=="[date not set]"?"Next review: "+reviewDate:""}${sig}`;
 
-    if(id==="allied_health")return hdr("Request for Approval — Allied Health Treatment")+`
+    if(id==="allied_health")return hdr("Request for Approval — Allied Health Referral")+`
 
-I am writing to request approval for allied health treatment for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+I am writing to request approval for an allied health referral for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
 
 **Diagnosis:**
   - ${diagList}
 
-**Proposed Treatment:**
-Treating discipline: ${ahrmTreatment||"Allied health"}
-Frequency: ${ahrmFreq||"As clinically indicated"}
-Duration: ${ahrmDuration||"As clinically indicated"}
-Total sessions requested: ${ahrmSessions||"As clinically indicated"}
-Treatment dates: ${cocFrom} to ${cocTo}
+**Proposed Referral:**
+I am requesting approval to refer ${patientName} to the following allied health practitioner:
+${firstRef.name?firstRef.name+", ":""} ${ahrmTreatment||firstRef.specialty||"Allied health practitioner"}${firstRef.clinic?" — "+firstRef.clinic:""}
+
+The referred practitioner will conduct their own clinical assessment, complete the required Allied Health Recovery Management Plan (AHRMP) and submit their own treatment request to you directly.
+
+**Current Proposed Treatment Strategy:**
+${ahrmJust}
 
 **Treatment Goals:**
 ${ahrmGoals||goalsText||"To restore functional capacity and support return to work."}
-
-**Clinical Justification:**
-${ahrmJust}
 
 **Fitness for Work:**
 ${fitnessStatus||"As per Certificate of Capacity."}
 ${workRestrictions?"Work restrictions: "+workRestrictions:""}
 
-I am satisfied that the proposed treatment is reasonable, necessary and related to the compensable condition. I request your approval at your earliest convenience given the legislative timeframes that apply.${sig}`;
+I am satisfied that this referral is reasonable, necessary and related to the compensable condition. I request your approval at your earliest convenience given the legislative timeframes that apply.${sig}`;
 
-    if(id==="psychology")return hdr("Request for Approval — Psychological Treatment")+`
+    if(id==="psychology")return hdr("Request for Approval — Psychological Assessment and Treatment")+`
 
-I am writing to request approval for psychological treatment services for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+I am writing to request approval for psychological assessment and treatment for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
 
-**Diagnosis:**
+**Physical Diagnosis (Compensable Injury):**
   - ${diagList}
 
 **Clinical Indication:**
-${patientName} is presenting with psychological sequelae directly related to the compensable injury sustained on ${doi}. ${treatPlan}
+${patientName} sustained the above compensable injury on ${doi}${employer?" while employed with "+employer:""}. ${patientName} is presenting with psychological difficulties that are believed to be related to the compensable injury and/or the workplace incident. ${treatmentStrategy}
 
-**Proposed Psychology Treatment:**
-Sessions requested: ${ahrmSessions||"12–16 sessions"}
-Frequency: ${ahrmFreq||"Weekly"}
-Modality: ${(claim.ps604Data&&claim.ps604Data.modality)||"Cognitive Behavioural Therapy (CBT) / evidence-based psychological intervention"}
+A formal psychological assessment and DSM-5 diagnostic formulation by a qualified psychologist is required to determine the nature and extent of any psychological condition, and whether it is secondary to the physical injury or arose directly from the workplace incident.
 
-**Treatment Goals:**
-${(claim.ps604Data&&claim.ps604Data.goals)||ahrmGoals||"Reduce psychological distress, improve daily functioning, and support return to work."}
+**Psychosocial Barriers and Flags:**
+The following barriers to recovery have been identified and are presented for the psychologist's awareness:
+${(()=>{const fl=claim.psychosocial||{};const fb=[...(fl.yellow||[]),...(fl.blue||[]),...(fl.black||[]),...(fl.orange||[])];return fb.length>0?fb.join(", ")+".":"No psychosocial barriers formally identified at this time."})()}
 
-**Psychosocial Factors:**
-${(()=>{const fl=claim.psychosocial||{};const fb=[...(fl.yellow||[]),...(fl.blue||[]),...(fl.black||[]),...(fl.orange||[])];return fb.length>0?"The following barriers have been identified: "+fb.join(", ")+".":"No significant psychosocial barriers identified at this time."})()}
-
-I am requesting your approval to proceed with psychological treatment in accordance with the PS604 treatment planning documentation.${sig}`;
+I am requesting your expert assessment and recommendations. The psychologist will determine the appropriate diagnosis, treatment approach, frequency and duration based on their own clinical assessment.${sig}`;
 
     if(id==="gym_swim")return hdr("Request for Approval — Gym / Hydrotherapy Membership")+`
 
@@ -2800,17 +2817,23 @@ I am writing to request approval for a procedure / surgical intervention for my 
   - ${diagList}
 
 **Proposed Procedure:**
-${firstRef.specialty||"[Procedure / surgical intervention]"} — to be performed by ${firstRef.name||"[Specialist name]"}${firstRef.clinic?" at "+firstRef.clinic:""}.
+${proposedProcedure||firstRef.specialty||"[Procedure / surgical intervention]"} — to be performed by ${firstRef.name||"[Specialist name]"}${firstRef.clinic?" at "+firstRef.clinic:""}.
 
 **Clinical Justification:**
-Conservative management has been undertaken since ${doi}. ${treatPlan}
+${patientName} sustained the above compensable injury on ${doi}${employer?" while employed with "+employer:""}. Conservative management has been undertaken and ${treatmentStrategy}
 
-${imagingSummary?"\n**Supporting Imaging:**\n"+imagingSummary+"\n":""}**Expected Outcomes:**
-The proposed intervention is expected to ${goalsText||"improve functional capacity, reduce pain, and support return to work"}.
+**Treatment Summary — Previously Approved Treatment:**
+${(claim.referrals||[]).length>0?(claim.referrals||[]).map(r=>r.specialty+(r.name?" — "+r.name:"")+(r.status?" ("+r.status+")":"")).join("\n"):"No prior referrals recorded."}
 
-**Post-Operative Plan:**
-${rtwMod!=="[date not set]"?"Estimated return to modified duties: "+rtwMod:""}
-${rtwNorm!=="[date not set]"?"Estimated return to normal duties: "+rtwNorm:""}
+${imagingSummary?`**Supporting Imaging:**
+${imagingSummary}
+
+`:""}**Post-Procedure Treatment Plan and Recommendations:**
+${goalsText||"Restoration of functional capacity, pain reduction, and progressive return to pre-injury level of function."}
+${(claim.referrals||[]).filter(r=>r.status==="Approved").length>0?"Ongoing approved referrals to continue post-procedure: "+(claim.referrals||[]).filter(r=>r.status==="Approved").map(r=>r.specialty).join(", ")+".\n":""}Additional referrals or investigations may be required following the procedure as clinically indicated.
+
+**Return to Work:**
+${rtwMod!=="[date not set]"?"Estimated return to modified duties: "+rtwMod+"\n":""}${rtwNorm!=="[date not set]"?"Estimated return to normal duties: "+rtwNorm:""}
 
 I am satisfied that this procedure is reasonable, necessary, and causally related to the compensable condition. I request your approval at your earliest convenience.${sig}`;
 
