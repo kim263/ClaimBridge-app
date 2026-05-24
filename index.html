@@ -592,7 +592,6 @@ function Tab1({claim,up,practitioners}){
         e(Sel,{key:"ps",label:"Select practitioner",value:claim.practitionerId,onChange:selPrac,options:practitioners.map(p=>({value:p.id,label:p.name+" - "+p.profession})),required:true}),
         sp&&e(OK,{key:"ok"},"Provider No: "+(sp.providerNo||"Not set")+" | "+sp.profession),
         practitioners.length===0&&e(WARN,{key:"warn"},"No practitioners added. Go to Practitioners in the sidebar."),
-        e(Inp,{key:"nrd",label:"Next review date",value:claim.nextReviewDate,onChange:v=>up("nextReviewDate",v),type:"date"}),
         div({key:"con",style:{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
           div({key:"h",style:{fontWeight:600,fontSize:"0.85rem",marginBottom:10}},"Consent"),
           div({style:{display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer"},onClick:()=>up("consent",!claim.consent)},[
@@ -850,6 +849,7 @@ function Tab4({claim,up}){
   const[subTab,setSubTab]=useState(0);
   const SUB=["Goals & Management","Referrals","Work & Activity","Medication & Investigations","Outcome Measures"];
   const isPrescriber=PRESCRIBING.includes(claim.practitionerProfession);
+  const isAlliedHealth=!PRESCRIBING.includes(claim.practitionerProfession)&&claim.practitionerProfession!=="General Practitioner"&&claim.practitionerProfession!=="";
   const subStyle=i=>({padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:subTab===i?"rgba(0,201,167,0.1)":"transparent",color:subTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:subTab===i?"2px solid #00C9A7":"none"});
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Treatment Plan"),
@@ -860,9 +860,36 @@ function Tab4({claim,up}){
     subTab===0&&div({key:"goals"},[
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:14}},"Goals & management"),
-        e(Ta,{key:"sg",label:"Short-term goals (0-4 weeks)",value:claim.goalsShort,onChange:v=>up("goalsShort",v),placeholder:"e.g. Pain reduction, restore ROM..."}),
-        e(Ta,{key:"lg",label:"Long-term goals (4+ weeks)",value:claim.goalsLong,onChange:v=>up("goalsLong",v),placeholder:"e.g. Return to full duties..."}),
-        e(Ta,{key:"tp",label:"Treatment plan / management approach",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Management approach...",rows:4}),
+        // Next review date moved here from Patient & Claim tab
+        div({key:"nrd",style:{marginBottom:16}},[
+          div({key:"g",style:S.g2},[
+            e(Inp,{key:"nrd",label:"Next review date",value:claim.nextReviewDate,onChange:v=>up("nextReviewDate",v),type:"date",mb:0}),
+            div({key:"sp"}),
+          ]),
+        ]),
+        isAlliedHealth?[
+          div({key:"note",style:{...S.warn,marginBottom:14}},"▹ Activity/functional limitations and SMART goals (AHRMP format)"),
+          ...[1,2,3].map(n=>div({key:"row"+n,style:{display:"grid",gridTemplateColumns:"1fr 1fr 140px",gap:10,marginBottom:10}},[
+            e(Inp,{key:"lim",label:n===1?"Current limitation":"",value:(claim["ahGoalLim"+n]||""),onChange:v=>up("ahGoalLim"+n,v),placeholder:"e.g. Unable to walk 100m",mb:0}),
+            e(Inp,{key:"goal",label:n===1?"Related SMART goal":"",value:(claim["ahGoalTarget"+n]||""),onChange:v=>up("ahGoalTarget"+n,v),placeholder:"e.g. Walk 500m by discharge",mb:0}),
+            e(Inp,{key:"date",label:n===1?"Est. date":"",value:(claim["ahGoalDate"+n]||""),onChange:v=>up("ahGoalDate"+n,v),type:"date",mb:0}),
+          ])),
+          div({key:"tx-grid",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}},[
+            e(Inp,{key:"ns",label:"No. of treatments",value:claim.txNum,onChange:v=>up("txNum",v),placeholder:"e.g. 12",mb:0}),
+            e(Inp,{key:"wks",label:"Over (weeks)",value:claim.txWeeks,onChange:v=>up("txWeeks",v),placeholder:"e.g. 6",mb:0}),
+            e(Inp,{key:"disc",label:"Anticipated discharge",value:claim.txDischarge,onChange:v=>up("txDischarge",v),type:"date",mb:0}),
+          ]),
+          div({key:"dates",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}},[
+            e(Inp,{key:"from",label:"Treatment from",value:claim.txFrom,onChange:v=>up("txFrom",v),type:"date",mb:0}),
+            e(Inp,{key:"to",label:"Treatment to",value:claim.txTo,onChange:v=>up("txTo",v),type:"date",mb:0}),
+          ]),
+          e(Ta,{key:"tp",label:"Treatment methods / proposed treatment",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Describe treatment methods to be used...",rows:3}),
+          e(Ta,{key:"sm",label:"Self-management strategies",value:claim.selfManagement,onChange:v=>up("selfManagement",v),placeholder:"Strategies the worker will use to manage their condition..."}),
+        ]:[
+          e(Ta,{key:"sg",label:"Short-term goals (0-4 weeks)",value:claim.goalsShort,onChange:v=>up("goalsShort",v),placeholder:"e.g. Pain reduction, restore ROM..."}),
+          e(Ta,{key:"lg",label:"Long-term goals (4+ weeks)",value:claim.goalsLong,onChange:v=>up("goalsLong",v),placeholder:"e.g. Return to full duties..."}),
+          e(Ta,{key:"tp",label:"Treatment plan / management approach",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Management approach...",rows:4}),
+        ],
         div({key:"barriers-section",style:{marginBottom:16}},[
           e("label",{key:"l",style:S.label},"Barriers to recovery"),
           (()=>{const flags=claim.psychosocial||{};const allFlags=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];return allFlags.length>0?div({key:"auto"},[div({key:"note",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:8}},"Auto-populated from psychosocial flags in Diagnosis screen:"),div({key:"pills",style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}},allFlags.map(f=>e("span",{key:f,style:{...S.pill,...S.pillA,cursor:"default",fontSize:"0.72rem"}},f)))]):null;})(),
@@ -1183,9 +1210,27 @@ function Tab5({claim,up,clinic,practitioners}){
             span({key:"l",style:{fontWeight:600,fontSize:10}},"In my opinion, the worker has:"),
           ]),
           div({key:"opts",style:{display:"grid",gridTemplateColumns:"auto 1fr",gap:"4px 16px",alignItems:"center",marginBottom:8,fontSize:10}},[
-            span({key:"cb1"},claim.fitnessForWork==="Fit for normal duties"?"☑":"☐"),span({key:"t1"},"Capacity to perform pre-injury employment from "+fmtDate(claim.cocFrom)),
-            span({key:"cb2"},claim.fitnessForWork==="Fit with restrictions"?"☑":"☐"),span({key:"t2"},["Capacity for suitable employment from ",span({key:"f",style:{fontWeight:claim.fitnessForWork==="Fit with restrictions"?600:400}},fmtDate(claim.cocFrom))," to ",span({key:"t"},fmtDate(claim.cocTo))]),
-            span({key:"cb3"},claim.fitnessForWork==="Unfit for all work"?"☑":"☐"),span({key:"t3"},["No capacity from ",span({key:"f",style:{fontWeight:600}},fmtDate(claim.cocFrom))," to ",span({key:"t"},fmtDate(claim.cocTo))]),
+            // Fit for normal duties — only show this row if selected
+            claim.fitnessForWork==="Fit for normal duties"&&[
+              span({key:"cb1"},"☑"),
+              span({key:"t1"},"Capacity to perform pre-injury employment from "+fmtDate(claim.fitNormalFrom||claim.cocFrom)),
+            ],
+            // Fit with restrictions — only show if selected
+            claim.fitnessForWork==="Fit with restrictions"&&[
+              span({key:"cb2"},"☑"),
+              span({key:"t2"},["Capacity for suitable employment from ",span({key:"f",style:{fontWeight:600}},fmtDate(claim.fitRestrictFrom||claim.cocFrom))," to ",span({key:"t",style:{fontWeight:600}},fmtDate(claim.fitRestrictTo||claim.cocTo))]),
+            ],
+            // Unfit for all work — only show if selected
+            claim.fitnessForWork==="Unfit for all work"&&[
+              span({key:"cb3"},"☑"),
+              span({key:"t3"},["No capacity for any work from ",span({key:"f",style:{fontWeight:600}},fmtDate(claim.unfitFrom||claim.cocFrom))," to ",span({key:"t",style:{fontWeight:600}},fmtDate(claim.unfitTo||claim.cocTo))]),
+            ],
+            // If no fitness selected, show all as unchecked placeholders
+            !claim.fitnessForWork&&[
+              span({key:"cb1u"},"☐"),span({key:"t1u"},"Capacity to perform pre-injury employment from ___________"),
+              span({key:"cb2u"},"☐"),span({key:"t2u"},"Capacity for suitable employment from ___________ to ___________"),
+              span({key:"cb3u"},"☐"),span({key:"t3u"},"No capacity for any work from ___________ to ___________"),
+            ],
           ]),
           claim.fitnessForWork==="Fit with restrictions"&&claim.fitnessRestrictions&&div({key:"res",style:{marginBottom:8,fontSize:10}},[span({key:"l",style:{color:"#555"}},"Restrictions: "),claim.fitnessRestrictions]),
           div({key:"rtw",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:10,marginBottom:6}},[
@@ -1288,7 +1333,29 @@ function Tab5({claim,up,clinic,practitioners}){
       div({key:"opts",style:{display:"flex",gap:10,flexWrap:"wrap",marginBottom:14}},
         ["Fit for normal duties","Fit with restrictions","Unfit for all work"].map(o=>btn({key:o,onClick:()=>up("fitnessForWork",o),style:{...S.pill,...(claim.fitnessForWork===o?S.pillT:S.pillM),fontSize:"0.87rem",padding:"11px 18px"}},o))
       ),
-      claim.fitnessForWork==="Fit with restrictions"&&e(Ta,{key:"res",label:"Restrictions / suitable employment detail",value:claim.fitnessRestrictions,onChange:v=>up("fitnessRestrictions",v),placeholder:"Detail specific restrictions and suitable employment conditions..."}),
+      // Conditional date fields based on fitness selection
+      claim.fitnessForWork==="Fit for normal duties"&&div({key:"fit-normal-dates",style:{marginBottom:14}},[
+        div({key:"n",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:10}},"Date the worker can return to pre-injury duties:"),
+        div({key:"g",style:{...S.g2}},[
+          e(Inp,{key:"from",label:"From date *",value:claim.fitNormalFrom,onChange:v=>up("fitNormalFrom",v),type:"date",required:true,mb:0}),
+          div({key:"sp"}),
+        ]),
+      ]),
+      claim.fitnessForWork==="Fit with restrictions"&&div({key:"fit-restrict-dates",style:{marginBottom:14}},[
+        div({key:"n",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:10}},"Dates for suitable employment with restrictions:"),
+        div({key:"g",style:S.g2},[
+          e(Inp,{key:"from",label:"From date *",value:claim.fitRestrictFrom,onChange:v=>up("fitRestrictFrom",v),type:"date",required:true,mb:0}),
+          e(Inp,{key:"to",label:"To date *",value:claim.fitRestrictTo,onChange:v=>up("fitRestrictTo",v),type:"date",required:true,mb:0}),
+        ]),
+        e(Ta,{key:"res",label:"Restrictions / suitable employment detail",value:claim.fitnessRestrictions,onChange:v=>up("fitnessRestrictions",v),placeholder:"Detail specific restrictions and suitable employment conditions..."}),
+      ]),
+      claim.fitnessForWork==="Unfit for all work"&&div({key:"unfit-dates",style:{marginBottom:14}},[
+        div({key:"n",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:10}},"Period of incapacity for all work:"),
+        div({key:"g",style:S.g2},[
+          e(Inp,{key:"from",label:"From date *",value:claim.unfitFrom,onChange:v=>up("unfitFrom",v),type:"date",required:true,mb:0}),
+          e(Inp,{key:"to",label:"To date *",value:claim.unfitTo,onChange:v=>up("unfitTo",v),type:"date",required:true,mb:0}),
+        ]),
+      ]),
       div({key:"dates2",style:S.g2},[
         e(Inp,{key:"nrd",label:"Next review date",value:claim.nextReviewDate,onChange:v=>up("nextReviewDate",v),type:"date",mb:0}),
         e(Inp,{key:"rtw",label:"Estimated RTW (normal duties)",value:claim.rtwNormalDate,onChange:v=>up("rtwNormalDate",v),type:"date",mb:0}),
@@ -2144,7 +2211,22 @@ function Tab6({claim,up,clinic,practitioners}){
         ]),
         e(Ta,{key:"o",label:"Expected outcomes",value:ah.outcomes||"",onChange:upAH("outcomes"),placeholder:"Expected functional improvements..."}),
         e(Ta,{key:"j",label:"Clinical justification",value:ah.justification||"",onChange:upAH("justification"),placeholder:"Clinical reasoning for this referral...",rows:4}),
-        e(Ta,{key:"b",label:"Barriers to recovery",value:ah.barriers||"",onChange:upAH("barriers"),placeholder:"Identified barriers..."}),
+        (()=>{
+          // Auto-populate barriers from psychosocial flags + treatment plan additional barriers
+          const flags=claim.psychosocial||{};
+          const flagBarriers=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
+          const addBarriers=claim.barriers||"";
+          const autoPop=[...flagBarriers,...(addBarriers?[addBarriers]:[])].join("; ");
+          const displayVal=ah.barriers||(ah._barriersSet?"":(autoPop||""));
+          return e(Ta,{key:"b",label:"Barriers to recovery",value:displayVal,onChange:v=>{upAH("barriers")(v);upAH("_barriersSet")(true);},placeholder:"Identified barriers (auto-populated from psychosocial flags and treatment plan)...",rows:3});
+        })(),
+        (()=>{
+          const flags=claim.psychosocial||{};
+          const flagBarriers=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
+          return flagBarriers.length>0&&div({key:"flagbadges",style:{display:"flex",flexWrap:"wrap",gap:6,marginTop:-8,marginBottom:12}},
+            flagBarriers.map(f=>span({key:f,style:{...S.pill,...S.pillA,fontSize:"0.7rem",cursor:"default"}},f))
+          );
+        })(),
       ]),
     ]),
 
