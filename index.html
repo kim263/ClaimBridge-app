@@ -1003,6 +1003,39 @@ function Tab4({claim,up}){
         e(Ta,{key:"plan",label:"RTW plan / graded return",value:claim.rtwPlan,onChange:v=>up("rtwPlan",v),placeholder:"Graduated return to work approach...",rows:3}),
         e(Ta,{key:"mod",label:"Modified duties recommendations",value:claim.modifiedDuties,onChange:v=>up("modifiedDuties",v),placeholder:"Specific modified duties available..."}),
       ]),
+
+      // Evidence-based recovery estimates
+      diags.length>0&&div({key:"rtw-estimates",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:4}},"Suggested recovery timeframes"),
+        div({key:"s",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:6}},"Research-based estimates adjusted for identified psychosocial barriers. For guidance only — clinical judgement applies."),
+        adjustments.length>0&&div({key:"adj-note",style:{...S.warn,marginBottom:12,fontSize:"0.78rem"}},"⚠ "+adjustments.length+" psychosocial barrier"+(adjustments.length>1?"s":"")+' identified — timeframes extended accordingly.'),
+        ...diags.map(d=>{
+          const r=calcRTW(d.label);
+          if(!r)return div({key:d.icd10,style:{padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.05)",fontSize:"0.82rem",color:"#5B7A99"}},d.label+" — no estimate available");
+          const ov=overrides[d.label]||{};
+          return div({key:d.icd10,style:{borderBottom:"1px solid rgba(255,255,255,0.06)",paddingBottom:12,marginBottom:12}},[
+            div({key:"name",style:{fontWeight:600,fontSize:"0.88rem",marginBottom:8}},d.label),
+            div({key:"grid",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:6}},[
+              div({key:"mod",style:{...S.cardSm,background:"rgba(255,184,48,0.06)",borderColor:"rgba(255,184,48,0.2)"}},[
+                div({key:"l",style:{fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#FFB830",marginBottom:4}},"Modified duties"),
+                div({key:"v",style:{fontWeight:700,fontSize:"1.1rem",color:"#FFB830"}},(ov.mod||r.adjModMin)+"–"+(ov.modMax||r.adjModMax)+" weeks"),
+                r.adjModMin!==r.baseModMin&&div({key:"base",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:2}},"Base: "+r.baseModMin+"–"+r.baseModMax+"w"),
+              ]),
+              div({key:"norm",style:{...S.cardSm,background:"rgba(0,201,167,0.06)",borderColor:"rgba(0,201,167,0.2)"}},[
+                div({key:"l",style:{fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#00C9A7",marginBottom:4}},"Normal duties"),
+                div({key:"v",style:{fontWeight:700,fontSize:"1.1rem",color:"#00C9A7"}},(ov.norm||r.adjNormMin)+"–"+(ov.normMax||r.adjNormMax)+" weeks"),
+                r.adjNormMin!==r.baseNormMin&&div({key:"base",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:2}},"Base: "+r.baseNormMin+"–"+r.baseNormMax+"w"),
+              ]),
+            ]),
+            r.notes&&div({key:"note",style:{fontSize:"0.76rem",color:"#5B7A99",fontStyle:"italic",marginBottom:6}},r.notes),
+            div({key:"override",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[
+              div({key:"ol",style:{fontSize:"0.74rem",color:"#5B7A99"}},"Override:"),
+              e(Inp,{key:"omod",label:"",value:ov.mod||"",onChange:v=>setOverride(d.label,"mod",v),placeholder:"Mod wks",mb:0}),
+              e(Inp,{key:"onorm",label:"",value:ov.norm||"",onChange:v=>setOverride(d.label,"norm",v),placeholder:"Normal wks",mb:0}),
+            ]),
+          ]);
+        }),
+      ]),
     ]),
 
     subTab===SUB.indexOf("Proposed Procedure / Surgery")&&div({key:"proc-tab"},[
