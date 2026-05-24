@@ -2552,24 +2552,276 @@ function Tab8({claim,up,clinic,practitioners}){
     return errs;
   };
 
-  const genLetter=async()=>{
+  // ── MERGE FIELD HELPERS ─────────────────────────────────────────────────────
+  const today=new Date().toLocaleDateString("en-AU",{day:"2-digit",month:"long",year:"numeric"});
+  const fmtD=d=>{if(!d)return"[date not set]";try{return new Date(d).toLocaleDateString("en-AU",{day:"2-digit",month:"long",year:"numeric"});}catch{return d;}};
+  const patientName=claim.patientName||"[Patient name]";
+  const patientDOB=fmtD(claim.dob);
+  const patientAddr=claim.patientAddress||"";
+  const claimNo=claim.claimNumber||"[Claim number]";
+  const doi=fmtD(claim.dateOfInjury);
+  const scheme=claim.scheme||"WorkCover";
+  const insurerName=claim.insurerName||claim.insurerNameCustom||"[Insurer]";
+  const insurerPhone=claim.insurerPhone||"";
+  const caseManager=claim.caseManagerName||"";
+  const caseManagerEmail=claim.caseManagerEmail||"";
+  const pracName=prac?prac.name:"[Treating practitioner]";
+  const pracProf=prac?prac.profession:"";
+  const pracProv=prac?prac.providerNo:"";
+  const pracPhone=prac?prac.phone:clinic.phone||"";
+  const clinicName=clinic.name||"";
+  const clinicAddr=clinic.address||"";
+  const diagList=(claim.diagnoses||[]).map(d=>d.label+(d.icd10?" ("+d.icd10+")":"")).join("\n  - ")||"[Diagnosis not recorded]";
+  const diagShort=(claim.diagnoses||[]).map(d=>d.label).join(", ")||"[Diagnosis not recorded]";
+  const treatPlan=claim.treatmentPlan||"As per clinical assessment and management plan.";
+  const goalsText=claim.goalsShort||claim.ahGoalTarget1||"";
+  const workRestrictions=claim.workRestrictions||"As per Certificate of Capacity.";
+  const fitnessStatus=claim.fitnessForWork||"";
+  const cocFrom=fmtD(claim.cocFrom||claim.fitNormalFrom||claim.fitRestrictFrom||claim.unfitFrom);
+  const cocTo=fmtD(claim.cocTo||claim.fitRestrictTo||claim.unfitTo);
+  const reviewDate=fmtD(claim.nextReviewDate);
+  const imagingSummary=(claim.imagingReports||[]).filter(r=>r.summary).map(r=>r.name+": "+r.summary.keyFindings).join("\n")||"";
+  const referralList=(claim.referrals||[]).map(r=>r.specialty+(r.name?" — "+r.name:"")).join(", ")||"";
+  const ahrmTreatment=claim.ahrmData&&claim.ahrmData.treatment||pracProf||"";
+  const ahrmSessions=claim.ahrmData&&claim.ahrmData.sessions||claim.txNum||"";
+  const ahrmDuration=claim.ahrmData&&claim.ahrmData.duration||(claim.txWeeks?claim.txWeeks+" weeks":"")||"";
+  const ahrmFreq=claim.ahrmData&&claim.ahrmData.frequency||"";
+  const ahrmGoals=claim.ahrmData&&claim.ahrmData.goals||goalsText||"";
+  const ahrmJust=claim.ahrmData&&claim.ahrmData.justification||treatPlan||"";
+  const rtwMod=fmtD(claim.rtwModifiedDate);
+  const rtwNorm=fmtD(claim.rtwNormalDate);
+  const employer=claim.employerName||"";
+
+  // Salutation helper
+  const salutation=firstRef.name?"Dear "+firstRef.name+",":`Dear ${caseManager?"Case Manager "+caseManager:"Sir / Madam"},`;
+  const recipient=firstRef.name?firstRef.name+(firstRef.specialty?" ("+firstRef.specialty+")":""):(caseManager||insurerName);
+
+  // ── LETTER TEMPLATES ────────────────────────────────────────────────────────
+  const buildLetter=(id)=>{
+    const sig=`
+
+Yours sincerely,
+
+${pracName}
+${pracProf}
+Provider No: ${pracProv}
+${clinicName}
+${clinicAddr}
+Ph: ${pracPhone}
+Date: ${today}`;
+
+    const hdr=(subj)=>`${today}
+
+${recipient}
+${insurerName}
+${insurerPhone}
+
+Re: ${scheme} Claim — ${patientName}
+Claim Number: ${claimNo}
+Date of Injury: ${doi}
+
+${salutation}
+
+Re: ${subj}`;
+
+    if(id==="specialist_opinion")return hdr("Referral for Specialist Opinion")+`
+
+I am writing to request approval for a specialist opinion for my patient, ${patientName} (DOB: ${patientDOB}), who is currently under my care for a ${scheme} compensable injury.
+
+**Diagnosis:**
+  - ${diagList}
+
+**Clinical Summary:**
+${patientName} sustained the above injury on ${doi}${employer?" while employed with "+employer:""}. ${treatPlan}
+
+**Reason for Referral:**
+I am requesting a specialist opinion from ${firstRef.specialty||"an appropriate specialist"} to assist with:
+- Clarification of diagnosis and causation
+- Specialist management recommendations
+- Opinion on prognosis and capacity for return to work
+${imagingSummary?"- Review of imaging: "+imagingSummary:""}
+
+**Current Fitness for Work:**
+${fitnessStatus||"As per current Certificate of Capacity."}
+
+I would be grateful for your expert opinion and management recommendations. Please direct your correspondence and report to our clinic.${sig}`;
+
+    if(id==="specialist_ongoing")return hdr("Referral for Specialist Ongoing Management")+`
+
+I am writing to request approval for ongoing specialist management for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+
+**Diagnosis:**
+  - ${diagList}
+
+**Clinical Background:**
+${patientName} has been receiving treatment for the above condition/s since ${doi}. ${treatPlan}
+
+**Request:**
+I am requesting ongoing specialist management with ${firstRef.specialty||"a specialist"} to ensure continuity of care and optimise recovery outcomes. The treating team believes ongoing specialist input is clinically necessary at this stage of rehabilitation.
+
+${imagingSummary?"\n**Imaging:**\n"+imagingSummary+"\n":""}**Current Status:**
+Fitness for work: ${fitnessStatus||"As per Certificate of Capacity."}
+Work restrictions: ${workRestrictions}
+${reviewDate!=="[date not set]"?"Next review: "+reviewDate:""}${sig}`;
+
+    if(id==="allied_health")return hdr("Request for Approval — Allied Health Treatment")+`
+
+I am writing to request approval for allied health treatment for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+
+**Diagnosis:**
+  - ${diagList}
+
+**Proposed Treatment:**
+Treating discipline: ${ahrmTreatment||"Allied health"}
+Frequency: ${ahrmFreq||"As clinically indicated"}
+Duration: ${ahrmDuration||"As clinically indicated"}
+Total sessions requested: ${ahrmSessions||"As clinically indicated"}
+Treatment dates: ${cocFrom} to ${cocTo}
+
+**Treatment Goals:**
+${ahrmGoals||goalsText||"To restore functional capacity and support return to work."}
+
+**Clinical Justification:**
+${ahrmJust}
+
+**Fitness for Work:**
+${fitnessStatus||"As per Certificate of Capacity."}
+${workRestrictions?"Work restrictions: "+workRestrictions:""}
+
+I am satisfied that the proposed treatment is reasonable, necessary and related to the compensable condition. I request your approval at your earliest convenience given the legislative timeframes that apply.${sig}`;
+
+    if(id==="psychology")return hdr("Request for Approval — Psychological Treatment")+`
+
+I am writing to request approval for psychological treatment services for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+
+**Diagnosis:**
+  - ${diagList}
+
+**Clinical Indication:**
+${patientName} is presenting with psychological sequelae directly related to the compensable injury sustained on ${doi}. ${treatPlan}
+
+**Proposed Psychology Treatment:**
+Sessions requested: ${ahrmSessions||"12–16 sessions"}
+Frequency: ${ahrmFreq||"Weekly"}
+Modality: ${(claim.ps604Data&&claim.ps604Data.modality)||"Cognitive Behavioural Therapy (CBT) / evidence-based psychological intervention"}
+
+**Treatment Goals:**
+${(claim.ps604Data&&claim.ps604Data.goals)||ahrmGoals||"Reduce psychological distress, improve daily functioning, and support return to work."}
+
+**Psychosocial Factors:**
+${(()=>{const fl=claim.psychosocial||{};const fb=[...(fl.yellow||[]),...(fl.blue||[]),...(fl.black||[]),...(fl.orange||[])];return fb.length>0?"The following barriers have been identified: "+fb.join(", ")+".":"No significant psychosocial barriers identified at this time."})()}
+
+I am requesting your approval to proceed with psychological treatment in accordance with the PS604 treatment planning documentation.${sig}`;
+
+    if(id==="gym_swim")return hdr("Request for Approval — Gym / Hydrotherapy Membership")+`
+
+I am writing to request approval for a ${(claim.gymData&&claim.gymData.type)||"gym / hydrotherapy"} membership for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+
+**Diagnosis:**
+  - ${diagList}
+
+**Clinical Justification:**
+${(claim.gymData&&claim.gymData.justification)||treatPlan}
+
+**Proposed Program:**
+Type: ${(claim.gymData&&claim.gymData.type)||"Gym / hydrotherapy"}
+Duration: ${(claim.gymData&&claim.gymData.duration)||ahrmDuration||"3 months"}
+Supervision: ${(claim.gymData&&claim.gymData.supervised)||"Supervised"}
+Program: ${(claim.gymData&&claim.gymData.program)||"Progressive strengthening and conditioning program to restore functional capacity."}
+
+**Expected Outcomes:**
+Improved cardiovascular fitness, strength, and functional capacity to support return to work and daily activities.${sig}`;
+
+    if(id==="radiology")return hdr("Request for Approval — Radiological Imaging")+`
+
+I am writing to request approval for radiological imaging for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+
+**Diagnosis:**
+  - ${diagList}
+
+**Imaging Requested:**
+${claim.imagingReferral||"MRI / CT / X-Ray — as clinically indicated"}
+
+**Clinical Indication:**
+${claim.imagingIndication||"To further investigate the clinical presentation and assist with diagnosis, treatment planning, and assessment of injury severity related to the compensable condition."}
+
+${claim.otherInvestigations?"\n**Other investigations:**\n"+claim.otherInvestigations:""}
+
+I request your approval for the above imaging to assist with the ongoing clinical management of this patient.${sig}`;
+
+    if(id==="household")return hdr("Request for Approval — Household Assistance")+`
+
+I am writing to request approval for household assistance services for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+
+**Diagnosis:**
+  - ${diagList}
+
+**Functional Limitations:**
+As a direct result of the compensable injury, ${patientName} is unable to perform the following household tasks:
+${(claim.hhData&&claim.hhData.tasks)||claim.hhTasks||"As documented in the Household Help Request form (FOR592)."}
+
+**Assistance Required:**
+Frequency: ${(claim.hhData&&claim.hhData.frequency)||claim.hhFrequency||"As clinically indicated"}
+Duration: ${(claim.hhData&&claim.hhData.duration)||claim.hhDuration||"Until functional capacity improves"}
+
+**Clinical Justification:**
+${(claim.hhData&&claim.hhData.justification)||claim.hhJustification||treatPlan}
+
+**Work/Activity Restrictions:**
+${workRestrictions}
+
+I am satisfied that the requested household assistance is reasonable and necessary as a direct consequence of the compensable injury.${sig}`;
+
+    if(id==="travel")return hdr("Request for Approval — Travel and/or Accommodation")+`
+
+I am writing to request approval for funded travel${claim.accommodationRequired==="yes"?" and accommodation":""} for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+
+**Diagnosis:**
+  - ${diagList}
+
+**Travel Request:**
+${claim.travelReasoning||"Travel is required to attend approved treatment. The patient is unable to use their private vehicle due to the nature of their compensable injury, and public transport is not a viable option."}
+${claim.accommodationRequired==="yes"?`
+**Accommodation Request:**
+Nights required: ${claim.accommodationNights||"[number of nights]"}
+${claim.accommodationReasoning||"Accommodation is required due to the distance from the patient's residence to the treatment facility."}`:""} 
+
+I request your approval for the above at your earliest convenience to ensure continuity of treatment.${sig}`;
+
+    if(id==="procedure")return hdr("Request for Approval — Procedure / Surgical Intervention")+`
+
+I am writing to request approval for a procedure / surgical intervention for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+
+**Diagnosis:**
+  - ${diagList}
+
+**Proposed Procedure:**
+${firstRef.specialty||"[Procedure / surgical intervention]"} — to be performed by ${firstRef.name||"[Specialist name]"}${firstRef.clinic?" at "+firstRef.clinic:""}.
+
+**Clinical Justification:**
+Conservative management has been undertaken since ${doi}. ${treatPlan}
+
+${imagingSummary?"\n**Supporting Imaging:**\n"+imagingSummary+"\n":""}**Expected Outcomes:**
+The proposed intervention is expected to ${goalsText||"improve functional capacity, reduce pain, and support return to work"}.
+
+**Post-Operative Plan:**
+${rtwMod!=="[date not set]"?"Estimated return to modified duties: "+rtwMod:""}
+${rtwNorm!=="[date not set]"?"Estimated return to normal duties: "+rtwNorm:""}
+
+I am satisfied that this procedure is reasonable, necessary, and causally related to the compensable condition. I request your approval at your earliest convenience.${sig}`;
+
+    return "Template not found.";
+  };
+
+  const genLetter=()=>{
     const errs=validate();
     setErrors(errs);
     if(errs.length>0)return;
-    setGen(true);
+    const txt=buildLetter(tmpl);
+    setLetter(txt);
     const t=TMPLS.find(x=>x.id===tmpl);
-    try{
-      const _apiKey=localStorage.getItem("cb_apikey")||"";
-      if(!_apiKey){setLetter("API key required. Go to Settings to add your Anthropic API key.");setGen(false);return;}
-      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":_apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:"Generate a professional "+claim.scheme+" referral letter for: "+t.label+". Patient: "+(claim.patientName||"[Patient]")+", DOB: "+(claim.dob||"[DOB]")+", Claim: "+(claim.claimNumber||"[Claim No]")+". Diagnosis: "+diags+". Referring: "+(prac&&prac.name||"[Practitioner]")+", "+(prac&&prac.profession||"")+", Provider: "+(prac&&prac.providerNo||"[No]")+", Clinic: "+clinic.name+". Referred to: "+(firstRef.name||"[Colleague]")+", "+(firstRef.specialty||"")+". Priority: "+(firstRef.priority||"Routine")+". Treatment: "+(claim.treatmentPlan||"As per clinical assessment")+". Scheme: "+claim.scheme+". Start with Dear "+(firstRef.name||"Colleague")+" and include: thank you for accepting, patient details, reason for referral, clinical summary, specific request. Close professionally. Australian medical letter format."}]})});
-      const d=await r.json();
-      if(d.error)setLetter("API error: "+d.error.message);
-      else{const txt=d.content&&d.content[0]&&d.content[0].text||"Error generating letter";
-      setLetter(txt);
-      const entry={id:"ltr_"+Date.now(),template:t.label,generatedAt:new Date().toISOString(),content:txt};
-      up("letterHistory",[...(claim.letterHistory||[]),entry]);}
-    }catch(err){setLetter("Unable to generate letter: "+err.message);}
-    setGen(false);
+    const entry={id:"ltr_"+Date.now(),template:t?t.label:tmpl,generatedAt:new Date().toISOString(),content:txt};
+    up("letterHistory",[...(claim.letterHistory||[]),entry]);
   };
 
   // Audit trail data
@@ -2611,7 +2863,7 @@ function Tab8({claim,up,clinic,practitioners}){
     // Generate letter
     div({key:"gen",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:14}},"Generate referral letter"),
-      !localStorage.getItem("cb_apikey")&&div({key:"nokey",style:{...S.warn,marginBottom:14}},"⚠️ No API key configured. Go to Settings → Anthropic API Key to enable letter generation."),
+      !localStorage.getItem("cb_apikey")&&div({key:"nokey",style:{display:"none"}}),
       e(Sel,{key:"t",label:"Select letter template",value:tmpl,onChange:setTmpl,options:TMPLS.map(t=>({value:t.id,label:t.label}))}),
 
       // Validation errors
@@ -2624,8 +2876,8 @@ function Tab8({claim,up,clinic,practitioners}){
         ])),
       ]),
 
-      btn({key:"b",style:{...S.btnP,opacity:gen?0.7:1},onClick:genLetter,disabled:gen},
-        gen?div({style:{display:"flex",alignItems:"center",gap:8}},["⏳ ","Generating letter..."]):"Generate letter"
+      btn({key:"b",style:{...S.btnP},onClick:genLetter},
+        "Preview letter"
       ),
 
       letter&&div({key:"letter",style:{marginTop:20}},[
