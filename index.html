@@ -525,10 +525,72 @@ function PractitionersPage({clinic}){
 const NO_DIAG_PROFS=["Occupational Therapist","Exercise Physiologist"];
 const NO_MED_PROFS=["Physiotherapist","Osteopath","Chiropractor","Podiatrist","Occupational Therapist","Exercise Physiologist","Psychologist"];
 
+// ── EPISODE SYSTEM ────────────────────────────────────────────────────────────
+const EPISODE_FIELDS=["treatmentPlan","goalsShort","goalsLong","selfManagement",
+  "ahGoalLim1","ahGoalLim2","ahGoalLim3","ahGoalTarget1","ahGoalTarget2","ahGoalTarget3",
+  "ahGoalDate1","ahGoalDate2","ahGoalDate3","txNum","txWeeks","txFrom","txTo","txDischarge",
+  "barriers","workRestrictions","activityRestrictions","workEnvironment",
+  "rtwNormalDate","rtwModifiedDate","rtwPlan","modifiedDuties","nextReviewDate",
+  "fitnessForWork","fitnessRestrictions","fitNormalFrom","fitRestrictFrom","fitRestrictTo",
+  "unfitFrom","unfitTo","cocFrom","cocTo","cocType","cocCount","cocNotes","otherConsiderations",
+  "referrals","newRef","letterHistory","alliedForm","ahrmData","hhData","gymData",
+  "ps604Data","ps109Data","imagingReferral","imagingIndication","otherInvestigations",
+  "medications","outcomeScores","rtwOverrides","travelRequired","travelReasoning",
+  "accommodationRequired","accommodationNights","accommodationReasoning",
+  "proposedProcedure","procedureSpecialistClinic","procedureDate","procedureNotes",
+];
+
+// Extract episode fields from claim root for migration
+function extractEpisodeData(claim){
+  const ep={};
+  EPISODE_FIELDS.forEach(f=>{if(claim[f]!==undefined)ep[f]=claim[f];});
+  return ep;
+}
+
+// Get claim with episodes migrated (Episode 0 = original claim data)
+function ensureEpisodes(claim){
+  if(claim.episodes&&claim.episodes.length>0)return claim;
+  // Migrate existing claim data into Episode 1
+  const ep0Data=extractEpisodeData(claim);
+  const hasData=Object.keys(ep0Data).some(k=>ep0Data[k]&&(Array.isArray(ep0Data[k])?ep0Data[k].length>0:true));
+  const ep0={
+    id:"ep_"+claim.id+"_0",
+    episodeNo:1,
+    date:claim.createdAt||new Date().toISOString(),
+    practitionerId:claim.practitionerId,
+    practitionerName:claim.practitionerName,
+    practitionerProfession:claim.practitionerProfession,
+    label:"Initial consultation",
+    createdAt:claim.createdAt||new Date().toISOString(),
+    ...ep0Data,
+  };
+  return {...claim,episodes:hasData?[ep0]:[]};
+}
+
+// Merge episode data onto claim for tab display
+function mergeEpisodeToClaim(claim,ep){
+  return {...claim,...ep,
+    practitionerId:ep.practitionerId||claim.practitionerId,
+    practitionerName:ep.practitionerName||claim.practitionerName,
+    practitionerProfession:ep.practitionerProfession||claim.practitionerProfession,
+  };
+}
+
+// Save episode data back to claim
+function saveEpisodeToClaim(claim,ep,epData){
+  const updatedEp={...ep,...epData};
+  const episodes=(claim.episodes||[]).map(e=>e.id===ep.id?updatedEp:e);
+  return {...claim,episodes};
+}
+
+
 function ClaimForm({clinic,claimData,onSave,onBack}){
   const ALL_TABS=["Overview","Patient & Claim","Diagnosis","Treatment Plan","Certificate of Capacity","Allied Health Forms","Referral & Export","Claim Log"];
   const[tab,setTab]=useState(0);
-  const[claim,setClaim]=useState(claimData||{id:"claim_"+Date.now(),scheme:"WorkCover",status:"Active",createdAt:new Date().toISOString(),clinicId:clinic.id});
+  const[claim,setClaim]=useState(()=>ensureEpisodes(claimData||{id:"claim_"+Date.now(),scheme:"WorkCover",status:"Active",createdAt:new Date().toISOString(),clinicId:clinic.id}));
+  // Episode editing state
+  const[activeEpId,setActiveEpId]=useState(null); // null = viewing claim overview
+  const[epTab,setEpTab]=useState(1); // which tab within episode editor (starts at Treatment Plan)
   const prof=claim.practitionerProfession||"";
   const TABS=ALL_TABS.filter(t=>{
     if(t==="Diagnosis"&&NO_DIAG_PROFS.includes(prof))return false;
@@ -538,7 +600,41 @@ function ClaimForm({clinic,claimData,onSave,onBack}){
   const[savedModal,setSavedModal]=useState(false);
   const[draftModal,setDraftModal]=useState(false);
   useEffect(()=>{sget("practitioners:"+clinic.id).then(p=>setPractitioners(p||[]));},[clinic.id]);
-  const up=(field,value)=>setClaim(prev=>({...prev,[field]:value}));
+  // up writes to active episode if one is open, otherwise to claim root
+  const up=(field,value)=>{
+    if(activeEpId&&EPISODE_FIELDS.includes(field)){
+      setClaim(prev=>{
+        const episodes=(prev.episodes||[]).map(ep=>ep.id===activeEpId?{...ep,[field]:value}:ep);
+        return {...prev,episodes};
+      });
+    } else {
+      setClaim(prev=>({...prev,[field]:value}));
+    }
+  };
+
+  // Create a new episode (new request)
+  const createEpisode=()=>{
+    const epNo=(claim.episodes||[]).length+1;
+    const cocCount=Math.max(...(claim.episodes||[]).map(e=>e.cocCount||0),0)+1;
+    const newEp={
+      id:"ep_"+claim.id+"_"+Date.now(),
+      episodeNo:epNo,
+      date:new Date().toISOString(),
+      practitionerId:claim.practitionerId,
+      practitionerName:claim.practitionerName,
+      practitionerProfession:claim.practitionerProfession,
+      label:"Request "+epNo,
+      createdAt:new Date().toISOString(),
+      cocCount,
+      cocType:"Subsequent",
+      referrals:[],
+      letterHistory:[],
+      medications:[],
+    };
+    setClaim(prev=>({...prev,episodes:[...(prev.episodes||[]),newEp]}));
+    setActiveEpId(newEp.id);
+    setEpTab(3); // open at Treatment Plan
+  };
   const save=async()=>{
     const now=new Date().toISOString();
     const prac=practitioners.find(p=>p.id===claim.practitionerId);
@@ -564,21 +660,44 @@ function ClaimForm({clinic,claimData,onSave,onBack}){
         btn({key:"save",style:S.btnP,onClick:save},"Save claim"),
       ]),
     ]),
+    // Episode context banner
+    activeEpId&&(()=>{
+      const ep=(claim.episodes||[]).find(e=>e.id===activeEpId);
+      return ep&&div({key:"ep-banner",style:{background:"rgba(0,201,167,0.08)",border:"1px solid rgba(0,201,167,0.2)",borderRadius:10,padding:"10px 16px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}},[
+        div({key:"l",style:{display:"flex",alignItems:"center",gap:10}},[
+          span({key:"ic"},"📋"),
+          div({key:"t"},[
+            div({key:"n",style:{fontWeight:600,fontSize:"0.88rem",color:"#00C9A7"}},"Editing: "+ep.label),
+            div({key:"d",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:1}},new Date(ep.date).toLocaleDateString("en-AU")+(ep.practitionerName?" · "+ep.practitionerName:"")),
+          ]),
+        ]),
+        btn({key:"close",style:{...S.btnS,fontSize:"0.78rem",padding:"5px 12px"},onClick:()=>{setActiveEpId(null);setTab(0);}},"← Back to claim overview"),
+      ]);
+    })(),
     div({key:"tabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:28,flexWrap:"wrap"}},
-      TABS.map((t,i)=>btn({key:t,className:"tab-btn",onClick:()=>{setTab(i);window.scrollTo(0,0);},style:{padding:"10px 16px",borderRadius:"8px 8px 0 0",border:"none",background:tab===i?"rgba(0,201,167,0.1)":"transparent",color:tab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:tab===i?"2px solid #00C9A7":"none"}},(i+1)+". "+t))
+      TABS.map((t,i)=>btn({key:t,className:"tab-btn",onClick:()=>{if(activeEpId)setEpTab(i);else setTab(i);window.scrollTo(0,0);},style:{padding:"10px 16px",borderRadius:"8px 8px 0 0",border:"none",background:(activeEpId?epTab:tab)===i?"rgba(0,201,167,0.1)":"transparent",color:(activeEpId?epTab:tab)===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:tab===i?"2px solid #00C9A7":"none"}},(i+1)+". "+t))
     ),
-    tab===0&&e(TabOverview,{key:"t0",claim,up,clinic,practitioners}),
-    tab===1&&e(Tab1,{key:"t1",claim,up,practitioners}),
-    tab===2&&e(Tab2,{key:"t2",claim,up}),
-    tab===3&&e(Tab4,{key:"t3",claim,up}),
-    tab===4&&e(Tab5,{key:"t4",claim,up,clinic,practitioners}),
-    tab===5&&e(Tab6,{key:"t5",claim,up,clinic,practitioners}),
-    tab===6&&e(Tab8,{key:"t6",claim,up,clinic,practitioners}),
-    tab===7&&e(TabClaimLog,{key:"t7",claim,up,clinic,practitioners}),
+        // When an episode is active, merge it onto claim for all tabs
+    (()=>{
+      const activeEp=(claim.episodes||[]).find(ep=>ep.id===activeEpId);
+      const viewClaim=activeEp?mergeEpisodeToClaim(claim,activeEp):claim;
+      // In episode mode, use epTab for navigation; otherwise use tab
+      const curTab=activeEp?epTab:tab;
+      return [
+        curTab===0&&e(TabOverview,{key:"t0",claim:viewClaim,up,clinic,practitioners,activeEpId,setActiveEpId,createEpisode,setEpTab}),
+        curTab===1&&e(Tab1,{key:"t1",claim:viewClaim,up,practitioners,readOnly:!!activeEp}),
+        curTab===2&&e(Tab2,{key:"t2",claim:viewClaim,up,readOnly:!!activeEp}),
+        curTab===3&&e(Tab4,{key:"t3",claim:viewClaim,up}),
+        curTab===4&&e(Tab5,{key:"t4",claim:viewClaim,up,clinic,practitioners}),
+        curTab===5&&e(Tab6,{key:"t5",claim:viewClaim,up,clinic,practitioners}),
+        curTab===6&&e(Tab8,{key:"t6",claim:viewClaim,up,clinic,practitioners}),
+        curTab===7&&e(TabClaimLog,{key:"t7",claim,up,clinic,practitioners,setActiveEpId,setEpTab}),
+      ];
+    })(),
     div({key:"nav",style:{...S.fb,marginTop:28,paddingTop:20,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
-      btn({key:"prev",style:{...S.btnS,...(tab===0?{opacity:0.3,pointerEvents:"none"}:{})},onClick:()=>{setTab(t=>Math.max(0,t-1));window.scrollTo(0,0);}},"<- Previous"),
-      span({key:"pg",style:{fontSize:"0.76rem",color:"#5B7A99"}},(tab+1)+" / "+TABS.length),
-      btn({key:"next",style:{...S.btnP,...(tab===TABS.length-1?{opacity:0.3,pointerEvents:"none"}:{})},onClick:()=>{setTab(t=>Math.min(TABS.length-1,t+1));window.scrollTo(0,0);}},"Next ->"),
+      btn({key:"prev",style:{...S.btnS,...((activeEpId?epTab:tab)===0?{opacity:0.3,pointerEvents:"none"}:{})},onClick:()=>{if(activeEpId)setEpTab(t=>Math.max(0,t-1));else setTab(t=>Math.max(0,t-1));window.scrollTo(0,0);}},"<- Previous"),
+      span({key:"pg",style:{fontSize:"0.76rem",color:"#5B7A99"}},((activeEpId?epTab:tab)+1)+" / "+TABS.length),
+      btn({key:"next",style:{...S.btnP,...((activeEpId?epTab:tab)===TABS.length-1?{opacity:0.3,pointerEvents:"none"}:{})},onClick:()=>{if(activeEpId)setEpTab(t=>Math.min(TABS.length-1,t+1));else setTab(t=>Math.min(TABS.length-1,t+1));window.scrollTo(0,0);}},"Next ->"),
     ]),
   ]);
 }
@@ -2987,7 +3106,7 @@ I am satisfied that this procedure is reasonable, necessary, and causally relate
 }
 
 // ── TAB: OVERVIEW ─────────────────────────────────────────────────────────────
-function TabOverview({claim,up,clinic,practitioners}){
+function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,createEpisode,setEpTab}){
   const diags=(claim.diagnoses||[]).map(d=>d.label).join(", ")||"No diagnosis recorded";
   const prac=practitioners.find(p=>p.id===claim.practitionerId);
   const refs=claim.referrals||[];
@@ -3050,10 +3169,43 @@ function TabOverview({claim,up,clinic,practitioners}){
     ]))),
 
     div({key:"cols",style:{display:"grid",gridTemplateColumns:"1fr 340px",gap:16}},[
-      // Timeline
-      div({key:"timeline",style:S.card},[
-        div({key:"h",style:{fontWeight:700,marginBottom:4}},"Correspondence timeline"),
-        div({key:"s",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:16}},"All referrals and generated letters, most recent first"),
+      div({key:"left"},[
+        // Episodes list
+        div({key:"episodes",style:{...S.card,marginBottom:16}},[
+          div({key:"h",style:{...S.fb,marginBottom:14}},[
+            div({key:"t",style:{fontWeight:700}},"Consultation episodes"),
+            btn({key:"new",style:{...S.btnP,fontSize:"0.82rem",padding:"8px 16px"},onClick:()=>{if(createEpisode)createEpisode();}},"+ New Request"),
+          ]),
+          (claim.episodes||[]).length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",padding:"12px 0",textAlign:"center"}},"No episodes yet — click New Request to begin"):
+          [...(claim.episodes||[])].reverse().map(ep=>{
+            const epRefs=ep.referrals||[];
+            const epLetters=ep.letterHistory||[];
+            const epPending=epRefs.filter(r=>r.status==="Pending"||!r.status).length;
+            const epApproved=epRefs.filter(r=>r.status==="Approved").length;
+            return div({key:ep.id,className:"card-hover",style:{...S.cardSm,marginBottom:10,cursor:"pointer",border:"1px solid "+(activeEpId===ep.id?"rgba(0,201,167,0.35)":"rgba(255,255,255,0.08)"),background:activeEpId===ep.id?"rgba(0,201,167,0.06)":"rgba(255,255,255,0.03)"},onClick:()=>{if(setActiveEpId&&setEpTab){setActiveEpId(ep.id);setEpTab(3);}}},[
+              div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}},[
+                div({key:"l"},[
+                  div({key:"n",style:{fontWeight:600,fontSize:"0.88rem"}},ep.label||"Episode "+ep.episodeNo),
+                  div({key:"d",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:2}},[
+                    new Date(ep.date).toLocaleDateString("en-AU"),
+                    ep.practitionerName&&" · "+ep.practitionerName,
+                    ep.practitionerProfession&&" ("+ep.practitionerProfession+")",
+                  ]),
+                ]),
+                div({key:"r",style:{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}},[
+                  epLetters.length>0&&span({key:"l",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},epLetters.length+" letter"+(epLetters.length!==1?"s":"")),
+                  epApproved>0&&span({key:"a",style:{...S.pill,...S.pillT,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},epApproved+" approved"),
+                  epPending>0&&span({key:"p",style:{...S.pill,...S.pillA,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},epPending+" pending"),
+                ]),
+              ]),
+            ]);
+          }),
+        ]),
+
+        // Correspondence timeline
+        div({key:"timeline",style:S.card},[
+          div({key:"h",style:{fontWeight:700,marginBottom:4}},"Correspondence timeline"),
+          div({key:"s",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:16}},"All referrals and generated letters, most recent first"),
         timeline.length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",padding:"20px 0",textAlign:"center"}},"No correspondence recorded yet"):
         timeline.map((item,i)=>div({key:item.id,style:{borderBottom:"1px solid rgba(255,255,255,0.05)",paddingBottom:12,marginBottom:12}},[
           div({key:"row",style:{display:"flex",alignItems:"flex-start",gap:12}},[
@@ -3072,7 +3224,8 @@ function TabOverview({claim,up,clinic,practitioners}){
             ]),
           ]),
         ])),
-      ]),
+        ]),  // close timeline card
+      ]),  // close left column
 
       // Right column
       div({key:"right"},[
@@ -3121,7 +3274,7 @@ function TabOverview({claim,up,clinic,practitioners}){
 }
 
 // ── TAB: CLAIM LOG ─────────────────────────────────────────────────────────────
-function TabClaimLog({claim,up,clinic,practitioners}){
+function TabClaimLog({claim,up,clinic,practitioners,setActiveEpId,setEpTab}){
   const[expanded,setExpanded]=useState(null);
   const fmtD=d=>{if(!d)return"—";try{return new Date(d).toLocaleString("en-AU",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});}catch{return d;}};
   const fmtDate=d=>{if(!d)return"—";try{return new Date(d).toLocaleDateString("en-AU");}catch{return d;}};
@@ -3140,6 +3293,54 @@ function TabClaimLog({claim,up,clinic,practitioners}){
   };
 
   return div({style:{padding:"0"}},[
+    // Chronological episode timeline
+    div({key:"ep-timeline",style:{...S.card,marginBottom:16}},[
+      div({key:"h",style:{...S.fb,marginBottom:4}},[
+        div({key:"t",style:{fontWeight:700}},"Claim history"),
+        span({key:"c",style:{fontSize:"0.76rem",color:"#5B7A99"}},(claim.episodes||[]).length+" episode"+(((claim.episodes||[]).length)!==1?"s":"")),
+      ]),
+      div({key:"s",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:14}},"Chronological record of all consultation episodes. Click to open and review."),
+      (claim.episodes||[]).length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",padding:"12px 0",textAlign:"center"}},"No episodes recorded yet"):
+      [...(claim.episodes||[])].map((ep,i)=>{
+        const epRefs=ep.referrals||[];
+        const epLetters=ep.letterHistory||[];
+        const approved=epRefs.filter(r=>r.status==="Approved").length;
+        const pending=epRefs.filter(r=>r.status==="Pending"||!r.status).length;
+        const declined=epRefs.filter(r=>r.status==="Declined"||r.status==="Disputed").length;
+        return div({key:ep.id,style:{display:"flex",gap:14,paddingBottom:16,marginBottom:16,borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
+          // Timeline dot + line
+          div({key:"dot-col",style:{display:"flex",flexDirection:"column",alignItems:"center",flexShrink:0}},[
+            div({key:"dot",style:{width:32,height:32,borderRadius:"50%",background:"rgba(0,201,167,0.15)",border:"1px solid rgba(0,201,167,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.8rem",fontWeight:700,color:"#00C9A7"}},ep.episodeNo||i+1),
+            i<(claim.episodes||[]).length-1&&div({key:"line",style:{width:1,flex:1,background:"rgba(255,255,255,0.07)",marginTop:6}}),
+          ]),
+          div({key:"content",style:{flex:1}},[
+            div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}},[
+              div({key:"l"},[
+                div({key:"label",style:{fontWeight:600,fontSize:"0.9rem"}},ep.label||"Episode "+(ep.episodeNo||i+1)),
+                div({key:"meta",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:2}},[
+                  new Date(ep.date).toLocaleDateString("en-AU",{day:"2-digit",month:"short",year:"numeric"}),
+                  ep.practitionerName&&" · "+ep.practitionerName,
+                  ep.practitionerProfession&&" ("+ep.practitionerProfession+")",
+                ]),
+              ]),
+              btn({key:"open",style:{...S.btnS,fontSize:"0.75rem",padding:"5px 12px"},onClick:()=>{if(setActiveEpId&&setEpTab){setActiveEpId(ep.id);setEpTab(3);}}},"Open →"),
+            ]),
+            // Episode summary pills
+            div({key:"pills",style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}},[
+              epLetters.length>0&&span({key:"l",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},epLetters.length+" letter"+(epLetters.length!==1?"s":"")),
+              epRefs.length>0&&span({key:"r",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},epRefs.length+" request"+(epRefs.length!==1?"s":"")),
+              approved>0&&span({key:"a",style:{...S.pill,...S.pillT,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},approved+" approved"),
+              pending>0&&span({key:"p",style:{...S.pill,...S.pillA,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},pending+" pending"),
+              declined>0&&span({key:"d",style:{...S.pill,...S.pillR,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},declined+" declined/disputed"),
+            ]),
+            // Episode letters preview
+            epLetters.slice(0,2).map(l=>div({key:l.id,style:{fontSize:"0.75rem",color:"#5B7A99",padding:"3px 0"}},"📄 "+l.template+" — "+fmtDate(l.generatedAt))),
+            epLetters.length>2&&div({key:"more-l",style:{fontSize:"0.72rem",color:"#5B7A99"}},epLetters.length-2+" more letters"),
+          ]),
+        ]);
+      }),
+    ]),
+
     // Letter history
     div({key:"letters",style:{...S.card,marginBottom:16}},[
       div({key:"h",style:{...S.fb,marginBottom:4}},[
