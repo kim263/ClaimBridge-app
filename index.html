@@ -903,7 +903,7 @@ function OutcomeTrendChart({scores,measure,measureKey}){
 // ── TAB 4: TREATMENT PLAN ─────────────────────────────────────────────────────
 function Tab4({claim,up}){
   const[subTab,setSubTab]=useState(0);
-  const SUB=["Goals & Management & RTW","Proposed Procedure / Surgery","Referrals","Work & Activity","Medication & Investigations","Outcome Measures"];
+  const SUB=["Treatment & Recovery","Proposed Procedure / Surgery","Referrals","Medication & Investigations","Outcome Measures"];
   const isPrescriber=PRESCRIBING.includes(claim.practitionerProfession);
   const isAlliedHealth=!PRESCRIBING.includes(claim.practitionerProfession)&&claim.practitionerProfession!=="General Practitioner"&&claim.practitionerProfession!=="";
   const[overrides,setOverrides]=useState(claim.rtwOverrides||{});
@@ -936,7 +936,7 @@ function Tab4({claim,up}){
     div({key:"subtabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:24,flexWrap:"wrap"}},
       SUB.map((t,i)=>e("button",{key:t,onClick:()=>setSubTab(i),style:subStyle(i)},t))
     ),
-    subTab===SUB.indexOf("Goals & Management & RTW")&&div({key:"goals"},[
+    subTab===SUB.indexOf("Treatment & Recovery")&&div({key:"goals"},[
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:14}},"Goals & management"),
         // Next review date moved here from Patient & Claim tab
@@ -983,6 +983,15 @@ function Tab4({claim,up}){
           )
         ),
       ]),
+      // Work & Activity — between goals and RTW
+      div({key:"work-inline",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:6}},"Work & activity restrictions"),
+        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:14}},"Restrictions auto-populate into the Certificate of Capacity."),
+        e(Ta,{key:"wr",label:"Work restrictions",value:claim.workRestrictions,onChange:v=>up("workRestrictions",v),placeholder:"e.g. No lifting >5kg, avoid prolonged sitting >30 min, no overhead work..."}),
+        e(Ta,{key:"ar",label:"Activity restrictions",value:claim.activityRestrictions,onChange:v=>up("activityRestrictions",v),placeholder:"e.g. No driving, avoid stairs, limit walking to 20 min..."}),
+        e(Ta,{key:"we",label:"Work environment considerations",value:claim.workEnvironment,onChange:v=>up("workEnvironment",v),placeholder:"e.g. Temperature, noise, space, lighting considerations..."}),
+      ]),
+
       // RTW merged into this tab
       div({key:"rtw-merged",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:6}},"Return to work"),
@@ -1081,16 +1090,7 @@ function Tab4({claim,up}){
         ]),
       ]),
     ]),
-    subTab===SUB.indexOf("Work & Activity")&&div({key:"work"},[
-      div({key:"card",style:S.card},[
-        div({key:"h",style:{fontWeight:700,marginBottom:6}},"Work & activity restrictions"),
-        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:14}},"Restrictions auto-populate into the Certificate of Capacity."),
-        e(Ta,{key:"wr",label:"Work restrictions",value:claim.workRestrictions,onChange:v=>up("workRestrictions",v),placeholder:"e.g. No lifting >5kg, avoid prolonged sitting >30 min, no overhead work..."}),
-        e(Ta,{key:"ar",label:"Activity restrictions",value:claim.activityRestrictions,onChange:v=>up("activityRestrictions",v),placeholder:"e.g. No driving, avoid stairs, limit walking to 20 min..."}),
-        e(Ta,{key:"we",label:"Work environment considerations",value:claim.workEnvironment,onChange:v=>up("workEnvironment",v),placeholder:"e.g. Temperature, noise, space, lighting considerations..."}),
-      ]),
-    ]),
-    subTab===SUB.indexOf("Medication & Investigations")&&div({key:"medinv"},[
+        subTab===SUB.indexOf("Medication & Investigations")&&div({key:"medinv"},[
       e(Collapsible,{key:"meds",title:isPrescriber?"Medication recommendations":"Medication (prescribing practitioners only)",icon:"💊",defaultOpen:isPrescriber},
         e(MedSection,{claim,up})
       ),
