@@ -1452,9 +1452,12 @@ const ALL_FORMS=[
 function WSPrintWrap({title,code,onBack,children}){
   return div({style:{background:"white",color:"black",fontFamily:"Arial,sans-serif",fontSize:11,padding:24,maxWidth:760,margin:"0 auto"}},[
     e("style",{key:"ps"},WS_PRINT_STYLE),
-    div({key:"btns",className:"ws-no-print",style:{display:"flex",gap:10,marginBottom:16}},[
-      btn({key:"p",onClick:()=>window.print(),style:{...S.btnP,fontSize:"0.82rem"}},"🖨️ Print / Save PDF"),
-      btn({key:"b",onClick:onBack,style:{...S.btnS,fontSize:"0.82rem"}},"← Back to edit"),
+    div({key:"btns",className:"ws-no-print",style:{position:"sticky",top:0,zIndex:10,background:"rgba(12,26,46,0.97)",borderBottom:"1px solid rgba(255,255,255,0.1)",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",marginBottom:16,marginLeft:-24,marginRight:-24,paddingLeft:24,paddingRight:24}},[
+      div({key:"l",style:{fontSize:"0.82rem",color:"#5B7A99"}},title+" — Preview"),
+      div({key:"r",style:{display:"flex",gap:10}},[
+        btn({key:"p",onClick:()=>window.print(),style:{...S.btnP,fontSize:"0.82rem"}},"🖨️ Print / Save PDF"),
+        btn({key:"b",onClick:onBack,style:{...S.btnS,fontSize:"0.82rem"}},"✕ Close preview"),
+      ]),
     ]),
     div({key:"hdr",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",borderBottom:"3px solid #F5A623",paddingBottom:10,marginBottom:12}},[
       div({key:"l",style:{display:"flex",alignItems:"center",gap:10}},[
@@ -2191,7 +2194,19 @@ function Tab6({claim,up,clinic,practitioners}){
     sessions:   _stored.sessions   !== undefined ? _stored.sessions   : (claim.txNum||""),
     txFrom:     _stored.txFrom     !== undefined ? _stored.txFrom     : (claim.txFrom||""),
     txTo:       _stored.txTo       !== undefined ? _stored.txTo       : (claim.txTo||""),
-    outcomes:   _stored.outcomes   !== undefined ? _stored.outcomes   : "",
+    outcomes:   _stored.outcomes   !== undefined ? _stored.outcomes   : (()=>{
+      const scores=claim.outcomeScores||{};
+      const keys=Object.keys(scores).filter(k=>scores[k]&&scores[k].length>0);
+      if(keys.length===0)return "";
+      return keys.map(k=>{
+        const sorted=[...scores[k]].sort((a,b)=>new Date(a.date)-new Date(b.date));
+        const first=sorted[0];const last=sorted[sorted.length-1];
+        const m=OUTCOME_MEASURES[k];const unit=m?m.unit:"";
+        let s=k+": baseline "+first.score+unit+" ("+new Date(first.date).toLocaleDateString("en-AU")+")";
+        if(sorted.length>1&&last.score!==first.score)s+=" → "+last.score+unit+" ("+new Date(last.date).toLocaleDateString("en-AU")+")";
+        return s;
+      }).join("\n");
+    })(),
     justification: _stored.justification !== undefined ? _stored.justification : (claim.treatmentPlan||""),
     barriers:   _stored.barriers   !== undefined ? _stored.barriers   : (()=>{
       const fl=claim.psychosocial||{};
@@ -2250,7 +2265,7 @@ function Tab6({claim,up,clinic,practitioners}){
           e(Inp,{key:"to",label:"Treatment to",value:ah.txTo||"",onChange:upAH("txTo"),type:"date",mb:0}),
         ]),
         div({key:"outcomes-spacer",style:{marginTop:20}},[
-          e(Ta,{key:"o",label:"Expected outcomes",value:ah.outcomes||"",onChange:upAH("outcomes"),placeholder:"Expected functional improvements..."}),
+          e(Ta,{key:"o",label:"Expected outcomes / outcome measure results",value:ah.outcomes||"",onChange:upAH("outcomes"),placeholder:"Expected functional improvements and outcome measure scores (auto-populated from Outcome Measures in Treatment Plan)..."}),
         ]),
         e(Ta,{key:"j",label:"Clinical justification / treatment methods",value:ah.justification||"",onChange:upAH("justification"),placeholder:"Clinical reasoning and treatment methods...",rows:4}),
         e(Ta,{key:"b",label:"Barriers to recovery",value:ah.barriers||"",onChange:upAH("barriers"),placeholder:"Identified barriers...",rows:3}),
@@ -2544,7 +2559,9 @@ function Tab8({claim,up,clinic,practitioners}){
     setGen(true);
     const t=TMPLS.find(x=>x.id===tmpl);
     try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:"Generate a professional "+claim.scheme+" referral letter for: "+t.label+". Patient: "+(claim.patientName||"[Patient]")+", DOB: "+(claim.dob||"[DOB]")+", Claim: "+(claim.claimNumber||"[Claim No]")+". Diagnosis: "+diags+". Referring: "+(prac&&prac.name||"[Practitioner]")+", "+(prac&&prac.profession||"")+", Provider: "+(prac&&prac.providerNo||"[No]")+", Clinic: "+clinic.name+". Referred to: "+(firstRef.name||"[Colleague]")+", "+(firstRef.specialty||"")+". Priority: "+(firstRef.priority||"Routine")+". Treatment: "+(claim.treatmentPlan||"As per clinical assessment")+". Scheme: "+claim.scheme+". Start with Dear "+(firstRef.name||"Colleague")+" and include: thank you for accepting, patient details, reason for referral, clinical summary, specific request. Close professionally. Australian medical letter format."}]})});
+      const _apiKey=localStorage.getItem("cb_apikey")||"";
+      if(!_apiKey){setLetter("API key required. Go to Settings to add your Anthropic API key.");setGen(false);return;}
+      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":_apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:"Generate a professional "+claim.scheme+" referral letter for: "+t.label+". Patient: "+(claim.patientName||"[Patient]")+", DOB: "+(claim.dob||"[DOB]")+", Claim: "+(claim.claimNumber||"[Claim No]")+". Diagnosis: "+diags+". Referring: "+(prac&&prac.name||"[Practitioner]")+", "+(prac&&prac.profession||"")+", Provider: "+(prac&&prac.providerNo||"[No]")+", Clinic: "+clinic.name+". Referred to: "+(firstRef.name||"[Colleague]")+", "+(firstRef.specialty||"")+". Priority: "+(firstRef.priority||"Routine")+". Treatment: "+(claim.treatmentPlan||"As per clinical assessment")+". Scheme: "+claim.scheme+". Start with Dear "+(firstRef.name||"Colleague")+" and include: thank you for accepting, patient details, reason for referral, clinical summary, specific request. Close professionally. Australian medical letter format."}]})});
       const d=await r.json();
       if(d.error)setLetter("API error: "+d.error.message);
       else{const txt=d.content&&d.content[0]&&d.content[0].text||"Error generating letter";
@@ -2594,6 +2611,7 @@ function Tab8({claim,up,clinic,practitioners}){
     // Generate letter
     div({key:"gen",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:14}},"Generate referral letter"),
+      !localStorage.getItem("cb_apikey")&&div({key:"nokey",style:{...S.warn,marginBottom:14}},"⚠️ No API key configured. Go to Settings → Anthropic API Key to enable letter generation."),
       e(Sel,{key:"t",label:"Select letter template",value:tmpl,onChange:setTmpl,options:TMPLS.map(t=>({value:t.id,label:t.label}))}),
 
       // Validation errors
@@ -2646,6 +2664,26 @@ function Tab8({claim,up,clinic,practitioners}){
   ]);
 }
 
+// ── API KEY SETTINGS ──────────────────────────────────────────────────────────
+function ApiKeySettings(){
+  const[key,setKey]=useState(localStorage.getItem("cb_apikey")||"");
+  const[saved,setSaved]=useState(false);
+  const save=()=>{localStorage.setItem("cb_apikey",key);setSaved(true);setTimeout(()=>setSaved(false),2000);};
+  const clear=()=>{localStorage.removeItem("cb_apikey");setKey("");setSaved(false);};
+  return div({style:S.card},[
+    div({key:"h",style:{fontWeight:700,marginBottom:6}},"Anthropic API Key"),
+    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:14}},"Required for AI letter generation. Your key is stored locally in your browser and never sent anywhere except directly to Anthropic."),
+    div({key:"inp",style:{display:"flex",gap:10,marginBottom:10}},[
+      inp({key:"i",className:"cb-input",style:{...S.inp,flex:1,fontFamily:"monospace",fontSize:"0.85rem"},type:"password",value:key,onChange:ev=>setKey(ev.target.value),placeholder:"sk-ant-api03-..."}),
+      btn({key:"s",style:S.btnP,onClick:save},"Save"),
+      key&&btn({key:"c",style:S.btnD,onClick:clear},"Clear"),
+    ]),
+    saved&&e(OK,{key:"ok"},"API key saved"),
+    !key&&e(WARN,{key:"w"},"No API key set — letter generation will not work. Get your key from console.anthropic.com"),
+    key&&div({key:"set",style:{fontSize:"0.78rem",color:"#00C9A7"}},"✅ API key configured"),
+  ]);
+}
+
 // ── ROOT APP ──────────────────────────────────────────────────────────────────
 function App(){
   const[clinic,setClinic]=useState(null);
@@ -2679,6 +2717,7 @@ function App(){
           div({key:"h",style:{fontWeight:700,marginBottom:12}},"Clinic details"),
           ...[["Name",clinic.name],["Plan",clinic.plan],["ABN",clinic.abn]].map(([l,v])=>div({key:l,style:{fontSize:"0.88rem",lineHeight:2}},[span({key:"l",style:{color:"#5B7A99"}},l+": "),v])),
         ]),
+        e(ApiKeySettings,{key:"api"}),
       ]),
       nav==="help"&&div({key:"help",style:{padding:"28px",maxWidth:960,margin:"0 auto"}},[
         div({key:"h",style:{fontWeight:800,fontSize:"1.2rem",marginBottom:20}},"Help & Support"),
