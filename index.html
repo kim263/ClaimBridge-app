@@ -1953,7 +1953,7 @@ function Tab6({claim,up,clinic,practitioners}){
           ]),
           btn({key:"print",style:{...S.btnP,fontSize:"0.82rem",display:"flex",alignItems:"center",gap:6},onClick:()=>setPrintForm("ps109")},"🖨️ Print Form"),
         ]),
-        e(OK,{key:"ok"},"Outcome measures, mental function and RTW data auto-populated"},
+        e(OK,{key:"ok"},"Outcome measures, mental function and RTW data auto-populated"),
         e(Inp,{key:"sc",label:"Sessions completed to date",value:p9.sessionsCompleted||"",onChange:upP9("sessionsCompleted"),placeholder:"e.g. 8 sessions"}),
         e(Inp,{key:"pd",label:"PS604 reference date",value:p9.ps604Date||"",onChange:upP9("ps604Date"),type:"date"}),
         e(Ta,{key:"cd",label:"Current diagnosis (any changes since PS604?)",value:p9.currentDiagnosis||"",onChange:upP9("currentDiagnosis"),placeholder:"e.g. No change / Updated to..."}),
