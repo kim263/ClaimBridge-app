@@ -2238,7 +2238,7 @@ function Tab6({claim,up,clinic,practitioners}){
         div({key:"goals-note",style:{fontSize:"0.75rem",color:"#5B7A99",marginBottom:8}},"Fields below are pre-filled from Treatment Plan — edit any field to customise."),
         e(Ta,{key:"g",label:"Specific goals for this referral",value:ah.goals||"",onChange:upAH("goals"),placeholder:"Goals (from Treatment Plan SMART goals or short/long-term goals)...",rows:4}),
         div({key:"gr",style:S.g2},[
-          e(Inp,{key:"t",label:"Treatment type",value:ah.treatment||"",onChange:upAH("treatment"),placeholder:"e.g. Physiotherapy"}),
+          e(Sel,{key:"t",label:"Treatment type",value:ah.treatment||"",onChange:upAH("treatment"),options:["Physiotherapy","Chiropractic","Osteopathy","Podiatry","EIPF Physiotherapy","Exercise Physiology","Occupational Therapy"],mb:0}),
           e(Inp,{key:"f",label:"Frequency",value:ah.frequency||"",onChange:upAH("frequency"),placeholder:"e.g. 2x per week",mb:0}),
         ]),
         div({key:"gr2",style:{...S.g2,marginTop:16}},[
@@ -2249,7 +2249,9 @@ function Tab6({claim,up,clinic,practitioners}){
           e(Inp,{key:"from",label:"Treatment from",value:ah.txFrom||"",onChange:upAH("txFrom"),type:"date",mb:0}),
           e(Inp,{key:"to",label:"Treatment to",value:ah.txTo||"",onChange:upAH("txTo"),type:"date",mb:0}),
         ]),
-        e(Ta,{key:"o",label:"Expected outcomes",value:ah.outcomes||"",onChange:upAH("outcomes"),placeholder:"Expected functional improvements..."}),
+        div({key:"outcomes-spacer",style:{marginTop:20}},[
+          e(Ta,{key:"o",label:"Expected outcomes",value:ah.outcomes||"",onChange:upAH("outcomes"),placeholder:"Expected functional improvements..."}),
+        ]),
         e(Ta,{key:"j",label:"Clinical justification / treatment methods",value:ah.justification||"",onChange:upAH("justification"),placeholder:"Clinical reasoning and treatment methods...",rows:4}),
         e(Ta,{key:"b",label:"Barriers to recovery",value:ah.barriers||"",onChange:upAH("barriers"),placeholder:"Identified barriers...",rows:3}),
         (()=>{
