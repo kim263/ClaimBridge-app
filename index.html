@@ -112,6 +112,7 @@ const PSYCH_FLAGS=[
 const PRESCRIBING=["General Practitioner","Pain Specialist","Orthopaedic Surgeon","Psychiatrist","Neurologist","Rehabilitation Physician","Rheumatologist","Other Specialist"];
 const PROFESSIONS=["General Practitioner","Physiotherapist","Osteopath","Chiropractor","Pain Specialist","Orthopaedic Surgeon","Occupational Therapist","Exercise Physiologist","Psychologist","Podiatrist","Other"];
 const SPECIALTIES=["Orthopaedic Surgeon","Pain Specialist / Anaesthetist","Neurologist","Rheumatologist","Psychiatrist","Rehabilitation Physician","Physiotherapist","Osteopath","Chiropractor","Podiatrist","Exercise Physiologist (GP referral required)","Occupational Therapist (GP referral required)","Psychologist","Hand Therapist","Other Specialist"];
+const SPECIALTIES_ALLIED_HEALTH=["General Practitioner"];
 const RTW_DB={
   "Low back pain":{mod:[1,2],normal:[2,6],notes:"Non-specific LBP. Early activity encouraged."},
   "Lumbago with sciatica":{mod:[2,4],normal:[6,12],notes:"Radiculopathy adds complexity."},
@@ -852,7 +853,7 @@ function OutcomeTrendChart({scores,measure,measureKey}){
 // ── TAB 4: TREATMENT PLAN ─────────────────────────────────────────────────────
 function Tab4({claim,up}){
   const[subTab,setSubTab]=useState(0);
-  const SUB=["Goals & Management","Referrals","Work & Activity","Medication & Investigations","Outcome Measures"];
+  const SUB=["Goals & Management","Proposed Procedure / Surgery","Referrals","Work & Activity","Medication & Investigations","Outcome Measures"];
   const isPrescriber=PRESCRIBING.includes(claim.practitionerProfession);
   const isAlliedHealth=!PRESCRIBING.includes(claim.practitionerProfession)&&claim.practitionerProfession!=="General Practitioner"&&claim.practitionerProfession!=="";
   const subStyle=i=>({padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:subTab===i?"rgba(0,201,167,0.1)":"transparent",color:subTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:subTab===i?"2px solid #00C9A7":"none"});
@@ -862,7 +863,7 @@ function Tab4({claim,up}){
     div({key:"subtabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:24,flexWrap:"wrap"}},
       SUB.map((t,i)=>e("button",{key:t,onClick:()=>setSubTab(i),style:subStyle(i)},t))
     ),
-    subTab===0&&div({key:"goals"},[
+    subTab===SUB.indexOf("Goals & Management")&&div({key:"goals"},[
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:14}},"Goals & management"),
         // Next review date moved here from Patient & Claim tab
@@ -897,11 +898,7 @@ function Tab4({claim,up}){
           e(Ta,{key:"sg",label:"Short-term goals (0-4 weeks)",value:claim.goalsShort,onChange:v=>up("goalsShort",v),placeholder:"e.g. Pain reduction, restore ROM..."}),
           e(Ta,{key:"lg",label:"Long-term goals (4+ weeks)",value:claim.goalsLong,onChange:v=>up("goalsLong",v),placeholder:"e.g. Return to full duties..."}),
         ],
-        div({key:"proc-section",style:{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
-          div({key:"h",style:{fontWeight:600,fontSize:"0.85rem",marginBottom:12}},"Proposed procedure / surgery"),
-          e(Sel,{key:"proc",label:"Proposed procedure (if applicable)",value:claim.proposedProcedure,onChange:v=>up("proposedProcedure",v),options:["Arthroscopic knee surgery (meniscectomy / chondroplasty)","ACL reconstruction","Total knee replacement (TKR)","Total hip replacement (THR)","Hip arthroscopy / labral repair","Rotator cuff repair","Shoulder arthroscopy / decompression","Shoulder stabilisation / Bankart repair","SLAP repair","Acromioclavicular joint reconstruction","Carpal tunnel release","Trigger finger release","Dupuytren's fasciectomy","Wrist arthroscopy / TFCC repair","Distal radius ORIF","Cervical spine discectomy / fusion (ACDF)","Lumbar discectomy / microdiscectomy","Lumbar spinal fusion","Lumbar laminectomy / decompression","Facet joint injection / denervation","Spinal cord stimulator implantation","Pain management program","Injection therapy (corticosteroid / PRP / hydrocortisone)","Nerve block / epidural steroid injection","Achilles tendon repair","Ankle arthroscopy","Plantar fascia release","Elbow arthroscopy","Cubital tunnel release (ulnar nerve transposition)","Other — see clinical notes"],mb:0}),
-          claim.proposedProcedure&&div({key:"proc-note",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:8}},"This will autopopulate to the Procedure / Surgery referral letter."),
-        ]),
+        
         div({key:"barriers-section",style:{marginBottom:16}},[
           e("label",{key:"l",style:S.label},"Barriers to recovery"),
           (()=>{const flags=claim.psychosocial||{};const allFlags=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];return allFlags.length>0?div({key:"auto"},[div({key:"note",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:8}},"Auto-populated from psychosocial flags in Diagnosis screen:"),div({key:"pills",style:{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}},allFlags.map(f=>e("span",{key:f,style:{...S.pill,...S.pillA,cursor:"default",fontSize:"0.72rem"}},f)))]):null;})(),
@@ -909,12 +906,31 @@ function Tab4({claim,up}){
         ]),
       ]),
     ]),
-    subTab===1&&div({key:"refs"},[
+
+    subTab===SUB.indexOf("Proposed Procedure / Surgery")&&div({key:"proc-tab"},[
+      div({key:"card",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:6}},"Proposed procedure / surgery"),
+        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Select a proposed procedure or surgery if applicable. This will autopopulate to the Procedure / Surgery referral letter."),
+        e(Sel,{key:"proc",label:"Proposed procedure",value:claim.proposedProcedure,onChange:v=>up("proposedProcedure",v),options:["Arthroscopic knee surgery (meniscectomy / chondroplasty)","ACL reconstruction","Total knee replacement (TKR)","Total hip replacement (THR)","Hip arthroscopy / labral repair","Rotator cuff repair","Shoulder arthroscopy / decompression","Shoulder stabilisation / Bankart repair","SLAP repair","Acromioclavicular joint reconstruction","Carpal tunnel release","Trigger finger release","Dupuytren's fasciectomy","Wrist arthroscopy / TFCC repair","Distal radius ORIF","Cervical spine discectomy / fusion (ACDF)","Lumbar discectomy / microdiscectomy","Lumbar spinal fusion","Lumbar laminectomy / decompression","Facet joint injection / denervation","Spinal cord stimulator implantation","Pain management program","Injection therapy (corticosteroid / PRP / hydrocortisone)","Nerve block / epidural steroid injection","Achilles tendon repair","Ankle arthroscopy","Plantar fascia release","Elbow arthroscopy","Cubital tunnel release (ulnar nerve transposition)","Other — see clinical notes"]}),
+        claim.proposedProcedure&&div({key:"note",style:{...S.ok,marginTop:12,marginBottom:16}},"✅ Will appear in the Procedure / Surgery referral letter."),
+        div({key:"g",style:{...S.g2,marginTop:16}},[
+          e(Inp,{key:"sn",label:"Specialist name",value:claim.procedureSpecialistName||"",onChange:v=>up("procedureSpecialistName",v),placeholder:"e.g. Dr. John Smith",mb:0}),
+          e(Inp,{key:"sc",label:"Hospital / clinic",value:claim.procedureSpecialistClinic||"",onChange:v=>up("procedureSpecialistClinic",v),placeholder:"e.g. Melbourne Private Hospital",mb:0}),
+        ]),
+        div({key:"g2",style:{...S.g2,marginTop:16}},[
+          e(Inp,{key:"pd",label:"Proposed date (if known)",value:claim.procedureDate||"",onChange:v=>up("procedureDate",v),type:"date",mb:0}),
+          e(Sel,{key:"pa",label:"Approval status",value:claim.procedureApprovalStatus||"",onChange:v=>up("procedureApprovalStatus",v),options:["Pending","Approved","Declined","Further info required"],mb:0}),
+        ]),
+        e(Ta,{key:"pn",label:"Clinical notes / justification",value:claim.procedureNotes||"",onChange:v=>up("procedureNotes",v),placeholder:"Additional clinical notes supporting the proposed procedure...",rows:4}),
+      ]),
+    ]),
+
+    subTab===SUB.indexOf("Referrals")&&div({key:"refs"},[ 
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:6}},"Specialist & Allied Health Referrals"),
         div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:14}},"Only complete this section if a referral is required for this consultation."),
         div({key:"g",style:S.g2},[
-          e(Sel,{key:"sp",label:"Specialty / profession",value:(claim.newRef&&claim.newRef.specialty)||"",onChange:v=>up("newRef",{...(claim.newRef||{}),specialty:v}),options:SPECIALTIES}),
+          e(Sel,{key:"sp",label:"Specialty / profession",value:(claim.newRef&&claim.newRef.specialty)||"",onChange:v=>up("newRef",{...(claim.newRef||{}),specialty:v}),options:isAlliedHealth?SPECIALTIES_ALLIED_HEALTH:SPECIALTIES}),
           e(Sel,{key:"pr",label:"Priority",value:(claim.newRef&&claim.newRef.priority)||"Routine (within 4 weeks)",onChange:v=>up("newRef",{...(claim.newRef||{}),priority:v}),options:["Routine (within 4 weeks)","Soon (within 2 weeks)","Urgent (within 48 hours)","Emergency"]}),
           e(Inp,{key:"n",label:"Practitioner name",value:(claim.newRef&&claim.newRef.name)||"",onChange:v=>up("newRef",{...(claim.newRef||{}),name:v}),placeholder:"Dr. John Smith"}),
           e(Inp,{key:"cl",label:"Clinic name",value:(claim.newRef&&claim.newRef.clinic)||"",onChange:v=>up("newRef",{...(claim.newRef||{}),clinic:v}),placeholder:"Melbourne Orthopaedics"}),
@@ -947,7 +963,7 @@ function Tab4({claim,up}){
         ]),
       ]),
     ]),
-    subTab===2&&div({key:"work"},[
+    subTab===SUB.indexOf("Work & Activity")&&div({key:"work"},[
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:6}},"Work & activity restrictions"),
         div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:14}},"Restrictions auto-populate into the Certificate of Capacity."),
@@ -956,7 +972,7 @@ function Tab4({claim,up}){
         e(Ta,{key:"we",label:"Work environment considerations",value:claim.workEnvironment,onChange:v=>up("workEnvironment",v),placeholder:"e.g. Temperature, noise, space, lighting considerations..."}),
       ]),
     ]),
-    subTab===3&&div({key:"medinv"},[
+    subTab===SUB.indexOf("Medication & Investigations")&&div({key:"medinv"},[
       e(Collapsible,{key:"meds",title:isPrescriber?"Medication recommendations":"Medication (prescribing practitioners only)",icon:"💊",defaultOpen:isPrescriber},
         e(MedSection,{claim,up})
       ),
@@ -968,7 +984,7 @@ function Tab4({claim,up}){
         ])
       ),
     ]),
-    subTab===4&&e(OutcomeMeasuresTab,{key:"om",claim,up}),
+    subTab===SUB.indexOf("Outcome Measures")&&e(OutcomeMeasuresTab,{key:"om",claim,up}),
   ]);
 }
 
@@ -1065,11 +1081,13 @@ function OutcomeMeasuresTab({claim,up}){
 function MedSection({claim,up}){
   const[meds,setMeds]=useState(claim.medications||[]);
   const[nm,setNm]=useState({name:"",dosage:"",frequency:"",duration:"",review:""});
+  const canPrescribe=PRESCRIBING.includes(claim.practitionerProfession);
   const add=()=>{if(!nm.name)return;const u=[...meds,{...nm,id:"med_"+Date.now()}];setMeds(u);up("medications",u);setNm({name:"",dosage:"",frequency:"",duration:"",review:""});};
   const rem=id=>{const u=meds.filter(m=>m.id!==id);setMeds(u);up("medications",u);};
   return div({},[
-    !PRESCRIBING.includes(claim.practitionerProfession)&&e(WARN,{key:"w"},"This section is for prescribing practitioners only."),
-    div({key:"g",style:S.g2},[
+    !canPrescribe&&div({key:"w",style:{...S.warn,marginBottom:14}},"⚠️ View only — medication management is for prescribing practitioners (GPs and Specialists) only."),
+    div({key:"content",style:{pointerEvents:canPrescribe?"auto":"none",opacity:canPrescribe?1:0.5}},[
+      div({key:"g",style:S.g2},[
       e(Inp,{key:"n",label:"Medication name",value:nm.name,onChange:v=>setNm({...nm,name:v}),placeholder:"e.g. Ibuprofen, Amitriptyline"}),
       e(Inp,{key:"d",label:"Dosage",value:nm.dosage,onChange:v=>setNm({...nm,dosage:v}),placeholder:"e.g. 400mg"}),
       e(Sel,{key:"f",label:"Frequency",value:nm.frequency,onChange:v=>setNm({...nm,frequency:v}),options:["Once daily","Twice daily (BD)","Three times daily (TDS)","Four times daily (QID)","Every morning","Every night","Every 4 hours","Every 6 hours","As required (PRN)","Weekly","Other"]}),
@@ -1083,6 +1101,7 @@ function MedSection({claim,up}){
         btn({key:"rem",style:S.btnD,onClick:()=>rem(m.id)},"Remove"),
       ]))
     ),
+    ]),
   ]);
 }
 
@@ -1435,6 +1454,7 @@ const WS_PRINT_STYLE=`
 
 // Profession → allowed form IDs
 const PROF_FORMS={
+  "General Practitioner":["household","gym_swim"],
   "Physiotherapist":["ahrmp","household","gym_swim"],
   "Osteopath":["ahrmp","household","gym_swim"],
   "Chiropractor":["ahrmp","household","gym_swim"],
@@ -1444,7 +1464,7 @@ const PROF_FORMS={
   "Podiatrist":["ahrmp"],
 };
 function getAllowedForms(profession){
-  return PROF_FORMS[profession]||["ahrmp","household","gym_swim","ps604","ps109"];
+  return PROF_FORMS[profession]||["household","gym_swim"];
 }
 
 const ALL_FORMS=[
