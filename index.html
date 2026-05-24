@@ -669,7 +669,7 @@ function Tab2({claim,up}){
             div({key:"n",style:{fontSize:"0.87rem",fontWeight:500}},d.label),
             div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},d.icd10+" · "+d.cat),
           ]),
-          span({key:"a",style:{color:"#00C9A7",fontSize:"0.8rem",fontWeight:600}},diags.find(x=>x.icd10===d.icd10)?"Added ✓","+ Add"),
+          span({key:"a",style:{color:"#00C9A7",fontSize:"0.8rem",fontWeight:600}},diags.find(x=>x.icd10===d.icd10)?"Added ✓":"+ Add"),
         ]))
       ),
     ]),
@@ -918,7 +918,7 @@ function Tab4({claim,up}){
           btn({key:"e",style:{...S.btnS,padding:"6px 10px",fontSize:"0.76rem"},onClick:()=>{setMf(m);setEm(m.id);}},"Edit"),
           btn({key:"d",style:{...S.btnD,padding:"6px 10px",fontSize:"0.76rem"},onClick:()=>up("medications",meds.filter(x=>x.id!==m.id))},"✕"),
         ]),
-      )))),
+      ]))),
       meds.length===0&&div({key:"empty",style:{fontSize:"0.83rem",color:"#5B7A99",fontStyle:"italic"}},"No medications added yet"),
     ]),
     e(Collapsible,{key:"barriers",title:"Barriers & recovery notes",icon:"⚠️"},[
@@ -2039,20 +2039,7 @@ function Tab7({claim,up}){
     ]),
   ]);
 }
-// ── UPDATED CLAIM FORM with profession tabs, audit trail, referral validation ──
-
-// Profession → hidden tabs
-const PROF_HIDDEN_TABS={
-  "Physiotherapist":["Medication"],
-  "Osteopath":["Medication"],
-  "Chiropractor":["Medication"],
-  "Psychologist":["Imaging","Medication"],
-  "Occupational Therapist":["Diagnosis","Medication"],
-  "Exercise Physiologist":["Diagnosis","Medication"],
-  "Podiatrist":["Medication"],
-};
-
-// Tab 8 updated: referral validation + audit trail
+// ── TAB 8: REFERRAL & EXPORT ────────────────────────────────────────────────
 function Tab8({claim,up,clinic,practitioners}){
   const[tmpl,setTmpl]=useState("");
   const[letter,setLetter]=useState("");
