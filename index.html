@@ -1098,9 +1098,12 @@ function Tab5({claim,up,clinic,practitioners}){
     const mentalFns=MENTAL_FUNCTIONS;
 
     return div({className:"coc-print-page",style:{background:"white",color:"black",fontFamily:"Arial,sans-serif",fontSize:11,padding:24,maxWidth:760,margin:"0 auto"}},[
-      div({key:"pbtns",className:"no-print",style:{position:"sticky",top:0,zIndex:10,background:"rgba(12,26,46,0.97)",borderBottom:"1px solid rgba(255,255,255,0.1)",display:"flex",gap:10,padding:"10px 0",marginBottom:20}},[
-        btn({key:"b",onClick:()=>setPrintMode(false),style:{...S.btnS,fontSize:"0.85rem"}},"← Close preview"),
-        btn({key:"p",onClick:()=>window.print(),style:{...S.btnP,fontSize:"0.85rem"}},"🖨️ Print / Save PDF"),
+      div({key:"pbtns",className:"no-print",style:{position:"sticky",top:0,zIndex:10,background:"rgba(12,26,46,0.97)",borderBottom:"1px solid rgba(255,255,255,0.1)",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",marginBottom:20}},[
+        div({key:"l",style:{fontSize:"0.82rem",color:"#5B7A99"}},"Certificate of Capacity — Preview"),
+        div({key:"r",style:{display:"flex",gap:10}},[
+          btn({key:"p",onClick:()=>window.print(),style:{...S.btnP,fontSize:"0.85rem"}},"🖨️ Print / Save PDF"),
+          btn({key:"b",onClick:()=>setPrintMode(false),style:{...S.btnS,fontSize:"0.85rem"}},"✕ Close preview"),
+        ]),
       ]),
       div({key:"hdr",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",borderBottom:"2px solid #1a1a1a",paddingBottom:12,marginBottom:8}},[
         div({key:"logos",style:{display:"flex",alignItems:"center",gap:16}},[
@@ -1352,7 +1355,8 @@ function Tab5({claim,up,clinic,practitioners}){
           e(Inp,{key:"from",label:"From date *",value:claim.fitRestrictFrom,onChange:v=>up("fitRestrictFrom",v),type:"date",required:true,mb:0}),
           e(Inp,{key:"to",label:"To date *",value:claim.fitRestrictTo,onChange:v=>up("fitRestrictTo",v),type:"date",required:true,mb:0}),
         ]),
-        e(Ta,{key:"res",label:"Restrictions / suitable employment detail",value:claim.fitnessRestrictions,onChange:v=>up("fitnessRestrictions",v),placeholder:"Detail specific restrictions and suitable employment conditions..."}),
+        div({key:"divider",style:{height:20}}),
+        e(Ta,{key:"res",label:"Restrictions / suitable employment detail",value:claim.fitnessRestrictions,onChange:v=>up("fitnessRestrictions",v),placeholder:"Detail specific restrictions and suitable employment conditions...",mb:0}),
       ]),
       claim.fitnessForWork==="Unfit for all work"&&div({key:"unfit-dates",style:{marginBottom:14}},[
         div({key:"n",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:10}},"Period of incapacity for all work:"),
@@ -2171,12 +2175,38 @@ function Tab6({claim,up,clinic,practitioners}){
   if(printForm==="ps604")return e(PS604Print,{claim,clinic,practitioners,onBack:()=>setPrintForm(null)});
   if(printForm==="ps109")return e(PS109Print,{claim,clinic,practitioners,onBack:()=>setPrintForm(null)});
 
-  const ah=claim.ahrmData||{};
+  // Build merged ah: stored ahrmData takes priority, fallback to treatment plan fields
+  const _stored=claim.ahrmData||{};
+  const _smartGoals=[1,2,3].map(n=>{
+    const lim=claim["ahGoalLim"+n];const tgt=claim["ahGoalTarget"+n];const dt=claim["ahGoalDate"+n];
+    if(!lim&&!tgt)return null;
+    return (lim||"")+(tgt?" → "+tgt:"")+(dt?" (by "+new Date(dt).toLocaleDateString("en-AU")+")":"");
+  }).filter(Boolean).join("\n");
+  const _gpGoals=[claim.goalsShort&&"Short-term: "+claim.goalsShort,claim.goalsLong&&"Long-term: "+claim.goalsLong].filter(Boolean).join("\n");
+  const ah={
+    goals:      _stored.goals      !== undefined ? _stored.goals      : (_smartGoals||_gpGoals||""),
+    treatment:  _stored.treatment  !== undefined ? _stored.treatment  : (claim.practitionerProfession||""),
+    frequency:  _stored.frequency  !== undefined ? _stored.frequency  : "",
+    duration:   _stored.duration   !== undefined ? _stored.duration   : (claim.txWeeks?claim.txWeeks+" weeks":""),
+    sessions:   _stored.sessions   !== undefined ? _stored.sessions   : (claim.txNum||""),
+    txFrom:     _stored.txFrom     !== undefined ? _stored.txFrom     : (claim.txFrom||""),
+    txTo:       _stored.txTo       !== undefined ? _stored.txTo       : (claim.txTo||""),
+    outcomes:   _stored.outcomes   !== undefined ? _stored.outcomes   : "",
+    justification: _stored.justification !== undefined ? _stored.justification : (claim.treatmentPlan||""),
+    barriers:   _stored.barriers   !== undefined ? _stored.barriers   : (()=>{
+      const fl=claim.psychosocial||{};
+      const fb=[...(fl.yellow||[]),...(fl.blue||[]),...(fl.black||[]),...(fl.orange||[])];
+      const ab=(claim.barriers||"").trim();
+      const parts=[];if(fb.length>0)parts.push(fb.join(", "));if(ab)parts.push(ab);
+      return parts.join(".\n");
+    })(),
+    ..._stored,
+  };
   const hh=claim.hhData||{};
   const gd=claim.gymData||{};
   const p4=claim.ps604Data||{};
   const p9=claim.ps109Data||{};
-  const upAH=(f)=>(v)=>up("ahrmData",{...ah,[f]:v});
+  const upAH=(f)=>(v)=>up("ahrmData",{..._stored,[f]:v});
   const upHH=(f)=>(v)=>up("hhData",{...hh,[f]:v});
   const upGD=(f)=>(v)=>up("gymData",{...gd,[f]:v});
   const upP4=(f)=>(v)=>up("ps604Data",{...p4,[f]:v});
@@ -2204,64 +2234,29 @@ function Tab6({claim,up,clinic,practitioners}){
           ]),
           btn({key:"print",style:{...S.btnP,fontSize:"0.82rem",display:"flex",alignItems:"center",gap:6},onClick:()=>setPrintForm("ahrmp")},"🖨️ Print Form"),
         ]),
-        e(OK,{key:"ok"},"Patient, diagnosis and capacity details pre-populated"),
-        // Auto-populate goals from Tab4 — SMART goals (allied health) OR short/long goals (GP)
-        (()=>{
-          const smartGoals=[1,2,3].map(n=>{
-            const lim=claim["ahGoalLim"+n];const target=claim["ahGoalTarget"+n];const date=claim["ahGoalDate"+n];
-            if(!lim&&!target)return null;
-            return (lim||"")+(target?" → "+target:"")+(date?" (by "+new Date(date).toLocaleDateString("en-AU")+")":"");
-          }).filter(Boolean).join("\n");
-          const gpGoals=[claim.goalsShort&&"Short-term: "+claim.goalsShort,claim.goalsLong&&"Long-term: "+claim.goalsLong].filter(Boolean).join("\n");
-          const treatPlan=claim.treatmentPlan||"";
-          const autoGoals=smartGoals||gpGoals||"";
-          const displayVal=ah.goals||(ah._goalsSet?"":autoGoals)||"";
-          return e(Ta,{key:"g",label:"Specific goals for this referral",value:displayVal,onChange:v=>{upAH("goals")(v);upAH("_goalsSet")(true);},placeholder:"Goals (auto-populated from Treatment Plan)...",rows:4});
-        })(),
-        (()=>{
-          const hasGoalSrc=[1,2,3].some(n=>claim["ahGoalLim"+n]||claim["ahGoalTarget"+n])||(claim.goalsShort||claim.goalsLong);
-          return hasGoalSrc&&!ah._goalsSet&&div({key:"goals-src",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:-10,marginBottom:14}},"↑ Auto-populated from Treatment Plan — edit above to customise");
-        })(),
+        e(OK,{key:"ok"},"Patient, diagnosis and capacity details pre-populated from Treatment Plan"),
+        div({key:"goals-note",style:{fontSize:"0.75rem",color:"#5B7A99",marginBottom:8}},"Fields below are pre-filled from Treatment Plan — edit any field to customise."),
+        e(Ta,{key:"g",label:"Specific goals for this referral",value:ah.goals||"",onChange:upAH("goals"),placeholder:"Goals (from Treatment Plan SMART goals or short/long-term goals)...",rows:4}),
         div({key:"gr",style:S.g2},[
-          e(Inp,{key:"t",label:"Treatment type",value:ah.treatment||(claim.practitionerProfession||""),onChange:upAH("treatment"),placeholder:"e.g. Physiotherapy, Occupational Therapy"}),
+          e(Inp,{key:"t",label:"Treatment type",value:ah.treatment||"",onChange:upAH("treatment"),placeholder:"e.g. Physiotherapy"}),
           e(Inp,{key:"f",label:"Frequency",value:ah.frequency||"",onChange:upAH("frequency"),placeholder:"e.g. 2x per week",mb:0}),
         ]),
         div({key:"gr2",style:{...S.g2,marginTop:16}},[
-          e(Inp,{key:"d",label:"Duration",value:ah.duration||(claim.txWeeks?claim.txWeeks+" weeks":""),onChange:upAH("duration"),placeholder:"e.g. 6 weeks"}),
-          e(Inp,{key:"s",label:"Sessions requested",value:ah.sessions||(claim.txNum||""),onChange:upAH("sessions"),placeholder:"e.g. 12"}),
+          e(Inp,{key:"d",label:"Duration",value:ah.duration||"",onChange:upAH("duration"),placeholder:"e.g. 6 weeks"}),
+          e(Inp,{key:"s",label:"Sessions requested",value:ah.sessions||"",onChange:upAH("sessions"),placeholder:"e.g. 12"}),
         ]),
         div({key:"dates",style:S.g2},[
-          e(Inp,{key:"from",label:"Treatment from",value:ah.txFrom||(claim.txFrom||""),onChange:v=>upAH("txFrom")(v),type:"date",mb:0}),
-          e(Inp,{key:"to",label:"Treatment to",value:ah.txTo||(claim.txTo||""),onChange:v=>upAH("txTo")(v),type:"date",mb:0}),
+          e(Inp,{key:"from",label:"Treatment from",value:ah.txFrom||"",onChange:upAH("txFrom"),type:"date",mb:0}),
+          e(Inp,{key:"to",label:"Treatment to",value:ah.txTo||"",onChange:upAH("txTo"),type:"date",mb:0}),
         ]),
         e(Ta,{key:"o",label:"Expected outcomes",value:ah.outcomes||"",onChange:upAH("outcomes"),placeholder:"Expected functional improvements..."}),
-        e(Ta,{key:"j",label:"Clinical justification / treatment methods",value:ah.justification||(ah._justSet?"":claim.treatmentPlan||""),onChange:v=>{upAH("justification")(v);upAH("_justSet")(true);},placeholder:"Clinical reasoning and treatment methods (auto-populated from Treatment Plan)...",rows:4}),
-        claim.treatmentPlan&&!ah._justSet&&div({key:"just-src",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:-10,marginBottom:14}},"↑ Auto-populated from Treatment Plan — edit above to customise"),
-        (()=>{
-          // Auto-populate barriers from psychosocial flags + treatment plan additional barriers
-          const flags=claim.psychosocial||{};
-          const flagBarriers=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
-          const addBarriers=(claim.barriers||"").trim();
-          const parts=[];
-          if(flagBarriers.length>0)parts.push(flagBarriers.join(", "));
-          if(addBarriers)parts.push(addBarriers);
-          const autoPop=parts.join(".\n");
-          const displayVal=ah.barriers||(ah._barriersSet?"":(autoPop||""));
-          return e(Ta,{key:"b",label:"Barriers to recovery",value:displayVal,onChange:v=>{upAH("barriers")(v);upAH("_barriersSet")(true);},placeholder:"Identified barriers (auto-populated from psychosocial flags and treatment plan)...",rows:3});
-        })(),
+        e(Ta,{key:"j",label:"Clinical justification / treatment methods",value:ah.justification||"",onChange:upAH("justification"),placeholder:"Clinical reasoning and treatment methods...",rows:4}),
+        e(Ta,{key:"b",label:"Barriers to recovery",value:ah.barriers||"",onChange:upAH("barriers"),placeholder:"Identified barriers...",rows:3}),
         (()=>{
           const flags=claim.psychosocial||{};
-          const flagBarriers=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
-          const flags2=claim.psychosocial||{};
-          const flagBarriers2=[...(flags2.yellow||[]),...(flags2.blue||[]),...(flags2.black||[]),...(flags2.orange||[])];
-          const hasBarrierSrc=flagBarriers2.length>0||!!(claim.barriers||"").trim();
-          return hasBarrierSrc&&!ah._barriersSet&&div({key:"barriers-src",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:-10,marginBottom:12}},"↑ Auto-populated from psychosocial flags"+(claim.barriers?" and treatment plan barriers":"")+" — edit above to customise");
-        })(),
-        (()=>{
-          const flags=claim.psychosocial||{};
-          const flagBarriers=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
-          return flagBarriers.length>0&&div({key:"flagbadges",style:{display:"flex",flexWrap:"wrap",gap:6,marginTop:-8,marginBottom:12}},
-            flagBarriers.map(f=>span({key:f,style:{...S.pill,...S.pillA,fontSize:"0.7rem",cursor:"default"}},f))
+          const fb=[...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
+          return fb.length>0&&div({key:"flagbadges",style:{display:"flex",flexWrap:"wrap",gap:6,marginTop:-8,marginBottom:8}},
+            fb.map(f=>span({key:f,style:{...S.pill,...S.pillA,fontSize:"0.7rem",cursor:"default"}},f))
           );
         })(),
       ]),
