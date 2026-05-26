@@ -1820,10 +1820,6 @@ function Tab8({claim,up,clinic,practitioners}){
         div({key:"body",style:{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"20px",fontFamily:"Georgia,serif",fontSize:"0.9rem",lineHeight:1.8,whiteSpace:"pre-wrap",color:"rgba(239,246,255,0.9)",maxHeight:480,overflow:"auto"}},letter),
       ]),
     ]),
-    div({key:"summary",style:S.card},[
-      div({key:"h",style:{fontWeight:700,marginBottom:14}},"Claim summary"),
-      ...[["Patient",claim.patientName],["Claim number",claim.claimNumber],["Scheme",claim.scheme],["Insurer",claim.insurerName||claim.insurerNameCustom],["Diagnosis",diags],["Fitness for work",claim.fitnessForWork],["COC valid",claim.cocFrom?(claim.cocFrom+" to "+claim.cocTo):null],["Practitioner",claim.practitionerName]].map(([l,v])=>div({key:l,style:{fontSize:"0.85rem",lineHeight:2}},[span({key:"l",style:{color:"#5B7A99"}},l+": "),v||"—"])),
-    ]),
   ]);
 }
 
