@@ -22,42 +22,6 @@ button{font-family:inherit;cursor:pointer;}
 .card-hover:hover{border-color:rgba(0,201,167,0.2)!important;}
 .tab-btn:hover{color:rgba(255,255,255,0.75)!important;}
 .coll-btn:hover{background:rgba(255,255,255,0.05)!important;}
-@media print{body{background:white!important;color:black!important;font-size:11px;}.no-print{display:none!important;}.print-only{display:block!important;}.coc-print-page{background:white!important;color:black!important;padding:20px!important;max-width:100%!important;margin:0!important;box-shadow:none!important;border:none!important;}.coc-section-header{background:#1a1a1a!important;color:white!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.ws-form-wrap{background:white!important;color:black!important;}.ws-no-print{display:none!important;}.ws-sec-hdr{-webkit-print-color-adjust:exact;print-color-adjust:exact;}@page{margin:12mm;size:A4;}}
-.print-only{display:none;}
-.trend-line{fill:none;stroke-width:2.5;}
-.trend-dot{cursor:pointer;}
-.trend-dot:hover{r:6;}
-</style>
-</head>
-<body>
-<div id="root"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#07101E;flex-direction:column;gap:12px;"><div style="font-weight:800;font-size:1.5rem;color:#EFF6FF;">Claim<span style="color:#00C9A7">Bridge</span></div><div style="color:#5B7A99;font-size:0.85rem;">Loading...</div></div></div>
-<script>
-const e=React.createElement;
-const{useState,useEffect,useRef,useMemo,useCallback}=React;
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ClaimBridge</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#07101E;color:#EFF6FF;font-size:16px;min-height:100vh;}
-#root{min-height:100vh;}
-input,select,textarea{font-family:inherit;font-size:16px;color:#EFF6FF;}
-button{font-family:inherit;cursor:pointer;}
-::-webkit-scrollbar{width:6px;}
-::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px;}
-.cb-input:focus{border-color:rgba(0,201,167,0.5)!important;background:rgba(0,201,167,0.05)!important;outline:none;}
-.cb-ta:focus{border-color:rgba(0,201,167,0.5)!important;outline:none;}
-.cb-sel:focus{border-color:rgba(0,201,167,0.5)!important;outline:none;}
-.nav-btn:hover{background:rgba(255,255,255,0.06)!important;color:rgba(255,255,255,0.8)!important;}
-.card-hover:hover{border-color:rgba(0,201,167,0.2)!important;}
-.tab-btn:hover{color:rgba(255,255,255,0.75)!important;}
-.coll-btn:hover{background:rgba(255,255,255,0.05)!important;}
 @media print {
   body { background: white !important; color: black !important; font-size: 11px; }
   .no-print { display: none !important; }
@@ -261,6 +225,68 @@ const DIAGNOSES_DB=[
   {icd10:"F07.81",label:"Post-concussion syndrome",cat:"Head"},{icd10:"S06.0",label:"Concussion",cat:"Head"},
   {icd10:"G44.3",label:"Post-traumatic headache",cat:"Head"},{icd10:"H83.3",label:"Noise-induced hearing loss",cat:"Head"},
 ];
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function div(props,...children){return e("div",props,...children);}
+function span(props,...children){return e("span",props,...children);}
+function btn(props,...children){return e("button",props,...children);}
+function inp(props){return e("input",props);}
+function sel(props,...children){return e("select",props,...children);}
+function opt(val,lbl){return e("option",{key:val,value:val},lbl||val);}
+function ta(props){return e("textarea",props);}
+function lbl(props,...children){return e("label",props,...children);}
+
+function fmtMoney(n){return"$"+(parseFloat(n)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,",");}
+function fmtDate2(d){if(!d)return"";try{return new Date(d).toLocaleDateString("en-AU");}catch{return d;}}
+
+function Inp({label:l,value,onChange,placeholder,type="text",required,mb=16}){
+  return div({style:{marginBottom:mb}},[
+    l&&e("label",{key:"l",style:S.label},l,required&&span({key:"r",style:{color:"#FF4D6D",marginLeft:3}},"*")),
+    inp({key:"i",className:"cb-input",style:S.inp,type,value:value||"",onChange:ev=>onChange(ev.target.value),placeholder:placeholder||""}),
+  ]);
+}
+function Sel({label:l,value,onChange,options,required,mb=16}){
+  return div({style:{marginBottom:mb}},[
+    l&&e("label",{key:"l",style:S.label},l,required&&span({key:"r",style:{color:"#FF4D6D",marginLeft:3}},"*")),
+    e("select",{key:"s",className:"cb-sel",style:S.sel,value:value||"",onChange:ev=>onChange(ev.target.value)},[
+      e("option",{key:"__",value:""},"Select..."),
+      ...(options||[]).map(o=>typeof o==="string"?e("option",{key:o,value:o},o):e("option",{key:o.value||o.id,value:o.value||o.id},o.label||o.name)),
+    ]),
+  ]);
+}
+function Ta({label:l,value,onChange,placeholder,rows=3,mb=16}){
+  return div({style:{marginBottom:mb}},[
+    l&&e("label",{key:"l",style:S.label},l),
+    ta({key:"t",className:"cb-ta",style:{...S.ta,minHeight:rows*36},value:value||"",onChange:ev=>onChange(ev.target.value),placeholder:placeholder||""}),
+  ]);
+}
+function OK({children}){return div({style:S.ok},"✅ ",children);}
+function WARN({children}){return div({style:S.warn},"⚠️ ",children);}
+
+function Collapsible({title,children,icon,defaultOpen=false}){
+  const[open,setOpen]=useState(defaultOpen);
+  return div({style:{border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,overflow:"hidden",marginBottom:16}},[
+    btn({key:"h",className:"coll-btn",onClick:()=>setOpen(!open),style:{width:"100%",background:"rgba(255,255,255,0.03)",border:"none",padding:"14px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",color:"#EFF6FF",textAlign:"left"}},[
+      div({key:"t",style:{display:"flex",alignItems:"center",gap:10,fontWeight:600,fontSize:"0.9rem"}},icon&&span({key:"i"},icon)," ",title),
+      span({key:"a",style:{color:"rgba(255,255,255,0.4)",display:"inline-block",transform:open?"rotate(180deg)":"none",transition:"transform 0.2s"}},"v"),
+    ]),
+    open&&div({key:"b",style:{padding:"18px",borderTop:"1px solid rgba(255,255,255,0.07)"}},children),
+  ]);
+}
+
+function Modal({msg,onClose,onConfirm}){
+  return div({style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}},
+    div({style:{...S.card,maxWidth:360,width:"90%",textAlign:"center",marginBottom:0}},[
+      div({key:"i",style:{fontSize:"1.8rem",marginBottom:14}},"✅"),
+      div({key:"m",style:{fontWeight:600,marginBottom:6}},msg),
+      div({key:"b",style:{display:"flex",gap:10,justifyContent:"center",marginTop:20}},[
+        btn({key:"c",style:S.btnS,onClick:onClose},"Close"),
+        onConfirm&&btn({key:"ok",style:S.btnP,onClick:onConfirm},"Continue"),
+      ]),
+    ])
+  );
+}
+
+
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
 function LoginScreen({onLogin}){
   const[email,setEmail]=useState("");
