@@ -1636,8 +1636,8 @@ function capVal(capMap, key) {
 // ── AHRMP PDF MERGE ────────────────────────────────────────────────────────────
 async function generateAHRMPPdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = await fetchPdf(FORM_URLS.ahrmp); }
-  catch { alert("Could not fetch the AHRMP PDF from WorkSafe. Check your internet connection."); return; }
+  try { pdfBytes = b64ToBuffer(PDF_DATA.ahrmp); }
+  catch(err) { alert("Could not load PDF: " + (err&&err.message||err)); return; }
 
   const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -1730,8 +1730,8 @@ async function generateAHRMPPdf(claim, prac, clinic) {
 // ── HOUSEHOLD HELP PDF MERGE ───────────────────────────────────────────────────
 async function generateHouseholdPdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = await fetchPdf(FORM_URLS.household); }
-  catch { alert("Could not fetch the Household Help PDF from WorkSafe. Check your internet connection."); return; }
+  try { pdfBytes = b64ToBuffer(PDF_DATA.household); }
+  catch(err) { alert("Could not load PDF: " + (err&&err.message||err)); return; }
 
   const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -1808,8 +1808,8 @@ async function generateHouseholdPdf(claim, prac, clinic) {
 // ── PS604 PDF MERGE ────────────────────────────────────────────────────────────
 async function generatePS604Pdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = await fetchPdf(FORM_URLS.ps604); }
-  catch { alert("Could not fetch the PS604 PDF from WorkSafe. Check your internet connection."); return; }
+  try { pdfBytes = b64ToBuffer(PDF_DATA.ps604); }
+  catch(err) { alert("Could not load PDF: " + (err&&err.message||err)); return; }
 
   const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -1899,8 +1899,8 @@ async function generatePS604Pdf(claim, prac, clinic) {
 // ── PS109 PDF MERGE ────────────────────────────────────────────────────────────
 async function generatePS109Pdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = await fetchPdf(FORM_URLS.ps109); }
-  catch { alert("Could not fetch the PS109 PDF from WorkSafe. Check your internet connection."); return; }
+  try { pdfBytes = b64ToBuffer(PDF_DATA.ps109); }
+  catch(err) { alert("Could not load PDF: " + (err&&err.message||err)); return; }
 
   const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -1999,8 +1999,8 @@ async function generatePS109Pdf(claim, prac, clinic) {
 // Coordinates derived from structure extraction (y inverted: pdfY = 841.9 - structureY)
 async function generateGymSwimPdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = await fetchPdf(FORM_URLS.gym_swim); }
-  catch { alert("Could not fetch the Gym/Swim PDF from WorkSafe. Check your internet connection."); return; }
+  try { pdfBytes = b64ToBuffer(PDF_DATA.gym_swim); }
+  catch(err) { alert("Could not load PDF: " + (err&&err.message||err)); return; }
 
   const { PDFDocument, rgb, StandardFonts } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
