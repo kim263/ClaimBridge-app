@@ -2485,10 +2485,6 @@ function Tab8({claim,up,clinic,practitioners}){
 
 // ── WARM HANDOVER PACKAGE PDF ─────────────────────────────────────────────────
 function generateHandoverPdf(claim, practitioners, clinic) {
-  const { jsPDF } = window.jspdf;
-  // Use jsPDF since it's already loaded (replacing jspdf with pdf-lib would need different approach)
-  // Actually we have pdf-lib now - use that approach
-  // Simple approach: generate as printable HTML page
   const prac = practitioners.find(p=>p.id===claim.practitionerId)||{};
   const allPracs = (claim.episodes||[]).map(ep=>ep.practitionerName).filter(Boolean);
   const uniquePracs = [...new Set(allPracs)];
@@ -2749,11 +2745,14 @@ ${meds.length>0 ? `
 </body>
 </html>`;
 
-  // Open in new window for printing
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
-  setTimeout(() => win.print(), 500);
+  // Use blob URL to avoid popup blockers
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 
