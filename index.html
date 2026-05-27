@@ -2486,10 +2486,6 @@ function Tab8({claim,up,clinic,practitioners}){
 
 // ── WARM HANDOVER PACKAGE PDF ─────────────────────────────────────────────────
 function generateHandoverPdf(claim, practitioners, clinic) {
-  const { jsPDF } = window.jspdf;
-  // Use jsPDF since it's already loaded (replacing jspdf with pdf-lib would need different approach)
-  // Actually we have pdf-lib now - use that approach
-  // Simple approach: generate as printable HTML page
   const prac = practitioners.find(p=>p.id===claim.practitionerId)||{};
   const allPracs = (claim.episodes||[]).map(ep=>ep.practitionerName).filter(Boolean);
   const uniquePracs = [...new Set(allPracs)];
@@ -2750,11 +2746,14 @@ ${meds.length>0 ? `
 </body>
 </html>`;
 
-  // Open in new window for printing
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
-  setTimeout(() => win.print(), 500);
+  // Blob URL avoids popup blockers
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 
@@ -2776,6 +2775,8 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
   const[expanded,setExpanded]=useState(null);
   const[tlPage,setTlPage]=useState(0);
   const TL_PAGE_SIZE=5;
+  const[epPage,setEpPage]=useState(0);
+  const EP_PAGE_SIZE=5;
   return div({style:{padding:"0"}},[
     div({key:"hdr",style:{...S.card,marginBottom:16,padding:"20px 24px"}},[
       div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}},[
@@ -2803,7 +2804,7 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
         div({key:"episodes",style:{...S.card,marginBottom:16}},[
           div({key:"h",style:{...S.fb,marginBottom:14}},[div({key:"t",style:{fontWeight:700}},"Consultation episodes"),btn({key:"new",style:{...S.btnP,fontSize:"0.82rem",padding:"8px 16px"},onClick:()=>{if(createEpisode)createEpisode();}},"+ New Request")]),
           (claim.episodes||[]).length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",padding:"12px 0",textAlign:"center"}},"No episodes yet \u2014 click New Request to begin"):
-          [...(claim.episodes||[])].reverse().map(ep=>{
+          [...(claim.episodes||[])].reverse().slice(epPage*EP_PAGE_SIZE,(epPage+1)*EP_PAGE_SIZE).map(ep=>{
             const epRefs=ep.referrals||[];const epLetters=ep.letterHistory||[];
             const epPending=epRefs.filter(r=>r.status==="Pending"||!r.status).length;
             const epApproved=epRefs.filter(r=>r.status==="Approved").length;
@@ -2814,6 +2815,7 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
               ]),
             ]);
           }),
+        (claim.episodes||[]).length>EP_PAGE_SIZE&&div({key:"ep-nav",style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:10,paddingTop:8,borderTop:"1px solid rgba(255,255,255,0.07)"}},[div({key:"info",style:{fontSize:"0.74rem",color:"#5B7A99"}},(epPage*EP_PAGE_SIZE+1)+"-"+Math.min((epPage+1)*EP_PAGE_SIZE,(claim.episodes||[]).length)+" of "+(claim.episodes||[]).length),div({key:"btns",style:{display:"flex",gap:6}},[btn({key:"prev",style:{...S.btnS,padding:"4px 10px",fontSize:"0.76rem"},onClick:()=>setEpPage(p=>Math.max(0,p-1)),disabled:epPage===0},"\u2190"),btn({key:"next",style:{...S.btnS,padding:"4px 10px",fontSize:"0.76rem"},onClick:()=>setEpPage(p=>Math.min(Math.ceil((claim.episodes||[]).length/EP_PAGE_SIZE)-1,p+1)),disabled:(epPage+1)*EP_PAGE_SIZE>=(claim.episodes||[]).length},"\u2192")])]),
         ]),
         div({key:"timeline",style:S.card},[
           div({key:"h",style:{fontWeight:700,marginBottom:4}},"Correspondence timeline"),
@@ -2943,6 +2945,8 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
   const[selClaim,setSelClaim]=useState("");
   const[form,setForm]=useState({description:"",itemCode:"",amount:"",date:new Date().toISOString().slice(0,10),gst:"yes"});
   const[saved,setSaved]=useState(false);
+  const[patientSearch,setPatientSearch]=useState("");
+  const[showPatientDd,setShowPatientDd]=useState(false);
   const activeClaims=claims.filter(c=>c.status!=="Closed");
   const claim=claims.find(c=>c.id===selClaim);
   const allInvoices=claims.flatMap(c=>(c.invoices||[]).map(inv=>({...inv,claimId:c.id,patientName:c.patientName})));
@@ -2954,7 +2958,105 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
   const fmtAUD=n=>"$"+parseFloat(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,",");
   const fmtDate=d=>{try{return new Date(d).toLocaleDateString("en-AU");}catch{return d||"\u2014";}};
   const statusPill=s=>s==="Paid"?S.pillT:s==="Overdue"?S.pillR:S.pillA;
-  const WORKSAFE_CODES=[{value:"",label:"Select item code..."},{value:"GP-Initial",label:"GP \u2014 Initial consultation"},{value:"GP-Review",label:"GP \u2014 Review consultation"},{value:"COC",label:"Certificate of Capacity"},{value:"AHRMP",label:"AHRMP \u2014 Allied Health Recovery Management Plan"},{value:"PS604",label:"PS604 \u2014 Psychology Treatment Planning"},{value:"PS109",label:"PS109 \u2014 Psychology Treatment Review"},{value:"IME",label:"Independent Medical Examination (IME)"},{value:"Physio-Initial",label:"Physiotherapy \u2014 Initial assessment"},{value:"Physio-Treatment",label:"Physiotherapy \u2014 Treatment session"},{value:"OT-Initial",label:"Occupational Therapy \u2014 Initial assessment"},{value:"OT-Worksite",label:"Occupational Therapy \u2014 Worksite assessment"},{value:"Psych-Session",label:"Psychology \u2014 Treatment session"},{value:"Pain-Consult",label:"Pain Specialist \u2014 Consultation"},{value:"Custom",label:"Custom / other"}];
+  const WORKSAFE_CODES=[
+  // ── GENERAL PRACTITIONER (MBS-based, WorkSafe rates as at 1 March 2026) ─────
+  {value:"",label:"Select item code...",amount:"",cat:""},
+  {value:"MBS3",label:"MBS 3 — GP Attendance, Brief (≤5 min)",amount:"37.48",cat:"GP"},
+  {value:"MBS23",label:"MBS 23 — GP Attendance, Short (6–20 min)",amount:"76.55",cat:"GP"},
+  {value:"MBS36",label:"MBS 36 — GP Attendance, Standard (21–40 min)",amount:"140.36",cat:"GP"},
+  {value:"MBS44",label:"MBS 44 — GP Attendance, Long (41–60 min)",amount:"210.29",cat:"GP"},
+  {value:"MBS47",label:"MBS 47 — GP Attendance, Prolonged (>60 min)",amount:"264.39",cat:"GP"},
+  {value:"MBS104",label:"MBS 104 — Specialist Consultation, Brief",amount:"205.30",cat:"Specialist"},
+  {value:"MBS105",label:"MBS 105 — Specialist Consultation, Short",amount:"102.87",cat:"Specialist"},
+  {value:"MBS106",label:"MBS 106 — Specialist Attendance",amount:"168.76",cat:"Specialist"},
+  {value:"MBS107",label:"MBS 107 — Specialist Attendance, Long",amount:"300.24",cat:"Specialist"},
+  {value:"MBS110",label:"MBS 110 — Specialist Attendance, Prolonged",amount:"340.10",cat:"Specialist"},
+  // ── MEDICAL RTW ACTIVITIES ──────────────────────────────────────────────────
+  {value:"RTWCC1",label:"RTWCC1 — GP RTW Case Conference (<20 min)",amount:"141.45",cat:"RTW"},
+  {value:"RTWCC2",label:"RTWCC2 — GP RTW Case Conference (20–40 min)",amount:"226.24",cat:"RTW"},
+  {value:"RTWCC3",label:"RTWCC3 — GP RTW Case Conference (>40 min)",amount:"310.88",cat:"RTW"},
+  {value:"RTWCC4",label:"RTWCC4 — GP Organise & Coordinate RTW Case Conference",amount:"297.07",cat:"RTW"},
+  {value:"RTWPC",label:"RTWPC — GP RTW Phone Call with Employer",amount:"38.09",cat:"RTW"},
+  {value:"RTWWV",label:"RTWWV — GP RTW Worksite Visit",amount:"574.81",cat:"RTW"},
+  {value:"RTWCC6",label:"RTWCC6 — RTW Case Conference, Psychiatrist",amount:"284.58",cat:"RTW"},
+  {value:"RTWCC7",label:"RTWCC7 — RTW Case Conference, Medical Specialist",amount:"284.58",cat:"RTW"},
+  // ── MEDICAL REPORTS ─────────────────────────────────────────────────────────
+  {value:"AGT001",label:"AGT001 — GP Short Report",amount:"86.27",cat:"Reports"},
+  {value:"AGT002",label:"AGT002 — GP Standard Report",amount:"215.62",cat:"Reports"},
+  {value:"AGT003",label:"AGT003 — GP Comprehensive Report",amount:"418.99",cat:"Reports"},
+  {value:"AGT004",label:"AGT004 — Chiropractic / Osteopathy Standard Report",amount:"79.25",cat:"Reports"},
+  {value:"INS101",label:"INS101 — MLER Questionnaire, GP",amount:"139.66",cat:"Reports"},
+  {value:"INS102",label:"INS102 — MLER Questionnaire, Medical Specialist",amount:"227.66",cat:"Reports"},
+  {value:"INS104",label:"INS104 — MLER Questionnaire, Psychiatrist",amount:"227.66",cat:"Reports"},
+  {value:"INS107",label:"INS107 — MLER Questionnaire, Physiotherapist",amount:"104.49",cat:"Reports"},
+  {value:"INS108",label:"INS108 — MLER Questionnaire, Chiropractor",amount:"86.18",cat:"Reports"},
+  {value:"INS110",label:"INS110 — MLER Questionnaire, Psychologist",amount:"101.95",cat:"Reports"},
+  {value:"INS111",label:"INS111 — MLER Questionnaire, Osteopath",amount:"86.18",cat:"Reports"},
+  // ── PHYSIOTHERAPY ───────────────────────────────────────────────────────────
+  {value:"PY100",label:"PY100 — Physiotherapy Initial Consultation (inc. AHRMP)",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PY100T",label:"PY100T — Telehealth Physiotherapy Initial Consultation",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PY102",label:"PY102 — Physiotherapy Standard Consultation",amount:"69.64",cat:"Physiotherapy"},
+  {value:"PY102T",label:"PY102T — Telehealth Physiotherapy Standard Consultation",amount:"69.64",cat:"Physiotherapy"},
+  {value:"PY105",label:"PY105 — Physiotherapy Restricted Consultation",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PY106",label:"PY106 — Physiotherapy Restricted Consultation Application",amount:"52.24",cat:"Physiotherapy"},
+  {value:"PY130",label:"PY130 — Hydrotherapy Initial Consultation",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PY132",label:"PY132 — Hydrotherapy Standard Consultation",amount:"69.64",cat:"Physiotherapy"},
+  {value:"PY133",label:"PY133 — Hydrotherapy Long Consultation",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PY135",label:"PY135 — Hydrotherapy Group Consultation (2–6 patients)",amount:"34.84",cat:"Physiotherapy"},
+  {value:"PY136",label:"PY136 — Physiotherapy Group Consultation",amount:"34.84",cat:"Physiotherapy"},
+  {value:"PY600",label:"PY600 — Physiotherapy RTW Case Conference",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PYH100",label:"PYH100 — Hand Therapist Initial Consultation",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PYH102",label:"PYH102 — Hand Therapist Standard Consultation",amount:"69.64",cat:"Physiotherapy"},
+  // ── CHIROPRACTIC ────────────────────────────────────────────────────────────
+  {value:"CR100",label:"CR100 — Chiropractic Initial Consultation New Patient",amount:"85.06",cat:"Chiropractic"},
+  {value:"CR100T",label:"CR100T — Telehealth Chiropractic Initial Consultation",amount:"85.06",cat:"Chiropractic"},
+  {value:"CR101",label:"CR101 — Chiropractic Brief Consultation (≤5 min)",amount:"27.14",cat:"Chiropractic"},
+  {value:"CR102",label:"CR102 — Chiropractic Standard Consultation (5–25 min)",amount:"59.80",cat:"Chiropractic"},
+  {value:"CR105",label:"CR105 — Chiropractic Restricted Consultation",amount:"102.46",cat:"Chiropractic"},
+  {value:"CR106",label:"CR106 — Chiropractic Restricted Consultation Application",amount:"61.20",cat:"Chiropractic"},
+  {value:"CR109",label:"CR109 — Chiropractic Review Consultation",amount:"67.71",cat:"Chiropractic"},
+  {value:"CR600",label:"CR600 — Chiropractic RTW Case Conference",amount:"89.70",cat:"Chiropractic"},
+  // ── OSTEOPATHY ──────────────────────────────────────────────────────────────
+  {value:"OS100",label:"OS100 — Osteopathy Initial Consultation (≥30 min)",amount:"122.25",cat:"Osteopathy"},
+  {value:"OS100T",label:"OS100T — Telehealth Osteopathy Initial Consultation",amount:"122.25",cat:"Osteopathy"},
+  {value:"OS102",label:"OS102 — Osteopathy Standard Consultation (≥20 min)",amount:"81.77",cat:"Osteopathy"},
+  {value:"OS102T",label:"OS102T — Telehealth Osteopathy Standard Consultation",amount:"81.77",cat:"Osteopathy"},
+  {value:"OS105",label:"OS105 — Osteopathy Restricted Consultation",amount:"102.46",cat:"Osteopathy"},
+  {value:"OS106",label:"OS106 — Osteopathy Restricted Consultation Application",amount:"61.20",cat:"Osteopathy"},
+  {value:"OS109",label:"OS109 — Osteopathy Review Consultation",amount:"82.23",cat:"Osteopathy"},
+  {value:"OS200",label:"OS200 — Osteopathy RTW Case Conference",amount:"102.22",cat:"Osteopathy"},
+  // ── EXERCISE PHYSIOLOGY ─────────────────────────────────────────────────────
+  {value:"EX021",label:"EX021 — Exercise Physiology Initial Consultation (~45 min)",amount:"106.44",cat:"Exercise Physiology"},
+  {value:"EX021T",label:"EX021T — Telehealth Exercise Physiology Initial Consultation",amount:"106.44",cat:"Exercise Physiology"},
+  {value:"EX022",label:"EX022 — Exercise Physiology Standard Consultation (~30 min)",amount:"70.97",cat:"Exercise Physiology"},
+  {value:"EX022T",label:"EX022T — Telehealth Exercise Physiology Standard Consultation",amount:"70.97",cat:"Exercise Physiology"},
+  {value:"EX023",label:"EX023 — Exercise Physiology Restricted Consultation",amount:"106.44",cat:"Exercise Physiology"},
+  {value:"EX012",label:"EX012 — Exercise Physiology Group Consultation (≤6 patients)",amount:"23.67",cat:"Exercise Physiology"},
+  {value:"EX040",label:"EX040 — Exercise Physiology RTW Case Conference",amount:"88.71",cat:"Exercise Physiology"},
+  // ── PSYCHOLOGY ──────────────────────────────────────────────────────────────
+  {value:"PS612",label:"PS612 — Psychology Initial Consultation (60 min)",amount:"203.91",cat:"Psychology"},
+  {value:"PS612T",label:"PS612T — Telehealth Psychology Initial Consultation (60 min)",amount:"203.91",cat:"Psychology"},
+  {value:"PS602",label:"PS602 — Psychology Individual Consultation (60 min)",amount:"203.91",cat:"Psychology"},
+  {value:"PS602T",label:"PS602T — Telehealth Psychology Consultation (60 min)",amount:"203.91",cat:"Psychology"},
+  {value:"PS622",label:"PS622 — Psychology Consultation (30 min)",amount:"101.96",cat:"Psychology"},
+  {value:"PS632",label:"PS632 — Psychology Consultation (90 min, prior approval)",amount:"305.86",cat:"Psychology"},
+  {value:"PS100",label:"PS100 — Psychology Group Consultation (per person, ≤10)",amount:"51.17",cat:"Psychology"},
+  {value:"PS604",label:"PS604 — Psychology Treatment Planning Form",amount:"203.91",cat:"Psychology"},
+  {value:"PS109",label:"PS109 — Psychology Treatment Review Form",amount:"203.91",cat:"Psychology"},
+  {value:"PS600",label:"PS600 — Psychology RTW Case Conference",amount:"127.44",cat:"Psychology"},
+  {value:"PS700",label:"PS700 — Psychology Treatment & Recovery Planning Conference",amount:"127.44",cat:"Psychology"},
+  // ── GYM / SWIM ──────────────────────────────────────────────────────────────
+  {value:"RE100",label:"RE100 — Gym / Swimming 3-Month Membership",amount:"446.93",cat:"Gym/Swim"},
+  {value:"RE300",label:"RE300 — Casual Pool Entry (Supervised Hydrotherapy)",amount:"11.59",cat:"Gym/Swim"},
+  // ── HOUSEHOLD HELP ──────────────────────────────────────────────────────────
+  {value:"PH410",label:"PH410 — Household Help — Cleaning (per hour)",amount:"45.68",cat:"Household"},
+  {value:"PH420",label:"PH420 — Household Help — Lawn Mowing & Edging (quote per job)",amount:"",cat:"Household"},
+  {value:"PH430",label:"PH430 — Household Help — Garden Maintenance (per hour)",amount:"45.68",cat:"Household"},
+];
+
+// Lookup map for quick fee retrieval
+const WORKSAFE_FEE_MAP={};
+WORKSAFE_CODES.forEach(c=>{if(c.value)WORKSAFE_FEE_MAP[c.value]=c.amount||"";});
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.2rem",marginBottom:4}},"Invoicing"),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Track invoices per claim and monitor collection status."),
@@ -2963,8 +3065,8 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
       div({key:"form",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:16}},"Add invoice"),
         saved&&e(OK,{key:"ok"},"Invoice added"),
-        e(Sel,{key:"cl",label:"Claim / patient",value:selClaim,onChange:setSelClaim,options:activeClaims.map(c=>({value:c.id,label:(c.patientName||"Unnamed")+(c.claimNumber?" \u2014 "+c.claimNumber:"")})),required:true}),
-        e(Sel,{key:"ic",label:"Item code",value:form.itemCode,onChange:v=>setForm({...form,itemCode:v}),options:WORKSAFE_CODES}),
+        div({key:"cl",style:{marginBottom:16}},[e("label",{key:"l",style:S.label},"Claim / patient *"),div({key:"sw",style:{position:"relative"}},[  inp({key:"i",className:"cb-input",style:S.inp,placeholder:"Search patient name or claim number...",    value:patientSearch,onChange:ev=>{setPatientSearch(ev.target.value);setSelClaim("");},    onFocus:()=>setShowPatientDd(true),onBlur:()=>setTimeout(()=>setShowPatientDd(false),200)}),  selClaim&&div({key:"sel",style:{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",    fontSize:"0.75rem",color:"#00C9A7",pointerEvents:"none"}},"✓ Selected"),  showPatientDd&&patientSearch.length>0&&div({key:"dd",style:{position:"absolute",top:"100%",left:0,right:0,    background:"#112240",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,zIndex:100,    marginTop:4,maxHeight:200,overflow:"auto",boxShadow:"0 8px 30px rgba(0,0,0,0.3)"}},[    ...activeClaims.filter(c=>{      const q=patientSearch.toLowerCase();      return (c.patientName||"").toLowerCase().includes(q)||(c.claimNumber||"").toLowerCase().includes(q);    }).map(c=>div({key:c.id,onClick:()=>{setSelClaim(c.id);setPatientSearch((c.patientName||"Unnamed")+(c.claimNumber?" — "+c.claimNumber:""));setShowPatientDd(false);},      style:{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.05)",        fontSize:"0.87rem"}},[      div({key:"n",style:{fontWeight:600}},c.patientName||"Unnamed"),      div({key:"d",style:{fontSize:"0.74rem",color:"#5B7A99"}},c.claimNumber||"No claim #"),    ])),    activeClaims.filter(c=>{const q=patientSearch.toLowerCase();return (c.patientName||"").toLowerCase().includes(q)||(c.claimNumber||"").toLowerCase().includes(q);}).length===0&&    div({key:"empty",style:{padding:"12px 14px",color:"#5B7A99",fontSize:"0.84rem"}},"No matching claims"),  ]),]),]),
+        div({key:"ic",style:{marginBottom:16}},[e("label",{key:"l",style:S.label},"Item code"),e("select",{key:"s",className:"cb-sel",style:S.sel,value:form.itemCode,onChange:ev=>{  const v=ev.target.value;  const fee=WORKSAFE_FEE_MAP[v]||"";  const item=WORKSAFE_CODES.find(c=>c.value===v);  setForm({...form,itemCode:v,amount:fee,description:item&&item.value?item.label.replace(item.value+" — ",""):""})}},[e("option",{key:"",value:""},"Select item code..."),...Object.entries(WORKSAFE_CODES.slice(1).reduce((acc,c)=>{(acc[c.cat]=acc[c.cat]||[]).push(c);return acc;},{})).map(([cat,items])=>e("optgroup",{key:cat,label:cat},  items.map(c=>e("option",{key:c.value,value:c.value},c.label))))]),]),
         e(Inp,{key:"desc",label:"Description",value:form.description,onChange:v=>setForm({...form,description:v}),placeholder:"e.g. Certificate of Capacity \u2014 May 2026",required:true}),
         div({key:"g",style:S.g2},[e(Inp,{key:"amt",label:"Amount (excl. GST)",value:form.amount,onChange:v=>setForm({...form,amount:v}),placeholder:"0.00",mb:0}),e(Inp,{key:"date",label:"Invoice date",value:form.date,onChange:v=>setForm({...form,date:v}),type:"date",mb:0})]),
         div({key:"gst",style:{marginTop:16,marginBottom:16}},[e("label",{key:"l",style:S.label},"GST applicable"),div({key:"btns",style:{display:"flex",gap:8}},["yes","no"].map(v=>btn({key:v,onClick:()=>setForm({...form,gst:v}),style:{...S.pill,...(form.gst===v?S.pillT:S.pillM),padding:"8px 18px"}},v==="yes"?"Yes (add 10%)":"No GST")))]),
