@@ -527,7 +527,7 @@ function ensureEpisodes(claim){
 function mergeEpisodeToClaim(claim,ep){return {...claim,...ep,practitionerId:ep.practitionerId||claim.practitionerId,practitionerName:ep.practitionerName||claim.practitionerName,practitionerProfession:ep.practitionerProfession||claim.practitionerProfession};}
 function saveEpisodeToClaim(claim,ep,epData){const updatedEp={...ep,...epData};const episodes=(claim.episodes||[]).map(e=>e.id===ep.id?updatedEp:e);return {...claim,episodes};}
 
-function ClaimForm({clinic,claimData,onSave,onBack}){
+function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
   const ALL_TABS=["Overview","Patient & Claim","Diagnosis","Treatment Plan","Certificate of Capacity","Allied Health Forms","Referral & Export","Claim Log"];
   const[tab,setTab]=useState(0);
   const[claim,setClaim]=useState(()=>ensureEpisodes(claimData||{id:"claim_"+Date.now(),scheme:"WorkCover",status:"Active",createdAt:new Date().toISOString(),clinicId:clinic.id}));
@@ -584,11 +584,12 @@ function ClaimForm({clinic,claimData,onSave,onBack}){
         curTab===7&&e(TabClaimLog,{key:"t7",claim,up,clinic,practitioners,setActiveEpId,setEpTab}),
       ];
     })(),
-    div({key:"nav",style:{...S.fb,marginTop:28,paddingTop:20,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
+    (()=>{const _isLog=(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId;return _isLog?null:div({key:"nav",style:{...S.fb,marginTop:28,paddingTop:20,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
       btn({key:"prev",style:{...S.btnS,...((activeEpId?epTab:tab)===0?{opacity:0.3,pointerEvents:"none"}:{})},onClick:()=>{if(activeEpId)setEpTab(t=>Math.max(0,t-1));else setTab(t=>Math.max(0,t-1));window.scrollTo(0,0);}},"<- Previous"),
       span({key:"pg",style:{fontSize:"0.76rem",color:"#5B7A99"}},((activeEpId?epTab:tab)+1)+" / "+TABS.length),
-      btn({key:"next",style:{...S.btnP,...((activeEpId?epTab:tab)===TABS.length-1?{opacity:0.3,pointerEvents:"none"}:{})},onClick:()=>{if(activeEpId)setEpTab(t=>Math.min(TABS.length-1,t+1));else setTab(t=>Math.min(TABS.length-1,t+1));window.scrollTo(0,0);}},"Next ->"),
+      (()=>{const isLast=(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId;return btn({key:"next",style:S.btnP,onClick:()=>{if(isLast){if(onInvoice)onInvoice();}else{if(activeEpId)setEpTab(t=>Math.min(TABS.length-1,t+1));else setTab(t=>Math.min(TABS.length-1,t+1));window.scrollTo(0,0);}}},isLast?"Finish & Invoice ->":"Next ->");})(),
     ]),
+  })(),
   ]);
 }
 
@@ -1628,17 +1629,17 @@ function fmtY(d)  { try { return new Date(d).getFullYear().toString(); } catch {
 // Helper to map claim capacity key → radio value (/0=Can, /1=WithMods, /2=Cannot)
 function capVal(capMap, key) {
   const v = capMap[key];
-  if (v === "Can")      return "Can";
-  if (v === "Modified") return "With modifications";
-  if (v === "Cannot")   return "Cannot";
+  if (v === "Can")      return "/0";
+  if (v === "Modified") return "/1";
+  if (v === "Cannot")   return "/2";
   return null;
 }
 
 // ── AHRMP PDF MERGE ────────────────────────────────────────────────────────────
 async function generateAHRMPPdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = b64ToBuffer(PDF_DATA.ahrmp); }
-  catch(err) { alert("Could not load PDF: " + (err&&err.message||err)); return; }
+  try { pdfBytes = await fetchPdf(FORM_URLS.ahrmp); }
+  catch { alert("Could not fetch the AHRMP PDF from WorkSafe. Check your internet connection."); return; }
 
   const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -1674,8 +1675,7 @@ async function generateAHRMPPdf(claim, prac, clinic) {
   setText("Diagnosis areas being treated", (claim.diagnoses||[]).map(d=>d.label).join("; ")||"");
 
   // Section 3: Work status
-  // "Are you providing certificates of capacity?" is a checkbox not radio
-  try { const cocCb = form.getCheckBox("Are you providing certificates of capacity?"); claim.providingCOC==="No" ? cocCb.uncheck() : cocCb.check(); } catch(e) { console.warn("COC checkbox:", e.message); }
+  setRadio("Are you providing certificates of capacity?", claim.providingCOC==="No"?"/No":"/Yes");
   checkBox("Not working", claim.fitnessForWork === "Unfit for all work");
   checkBox("Pre-injury duties", claim.fitnessForWork === "Fit for normal duties");
   checkBox("Alternativemodified duties", claim.fitnessForWork === "Fit with restrictions");
@@ -1732,8 +1732,8 @@ async function generateAHRMPPdf(claim, prac, clinic) {
 // ── HOUSEHOLD HELP PDF MERGE ───────────────────────────────────────────────────
 async function generateHouseholdPdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = b64ToBuffer(PDF_DATA.household); }
-  catch(err) { alert("Could not load PDF: " + (err&&err.message||err)); return; }
+  try { pdfBytes = await fetchPdf(FORM_URLS.household); }
+  catch { alert("Could not fetch the Household Help PDF from WorkSafe. Check your internet connection."); return; }
 
   const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -1792,7 +1792,7 @@ async function generateHouseholdPdf(claim, prac, clinic) {
     setText("8 Household help commencement", fmtAU(hh.commenceDate || claim.txFrom));
   }
   // Default to 6 weeks
-  setRadio("8 Service requested for", "6 weeks");
+  setRadio("8 Service requested for", "/0");
 
   // Section 10: Declaration & provider
   checkBox("10 Declaration", true);
@@ -1810,8 +1810,8 @@ async function generateHouseholdPdf(claim, prac, clinic) {
 // ── PS604 PDF MERGE ────────────────────────────────────────────────────────────
 async function generatePS604Pdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = b64ToBuffer(PDF_DATA.ps604); }
-  catch(err) { alert("Could not load PDF: " + (err&&err.message||err)); return; }
+  try { pdfBytes = await fetchPdf(FORM_URLS.ps604); }
+  catch { alert("Could not fetch the PS604 PDF from WorkSafe. Check your internet connection."); return; }
 
   const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -1901,8 +1901,8 @@ async function generatePS604Pdf(claim, prac, clinic) {
 // ── PS109 PDF MERGE ────────────────────────────────────────────────────────────
 async function generatePS109Pdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = b64ToBuffer(PDF_DATA.ps109); }
-  catch(err) { alert("Could not load PDF: " + (err&&err.message||err)); return; }
+  try { pdfBytes = await fetchPdf(FORM_URLS.ps109); }
+  catch { alert("Could not fetch the PS109 PDF from WorkSafe. Check your internet connection."); return; }
 
   const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -2001,8 +2001,8 @@ async function generatePS109Pdf(claim, prac, clinic) {
 // Coordinates derived from structure extraction (y inverted: pdfY = 841.9 - structureY)
 async function generateGymSwimPdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = b64ToBuffer(PDF_DATA.gym_swim); }
-  catch(err) { alert("Could not load PDF: " + (err&&err.message||err)); return; }
+  try { pdfBytes = await fetchPdf(FORM_URLS.gym_swim); }
+  catch { alert("Could not fetch the Gym/Swim PDF from WorkSafe. Check your internet connection."); return; }
 
   const { PDFDocument, rgb, StandardFonts } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -2027,9 +2027,9 @@ async function generateGymSwimPdf(claim, prac, clinic) {
   // Page 1 -------
   // Membership type checkboxes (tick marks at approximate positions)
   const gymType = gd.type || claim.gymType || "";
-  if (gymType.includes("Gym") && !gymType.includes("Swim")) draw(p1, 133, 150, "X", 10);
-  else if (gymType.includes("Swim") && !gymType.includes("Gym")) draw(p1, 193, 150, "X", 10);
-  else if (gymType.includes("Gym") && gymType.includes("Swim")) draw(p1, 255, 150, "X", 10);
+  if (gymType.includes("Gym") && !gymType.includes("Swim")) draw(p1, 133, 150, "✓", 10);
+  else if (gymType.includes("Swim") && !gymType.includes("Gym")) draw(p1, 193, 150, "✓", 10);
+  else if (gymType.includes("Gym") && gymType.includes("Swim")) draw(p1, 255, 150, "✓", 10);
 
   // Worker details row (y≈216 in structure = input area below label at y≈216)
   draw(p1, 28,  228, patName);
@@ -2086,10 +2086,10 @@ async function generateGymSwimPdf(claim, prac, clinic) {
 
   // Profession checkboxes (y≈346)
   const prof = claim.practitionerProfession||"";
-  if (prof === "General Practitioner") draw(p2, 85, 347, "X", 10);
-  else if (prof === "Physiotherapist")  draw(p2, 213, 347, "X", 10);
-  else if (prof === "Chiropractor")     draw(p2, 322, 347, "X", 10);
-  else if (prof === "Osteopath")        draw(p2, 413, 347, "X", 10);
+  if (prof === "General Practitioner") draw(p2, 85, 347, "✓", 10);
+  else if (prof === "Physiotherapist")  draw(p2, 213, 347, "✓", 10);
+  else if (prof === "Chiropractor")     draw(p2, 322, 347, "✓", 10);
+  else if (prof === "Osteopath")        draw(p2, 413, 347, "✓", 10);
 
   const patFileN = (claim.patientLastName||claim.patientName||"patient").replace(/\s+/g,"_");
   dlPdf(await pdfDoc.save(), `GymSwim_${patFileN}_${new Date().toISOString().split("T")[0]}.pdf`);
@@ -2485,6 +2485,10 @@ function Tab8({claim,up,clinic,practitioners}){
 
 // ── WARM HANDOVER PACKAGE PDF ─────────────────────────────────────────────────
 function generateHandoverPdf(claim, practitioners, clinic) {
+  const { jsPDF } = window.jspdf;
+  // Use jsPDF since it's already loaded (replacing jspdf with pdf-lib would need different approach)
+  // Actually we have pdf-lib now - use that approach
+  // Simple approach: generate as printable HTML page
   const prac = practitioners.find(p=>p.id===claim.practitionerId)||{};
   const allPracs = (claim.episodes||[]).map(ep=>ep.practitionerName).filter(Boolean);
   const uniquePracs = [...new Set(allPracs)];
@@ -2745,14 +2749,11 @@ ${meds.length>0 ? `
 </body>
 </html>`;
 
-  // Use blob URL to avoid popup blockers
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  // Open in new window for printing
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => win.print(), 500);
 }
 
 
@@ -2821,6 +2822,7 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
               div({key:"info",style:{flex:1}},[
                 div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},[div({key:"l",style:{fontWeight:600,fontSize:"0.87rem"}},item.label),span({key:"s",style:{...S.pill,...statusStyle(item.status),fontSize:"0.68rem",padding:"2px 8px",cursor:"default"}},item.status)]),
                 div({key:"meta",style:{fontSize:"0.74rem",color:"#5B7A99",marginTop:2}},[span({key:"type",style:{textTransform:"uppercase",letterSpacing:"0.05em",marginRight:8}},item.type==="letter"?"\uD83D\uDCC4 Letter":"\uD83D\uDCCB Referral"),fmtD(item.date)]),
+                item.type==="referral"&&div({key:"sbtn",style:{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}},["Pending","Approved","Further info required","Declined","Disputed"].map(s=>{const active=(item.status||"Pending")===s;const col=s==="Approved"?S.pillT:s==="Declined"||s==="Disputed"?S.pillR:s==="Further info required"?S.pillA:S.pillM;return btn({key:s,onClick:()=>{const upd=(claim.referrals||[]).map(r=>r.id===item.id?{...r,status:s,statusDate:new Date().toISOString()}:r);up("referrals",upd);},style:{...S.pill,...(active?col:S.pillM),fontSize:"0.65rem",padding:"2px 8px"}},s);})),
                 item.type==="letter"&&btn({key:"view",style:{...S.btnS,fontSize:"0.74rem",padding:"4px 10px",marginTop:6},onClick:()=>setExpanded(expanded===item.id?null:item.id)},"View letter"),
                 item.type==="letter"&&expanded===item.id&&div({key:"body",style:{marginTop:10,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"14px",fontFamily:"Georgia,serif",fontSize:"0.82rem",lineHeight:1.7,whiteSpace:"pre-wrap",maxHeight:300,overflow:"auto",color:"rgba(239,246,255,0.85)"}},item.content),
               ]),
@@ -3088,7 +3090,7 @@ function App(){
       e(TopBar,{key:"tb",clinic,nav,claim:activeClaim}),
       nav==="dashboard"&&e(Dashboard,{key:"d",clinic,claims,onNew:()=>{setActiveClaim(null);setNav("claim");},onOpen:handleOpen}),
       nav==="claims"&&e(ClaimsPage,{key:"cl",claims,onOpen:handleOpen,onNew:()=>{setActiveClaim(null);setNav("claim");}}),
-      nav==="claim"&&e(ClaimForm,{key:"cf",clinic,claimData:activeClaim,onSave:handleSave,onBack:handleBack}),
+      nav==="claim"&&e(ClaimForm,{key:"cf",clinic,claimData:activeClaim,onSave:handleSave,onBack:handleBack,onInvoice:()=>{if(activeClaim)handleSave(activeClaim);setNav("invoicing");}}),
       nav==="practitioners"&&e(PractitionersPage,{key:"pr",clinic}),
       nav==="settings"&&e(SettingsPage,{key:"set",clinic,bankSettings,onSaveBank:saveBankSettings,insurerEmails,onSaveInsurerEmails:saveInsurerEmails}),
       nav==="help"&&div({key:"help",style:{padding:"28px",maxWidth:960,margin:"0 auto"}},[
