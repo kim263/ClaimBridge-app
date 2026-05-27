@@ -872,6 +872,8 @@ function Tab2({claim,up}){
   const[diags,setDiags]=useState(claim.diagnoses||[]);
   const[dSubTab,setDSubTab]=useState(0);
   const[hiIdx,setHiIdx]=useState(-1);
+  const[orthoQ,setOrthoQ]=useState("");
+  const[showOrthoDD,setShowOrthoDD]=useState(false);
   const DSUB=["Diagnosis & Capacity","Clinical Assessment","Psychosocial Barriers","Imaging"];
   const sugg=useMemo(()=>{if(!q||q.length<2)return[];const ql=q.toLowerCase();return DIAGNOSES_DB.filter(d=>d.label.toLowerCase().includes(ql)||d.icd10.toLowerCase().includes(ql)).slice(0,8);},[q]);
   const addD=d=>{if(diags.find(x=>x.icd10===d.icd10))return;const u=[...diags,d];setDiags(u);up("diagnoses",u);setQ("");setShow(false);};
@@ -968,8 +970,6 @@ function Tab2({claim,up}){
         div({},[
           e(Ta,{key:"cp",label:"Clinical presentation",value:claim.clinicalPresentation,onChange:v=>up("clinicalPresentation",v),placeholder:"Describe clinical presentation...",rows:4}),
           (()=>{
-          const[orthoQ,setOrthoQ]=React.useState("");
-          const[showOrthoDD,setShowOrthoDD]=React.useState(false);
           const selectedTests=(claim.orthoTests||"").split("\n").filter(Boolean);
           const filteredTests=orthoQ.length>1?ORTHO_TESTS.filter(t=>t.toLowerCase().includes(orthoQ.toLowerCase())):[];
           const addTest=t=>{
