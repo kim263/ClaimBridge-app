@@ -123,6 +123,125 @@ const PSYCH_FLAGS=[
 ];
 const PRESCRIBING=["General Practitioner","Pain Specialist","Orthopaedic Surgeon","Psychiatrist","Neurologist","Rehabilitation Physician","Rheumatologist","Other Specialist"];
 const PROFESSIONS=["General Practitioner","Physiotherapist","Osteopath","Chiropractor","Pain Specialist","Orthopaedic Surgeon","Occupational Therapist","Exercise Physiologist","Psychologist","Podiatrist","Other"];
+const WORKSAFE_CODES=[
+  // ── GENERAL PRACTITIONER (MBS-based, WorkSafe rates as at 1 March 2026) ─────
+  {value:"",label:"Select item code...",amount:"",cat:""},
+  {value:"MBS3",label:"MBS 3 — GP Attendance, Brief (≤5 min)",amount:"37.48",cat:"GP"},
+  {value:"MBS23",label:"MBS 23 — GP Attendance, Short (6–20 min)",amount:"76.55",cat:"GP"},
+  {value:"MBS36",label:"MBS 36 — GP Attendance, Standard (21–40 min)",amount:"140.36",cat:"GP"},
+  {value:"MBS44",label:"MBS 44 — GP Attendance, Long (41–60 min)",amount:"210.29",cat:"GP"},
+  {value:"MBS47",label:"MBS 47 — GP Attendance, Prolonged (>60 min)",amount:"264.39",cat:"GP"},
+  {value:"MBS104",label:"MBS 104 — Specialist Consultation, Brief",amount:"205.30",cat:"Specialist"},
+  {value:"MBS105",label:"MBS 105 — Specialist Consultation, Short",amount:"102.87",cat:"Specialist"},
+  {value:"MBS106",label:"MBS 106 — Specialist Attendance",amount:"168.76",cat:"Specialist"},
+  {value:"MBS107",label:"MBS 107 — Specialist Attendance, Long",amount:"300.24",cat:"Specialist"},
+  {value:"MBS110",label:"MBS 110 — Specialist Attendance, Prolonged",amount:"340.10",cat:"Specialist"},
+  // ── MEDICAL RTW ACTIVITIES ──────────────────────────────────────────────────
+  {value:"RTWCC1",label:"RTWCC1 — GP RTW Case Conference (<20 min)",amount:"141.45",cat:"RTW"},
+  {value:"RTWCC2",label:"RTWCC2 — GP RTW Case Conference (20–40 min)",amount:"226.24",cat:"RTW"},
+  {value:"RTWCC3",label:"RTWCC3 — GP RTW Case Conference (>40 min)",amount:"310.88",cat:"RTW"},
+  {value:"RTWCC4",label:"RTWCC4 — GP Organise & Coordinate RTW Case Conference",amount:"297.07",cat:"RTW"},
+  {value:"RTWPC",label:"RTWPC — GP RTW Phone Call with Employer",amount:"38.09",cat:"RTW"},
+  {value:"RTWWV",label:"RTWWV — GP RTW Worksite Visit",amount:"574.81",cat:"RTW"},
+  {value:"RTWCC6",label:"RTWCC6 — RTW Case Conference, Psychiatrist",amount:"284.58",cat:"RTW"},
+  {value:"RTWCC7",label:"RTWCC7 — RTW Case Conference, Medical Specialist",amount:"284.58",cat:"RTW"},
+  // ── MEDICAL REPORTS ─────────────────────────────────────────────────────────
+  {value:"AGT001",label:"AGT001 — GP Short Report",amount:"86.27",cat:"Reports"},
+  {value:"AGT002",label:"AGT002 — GP Standard Report",amount:"215.62",cat:"Reports"},
+  {value:"AGT003",label:"AGT003 — GP Comprehensive Report",amount:"418.99",cat:"Reports"},
+  {value:"AGT004",label:"AGT004 — Chiropractic / Osteopathy Standard Report",amount:"79.25",cat:"Reports"},
+  {value:"INS101",label:"INS101 — MLER Questionnaire, GP",amount:"139.66",cat:"Reports"},
+  {value:"INS102",label:"INS102 — MLER Questionnaire, Medical Specialist",amount:"227.66",cat:"Reports"},
+  {value:"INS104",label:"INS104 — MLER Questionnaire, Psychiatrist",amount:"227.66",cat:"Reports"},
+  {value:"INS107",label:"INS107 — MLER Questionnaire, Physiotherapist",amount:"104.49",cat:"Reports"},
+  {value:"INS108",label:"INS108 — MLER Questionnaire, Chiropractor",amount:"86.18",cat:"Reports"},
+  {value:"INS110",label:"INS110 — MLER Questionnaire, Psychologist",amount:"101.95",cat:"Reports"},
+  {value:"INS111",label:"INS111 — MLER Questionnaire, Osteopath",amount:"86.18",cat:"Reports"},
+  // ── PHYSIOTHERAPY ───────────────────────────────────────────────────────────
+  {value:"PY100",label:"PY100 — Physiotherapy Initial Consultation (inc. AHRMP)",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PY100T",label:"PY100T — Telehealth Physiotherapy Initial Consultation",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PY102",label:"PY102 — Physiotherapy Standard Consultation",amount:"69.64",cat:"Physiotherapy"},
+  {value:"PY102T",label:"PY102T — Telehealth Physiotherapy Standard Consultation",amount:"69.64",cat:"Physiotherapy"},
+  {value:"PY105",label:"PY105 — Physiotherapy Restricted Consultation",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PY106",label:"PY106 — Physiotherapy Restricted Consultation Application",amount:"52.24",cat:"Physiotherapy"},
+  {value:"PY130",label:"PY130 — Hydrotherapy Initial Consultation",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PY132",label:"PY132 — Hydrotherapy Standard Consultation",amount:"69.64",cat:"Physiotherapy"},
+  {value:"PY133",label:"PY133 — Hydrotherapy Long Consultation",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PY135",label:"PY135 — Hydrotherapy Group Consultation (2–6 patients)",amount:"34.84",cat:"Physiotherapy"},
+  {value:"PY136",label:"PY136 — Physiotherapy Group Consultation",amount:"34.84",cat:"Physiotherapy"},
+  {value:"PY600",label:"PY600 — Physiotherapy RTW Case Conference",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PYH100",label:"PYH100 — Hand Therapist Initial Consultation",amount:"139.32",cat:"Physiotherapy"},
+  {value:"PYH102",label:"PYH102 — Hand Therapist Standard Consultation",amount:"69.64",cat:"Physiotherapy"},
+  // ── CHIROPRACTIC ────────────────────────────────────────────────────────────
+  {value:"CR100",label:"CR100 — Chiropractic Initial Consultation New Patient",amount:"85.06",cat:"Chiropractic"},
+  {value:"CR100T",label:"CR100T — Telehealth Chiropractic Initial Consultation",amount:"85.06",cat:"Chiropractic"},
+  {value:"CR101",label:"CR101 — Chiropractic Brief Consultation (≤5 min)",amount:"27.14",cat:"Chiropractic"},
+  {value:"CR102",label:"CR102 — Chiropractic Standard Consultation (5–25 min)",amount:"59.80",cat:"Chiropractic"},
+  {value:"CR105",label:"CR105 — Chiropractic Restricted Consultation",amount:"102.46",cat:"Chiropractic"},
+  {value:"CR106",label:"CR106 — Chiropractic Restricted Consultation Application",amount:"61.20",cat:"Chiropractic"},
+  {value:"CR109",label:"CR109 — Chiropractic Review Consultation",amount:"67.71",cat:"Chiropractic"},
+  {value:"CR600",label:"CR600 — Chiropractic RTW Case Conference",amount:"89.70",cat:"Chiropractic"},
+  // ── OSTEOPATHY ──────────────────────────────────────────────────────────────
+  {value:"OS100",label:"OS100 — Osteopathy Initial Consultation (≥30 min)",amount:"122.25",cat:"Osteopathy"},
+  {value:"OS100T",label:"OS100T — Telehealth Osteopathy Initial Consultation",amount:"122.25",cat:"Osteopathy"},
+  {value:"OS102",label:"OS102 — Osteopathy Standard Consultation (≥20 min)",amount:"81.77",cat:"Osteopathy"},
+  {value:"OS102T",label:"OS102T — Telehealth Osteopathy Standard Consultation",amount:"81.77",cat:"Osteopathy"},
+  {value:"OS105",label:"OS105 — Osteopathy Restricted Consultation",amount:"102.46",cat:"Osteopathy"},
+  {value:"OS106",label:"OS106 — Osteopathy Restricted Consultation Application",amount:"61.20",cat:"Osteopathy"},
+  {value:"OS109",label:"OS109 — Osteopathy Review Consultation",amount:"82.23",cat:"Osteopathy"},
+  {value:"OS200",label:"OS200 — Osteopathy RTW Case Conference",amount:"102.22",cat:"Osteopathy"},
+  // ── EXERCISE PHYSIOLOGY ─────────────────────────────────────────────────────
+  {value:"EX021",label:"EX021 — Exercise Physiology Initial Consultation (~45 min)",amount:"106.44",cat:"Exercise Physiology"},
+  {value:"EX021T",label:"EX021T — Telehealth Exercise Physiology Initial Consultation",amount:"106.44",cat:"Exercise Physiology"},
+  {value:"EX022",label:"EX022 — Exercise Physiology Standard Consultation (~30 min)",amount:"70.97",cat:"Exercise Physiology"},
+  {value:"EX022T",label:"EX022T — Telehealth Exercise Physiology Standard Consultation",amount:"70.97",cat:"Exercise Physiology"},
+  {value:"EX023",label:"EX023 — Exercise Physiology Restricted Consultation",amount:"106.44",cat:"Exercise Physiology"},
+  {value:"EX012",label:"EX012 — Exercise Physiology Group Consultation (≤6 patients)",amount:"23.67",cat:"Exercise Physiology"},
+  {value:"EX040",label:"EX040 — Exercise Physiology RTW Case Conference",amount:"88.71",cat:"Exercise Physiology"},
+  // ── PSYCHOLOGY ──────────────────────────────────────────────────────────────
+  {value:"PS612",label:"PS612 — Psychology Initial Consultation (60 min)",amount:"203.91",cat:"Psychology"},
+  {value:"PS612T",label:"PS612T — Telehealth Psychology Initial Consultation (60 min)",amount:"203.91",cat:"Psychology"},
+  {value:"PS602",label:"PS602 — Psychology Individual Consultation (60 min)",amount:"203.91",cat:"Psychology"},
+  {value:"PS602T",label:"PS602T — Telehealth Psychology Consultation (60 min)",amount:"203.91",cat:"Psychology"},
+  {value:"PS622",label:"PS622 — Psychology Consultation (30 min)",amount:"101.96",cat:"Psychology"},
+  {value:"PS632",label:"PS632 — Psychology Consultation (90 min, prior approval)",amount:"305.86",cat:"Psychology"},
+  {value:"PS100",label:"PS100 — Psychology Group Consultation (per person, ≤10)",amount:"51.17",cat:"Psychology"},
+  {value:"PS604",label:"PS604 — Psychology Treatment Planning Form",amount:"203.91",cat:"Psychology"},
+  {value:"PS109",label:"PS109 — Psychology Treatment Review Form",amount:"203.91",cat:"Psychology"},
+  {value:"PS600",label:"PS600 — Psychology RTW Case Conference",amount:"127.44",cat:"Psychology"},
+  {value:"PS700",label:"PS700 — Psychology Treatment & Recovery Planning Conference",amount:"127.44",cat:"Psychology"},
+  // ── GYM / SWIM ──────────────────────────────────────────────────────────────
+  {value:"RE100",label:"RE100 — Gym / Swimming 3-Month Membership",amount:"446.93",cat:"Gym/Swim"},
+  {value:"RE300",label:"RE300 — Casual Pool Entry (Supervised Hydrotherapy)",amount:"11.59",cat:"Gym/Swim"},
+  // ── HOUSEHOLD HELP ──────────────────────────────────────────────────────────
+  {value:"PH410",label:"PH410 — Household Help — Cleaning (per hour)",amount:"45.68",cat:"Household"},
+  {value:"PH420",label:"PH420 — Household Help — Lawn Mowing & Edging (quote per job)",amount:"",cat:"Household"},
+  {value:"PH430",label:"PH430 — Household Help — Garden Maintenance (per hour)",amount:"45.68",cat:"Household"},
+];
+
+// Lookup map for quick fee retrieval
+const WORKSAFE_FEE_MAP={};
+WORKSAFE_CODES.forEach(c=>{if(c.value)WORKSAFE_FEE_MAP[c.value]=c.amount||"";});
+
+const PROF_INVOICE_CATS={
+  "General Practitioner":    ["GP","RTW","Reports","Gym/Swim"],
+  "Pain Specialist":         ["Specialist","RTW","Reports","Gym/Swim"],
+  "Orthopaedic Surgeon":     ["Specialist","Reports","Gym/Swim"],
+  "Psychiatrist":            ["Specialist","RTW","Reports","Gym/Swim"],
+  "Neurologist":             ["Specialist","Reports","Gym/Swim"],
+  "Rehabilitation Physician":["Specialist","RTW","Reports","Gym/Swim"],
+  "Rheumatologist":          ["Specialist","Reports","Gym/Swim"],
+  "Other Specialist":        ["Specialist","Reports","Gym/Swim"],
+  "Physiotherapist":         ["Physiotherapy","Reports","Gym/Swim","Household"],
+  "Osteopath":               ["Osteopathy","Reports","Household","Gym/Swim"],
+  "Chiropractor":            ["Chiropractic","Reports","Household","Gym/Swim"],
+  "Podiatrist":              ["Physiotherapy","Reports","Gym/Swim"],
+  "Exercise Physiologist":   ["Exercise Physiology","Reports","Gym/Swim"],
+  "Psychologist":            ["Psychology","Reports","Gym/Swim"],
+  "Occupational Therapist":  ["Physiotherapy","Reports","Household"],
+  "Hand Therapist":          ["Physiotherapy","Reports","Gym/Swim"],
+};
+
 const SPECIALTIES=["Orthopaedic Surgeon","Pain Specialist / Anaesthetist","Neurologist","Rheumatologist","Psychiatrist","Rehabilitation Physician","Physiotherapist","Osteopath","Chiropractor","Podiatrist","Exercise Physiologist (GP referral required)","Occupational Therapist (GP referral required)","Psychologist","Hand Therapist","Other Specialist"];
 const SPECIALTIES_ALLIED_HEALTH=["Physiotherapist","Osteopath","Chiropractor","Podiatrist","Exercise Physiologist","Occupational Therapist","Psychologist","Pain Specialist / Anaesthetist","Hand Therapist","Other Allied Health"];
 
@@ -1674,7 +1793,7 @@ async function generateAHRMPPdf(claim, prac, clinic) {
   setText("Diagnosis areas being treated", (claim.diagnoses||[]).map(d=>d.label).join("; ")||"");
 
   // Section 3: Work status
-  setRadio("Are you providing certificates of capacity?", claim.providingCOC==="No"?"/No":"/Yes");
+  try { const _cocCb=form.getCheckBox("Are you providing certificates of capacity?"); claim.providingCOC==="No"?_cocCb.uncheck():_cocCb.check(); } catch(e) { console.warn("COC cb:",e.message); }
   checkBox("Not working", claim.fitnessForWork === "Unfit for all work");
   checkBox("Pre-injury duties", claim.fitnessForWork === "Fit for normal duties");
   checkBox("Alternativemodified duties", claim.fitnessForWork === "Fit with restrictions");
@@ -1793,7 +1912,7 @@ async function generateHouseholdPdf(claim, prac, clinic) {
     setText("8 Household help commencement", fmtAU(hh.commenceDate || claim.txFrom));
   }
   // Default to 6 weeks
-  setRadio("8 Service requested for", "/0");
+  setRadio("8 Service requested for", "6 weeks");
 
   // Section 10: Declaration & provider
   checkBox("10 Declaration", true);
@@ -2967,124 +3086,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
   const fmtAUD=n=>"$"+parseFloat(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,",");
   const fmtDate=d=>{try{return new Date(d).toLocaleDateString("en-AU");}catch{return d||"\u2014";}};
   const statusPill=s=>s==="Paid"?S.pillT:s==="Overdue"?S.pillR:S.pillA;
-  const WORKSAFE_CODES=[
-  // ── GENERAL PRACTITIONER (MBS-based, WorkSafe rates as at 1 March 2026) ─────
-  {value:"",label:"Select item code...",amount:"",cat:""},
-  {value:"MBS3",label:"MBS 3 — GP Attendance, Brief (≤5 min)",amount:"37.48",cat:"GP"},
-  {value:"MBS23",label:"MBS 23 — GP Attendance, Short (6–20 min)",amount:"76.55",cat:"GP"},
-  {value:"MBS36",label:"MBS 36 — GP Attendance, Standard (21–40 min)",amount:"140.36",cat:"GP"},
-  {value:"MBS44",label:"MBS 44 — GP Attendance, Long (41–60 min)",amount:"210.29",cat:"GP"},
-  {value:"MBS47",label:"MBS 47 — GP Attendance, Prolonged (>60 min)",amount:"264.39",cat:"GP"},
-  {value:"MBS104",label:"MBS 104 — Specialist Consultation, Brief",amount:"205.30",cat:"Specialist"},
-  {value:"MBS105",label:"MBS 105 — Specialist Consultation, Short",amount:"102.87",cat:"Specialist"},
-  {value:"MBS106",label:"MBS 106 — Specialist Attendance",amount:"168.76",cat:"Specialist"},
-  {value:"MBS107",label:"MBS 107 — Specialist Attendance, Long",amount:"300.24",cat:"Specialist"},
-  {value:"MBS110",label:"MBS 110 — Specialist Attendance, Prolonged",amount:"340.10",cat:"Specialist"},
-  // ── MEDICAL RTW ACTIVITIES ──────────────────────────────────────────────────
-  {value:"RTWCC1",label:"RTWCC1 — GP RTW Case Conference (<20 min)",amount:"141.45",cat:"RTW"},
-  {value:"RTWCC2",label:"RTWCC2 — GP RTW Case Conference (20–40 min)",amount:"226.24",cat:"RTW"},
-  {value:"RTWCC3",label:"RTWCC3 — GP RTW Case Conference (>40 min)",amount:"310.88",cat:"RTW"},
-  {value:"RTWCC4",label:"RTWCC4 — GP Organise & Coordinate RTW Case Conference",amount:"297.07",cat:"RTW"},
-  {value:"RTWPC",label:"RTWPC — GP RTW Phone Call with Employer",amount:"38.09",cat:"RTW"},
-  {value:"RTWWV",label:"RTWWV — GP RTW Worksite Visit",amount:"574.81",cat:"RTW"},
-  {value:"RTWCC6",label:"RTWCC6 — RTW Case Conference, Psychiatrist",amount:"284.58",cat:"RTW"},
-  {value:"RTWCC7",label:"RTWCC7 — RTW Case Conference, Medical Specialist",amount:"284.58",cat:"RTW"},
-  // ── MEDICAL REPORTS ─────────────────────────────────────────────────────────
-  {value:"AGT001",label:"AGT001 — GP Short Report",amount:"86.27",cat:"Reports"},
-  {value:"AGT002",label:"AGT002 — GP Standard Report",amount:"215.62",cat:"Reports"},
-  {value:"AGT003",label:"AGT003 — GP Comprehensive Report",amount:"418.99",cat:"Reports"},
-  {value:"AGT004",label:"AGT004 — Chiropractic / Osteopathy Standard Report",amount:"79.25",cat:"Reports"},
-  {value:"INS101",label:"INS101 — MLER Questionnaire, GP",amount:"139.66",cat:"Reports"},
-  {value:"INS102",label:"INS102 — MLER Questionnaire, Medical Specialist",amount:"227.66",cat:"Reports"},
-  {value:"INS104",label:"INS104 — MLER Questionnaire, Psychiatrist",amount:"227.66",cat:"Reports"},
-  {value:"INS107",label:"INS107 — MLER Questionnaire, Physiotherapist",amount:"104.49",cat:"Reports"},
-  {value:"INS108",label:"INS108 — MLER Questionnaire, Chiropractor",amount:"86.18",cat:"Reports"},
-  {value:"INS110",label:"INS110 — MLER Questionnaire, Psychologist",amount:"101.95",cat:"Reports"},
-  {value:"INS111",label:"INS111 — MLER Questionnaire, Osteopath",amount:"86.18",cat:"Reports"},
-  // ── PHYSIOTHERAPY ───────────────────────────────────────────────────────────
-  {value:"PY100",label:"PY100 — Physiotherapy Initial Consultation (inc. AHRMP)",amount:"139.32",cat:"Physiotherapy"},
-  {value:"PY100T",label:"PY100T — Telehealth Physiotherapy Initial Consultation",amount:"139.32",cat:"Physiotherapy"},
-  {value:"PY102",label:"PY102 — Physiotherapy Standard Consultation",amount:"69.64",cat:"Physiotherapy"},
-  {value:"PY102T",label:"PY102T — Telehealth Physiotherapy Standard Consultation",amount:"69.64",cat:"Physiotherapy"},
-  {value:"PY105",label:"PY105 — Physiotherapy Restricted Consultation",amount:"139.32",cat:"Physiotherapy"},
-  {value:"PY106",label:"PY106 — Physiotherapy Restricted Consultation Application",amount:"52.24",cat:"Physiotherapy"},
-  {value:"PY130",label:"PY130 — Hydrotherapy Initial Consultation",amount:"139.32",cat:"Physiotherapy"},
-  {value:"PY132",label:"PY132 — Hydrotherapy Standard Consultation",amount:"69.64",cat:"Physiotherapy"},
-  {value:"PY133",label:"PY133 — Hydrotherapy Long Consultation",amount:"139.32",cat:"Physiotherapy"},
-  {value:"PY135",label:"PY135 — Hydrotherapy Group Consultation (2–6 patients)",amount:"34.84",cat:"Physiotherapy"},
-  {value:"PY136",label:"PY136 — Physiotherapy Group Consultation",amount:"34.84",cat:"Physiotherapy"},
-  {value:"PY600",label:"PY600 — Physiotherapy RTW Case Conference",amount:"139.32",cat:"Physiotherapy"},
-  {value:"PYH100",label:"PYH100 — Hand Therapist Initial Consultation",amount:"139.32",cat:"Physiotherapy"},
-  {value:"PYH102",label:"PYH102 — Hand Therapist Standard Consultation",amount:"69.64",cat:"Physiotherapy"},
-  // ── CHIROPRACTIC ────────────────────────────────────────────────────────────
-  {value:"CR100",label:"CR100 — Chiropractic Initial Consultation New Patient",amount:"85.06",cat:"Chiropractic"},
-  {value:"CR100T",label:"CR100T — Telehealth Chiropractic Initial Consultation",amount:"85.06",cat:"Chiropractic"},
-  {value:"CR101",label:"CR101 — Chiropractic Brief Consultation (≤5 min)",amount:"27.14",cat:"Chiropractic"},
-  {value:"CR102",label:"CR102 — Chiropractic Standard Consultation (5–25 min)",amount:"59.80",cat:"Chiropractic"},
-  {value:"CR105",label:"CR105 — Chiropractic Restricted Consultation",amount:"102.46",cat:"Chiropractic"},
-  {value:"CR106",label:"CR106 — Chiropractic Restricted Consultation Application",amount:"61.20",cat:"Chiropractic"},
-  {value:"CR109",label:"CR109 — Chiropractic Review Consultation",amount:"67.71",cat:"Chiropractic"},
-  {value:"CR600",label:"CR600 — Chiropractic RTW Case Conference",amount:"89.70",cat:"Chiropractic"},
-  // ── OSTEOPATHY ──────────────────────────────────────────────────────────────
-  {value:"OS100",label:"OS100 — Osteopathy Initial Consultation (≥30 min)",amount:"122.25",cat:"Osteopathy"},
-  {value:"OS100T",label:"OS100T — Telehealth Osteopathy Initial Consultation",amount:"122.25",cat:"Osteopathy"},
-  {value:"OS102",label:"OS102 — Osteopathy Standard Consultation (≥20 min)",amount:"81.77",cat:"Osteopathy"},
-  {value:"OS102T",label:"OS102T — Telehealth Osteopathy Standard Consultation",amount:"81.77",cat:"Osteopathy"},
-  {value:"OS105",label:"OS105 — Osteopathy Restricted Consultation",amount:"102.46",cat:"Osteopathy"},
-  {value:"OS106",label:"OS106 — Osteopathy Restricted Consultation Application",amount:"61.20",cat:"Osteopathy"},
-  {value:"OS109",label:"OS109 — Osteopathy Review Consultation",amount:"82.23",cat:"Osteopathy"},
-  {value:"OS200",label:"OS200 — Osteopathy RTW Case Conference",amount:"102.22",cat:"Osteopathy"},
-  // ── EXERCISE PHYSIOLOGY ─────────────────────────────────────────────────────
-  {value:"EX021",label:"EX021 — Exercise Physiology Initial Consultation (~45 min)",amount:"106.44",cat:"Exercise Physiology"},
-  {value:"EX021T",label:"EX021T — Telehealth Exercise Physiology Initial Consultation",amount:"106.44",cat:"Exercise Physiology"},
-  {value:"EX022",label:"EX022 — Exercise Physiology Standard Consultation (~30 min)",amount:"70.97",cat:"Exercise Physiology"},
-  {value:"EX022T",label:"EX022T — Telehealth Exercise Physiology Standard Consultation",amount:"70.97",cat:"Exercise Physiology"},
-  {value:"EX023",label:"EX023 — Exercise Physiology Restricted Consultation",amount:"106.44",cat:"Exercise Physiology"},
-  {value:"EX012",label:"EX012 — Exercise Physiology Group Consultation (≤6 patients)",amount:"23.67",cat:"Exercise Physiology"},
-  {value:"EX040",label:"EX040 — Exercise Physiology RTW Case Conference",amount:"88.71",cat:"Exercise Physiology"},
-  // ── PSYCHOLOGY ──────────────────────────────────────────────────────────────
-  {value:"PS612",label:"PS612 — Psychology Initial Consultation (60 min)",amount:"203.91",cat:"Psychology"},
-  {value:"PS612T",label:"PS612T — Telehealth Psychology Initial Consultation (60 min)",amount:"203.91",cat:"Psychology"},
-  {value:"PS602",label:"PS602 — Psychology Individual Consultation (60 min)",amount:"203.91",cat:"Psychology"},
-  {value:"PS602T",label:"PS602T — Telehealth Psychology Consultation (60 min)",amount:"203.91",cat:"Psychology"},
-  {value:"PS622",label:"PS622 — Psychology Consultation (30 min)",amount:"101.96",cat:"Psychology"},
-  {value:"PS632",label:"PS632 — Psychology Consultation (90 min, prior approval)",amount:"305.86",cat:"Psychology"},
-  {value:"PS100",label:"PS100 — Psychology Group Consultation (per person, ≤10)",amount:"51.17",cat:"Psychology"},
-  {value:"PS604",label:"PS604 — Psychology Treatment Planning Form",amount:"203.91",cat:"Psychology"},
-  {value:"PS109",label:"PS109 — Psychology Treatment Review Form",amount:"203.91",cat:"Psychology"},
-  {value:"PS600",label:"PS600 — Psychology RTW Case Conference",amount:"127.44",cat:"Psychology"},
-  {value:"PS700",label:"PS700 — Psychology Treatment & Recovery Planning Conference",amount:"127.44",cat:"Psychology"},
-  // ── GYM / SWIM ──────────────────────────────────────────────────────────────
-  {value:"RE100",label:"RE100 — Gym / Swimming 3-Month Membership",amount:"446.93",cat:"Gym/Swim"},
-  {value:"RE300",label:"RE300 — Casual Pool Entry (Supervised Hydrotherapy)",amount:"11.59",cat:"Gym/Swim"},
-  // ── HOUSEHOLD HELP ──────────────────────────────────────────────────────────
-  {value:"PH410",label:"PH410 — Household Help — Cleaning (per hour)",amount:"45.68",cat:"Household"},
-  {value:"PH420",label:"PH420 — Household Help — Lawn Mowing & Edging (quote per job)",amount:"",cat:"Household"},
-  {value:"PH430",label:"PH430 — Household Help — Garden Maintenance (per hour)",amount:"45.68",cat:"Household"},
-];
-
-// Lookup map for quick fee retrieval
-const WORKSAFE_FEE_MAP={};
-WORKSAFE_CODES.forEach(c=>{if(c.value)WORKSAFE_FEE_MAP[c.value]=c.amount||"";});
-
-const PROF_INVOICE_CATS={
-  "General Practitioner":    ["GP","RTW","Reports","Gym/Swim"],
-  "Pain Specialist":         ["Specialist","RTW","Reports","Gym/Swim"],
-  "Orthopaedic Surgeon":     ["Specialist","Reports","Gym/Swim"],
-  "Psychiatrist":            ["Specialist","RTW","Reports","Gym/Swim"],
-  "Neurologist":             ["Specialist","Reports","Gym/Swim"],
-  "Rehabilitation Physician":["Specialist","RTW","Reports","Gym/Swim"],
-  "Rheumatologist":          ["Specialist","Reports","Gym/Swim"],
-  "Other Specialist":        ["Specialist","Reports","Gym/Swim"],
-  "Physiotherapist":         ["Physiotherapy","Reports","Gym/Swim","Household"],
-  "Osteopath":               ["Osteopathy","Reports","Household","Gym/Swim"],
-  "Chiropractor":            ["Chiropractic","Reports","Household","Gym/Swim"],
-  "Podiatrist":              ["Physiotherapy","Reports","Gym/Swim"],
-  "Exercise Physiologist":   ["Exercise Physiology","Reports","Gym/Swim"],
-  "Psychologist":            ["Psychology","Reports","Gym/Swim"],
-  "Occupational Therapist":  ["Physiotherapy","Reports","Household"],
-  "Hand Therapist":          ["Physiotherapy","Reports","Gym/Swim"],
-};
+  
 
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.2rem",marginBottom:4}},"Invoicing"),
