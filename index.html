@@ -2947,8 +2947,17 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
   const[saved,setSaved]=useState(false);
   const[patientSearch,setPatientSearch]=useState("");
   const[showPatientDd,setShowPatientDd]=useState(false);
+  const[practitioners,setPractitioners]=useState([]);
+  useEffect(()=>{sget("practitioners:"+clinic.id).then(p=>setPractitioners(p||[]));},
+  [clinic.id]);
   const activeClaims=claims.filter(c=>c.status!=="Closed");
   const claim=claims.find(c=>c.id===selClaim);
+  const claimPrac=claim&&practitioners&&practitioners.find(p=>p.id===claim.practitionerId);
+  const claimProf=claimPrac&&claimPrac.profession||"";
+  const allowedCats=claimProf&&PROF_INVOICE_CATS[claimProf]||null;
+  const filteredCodes=allowedCats
+    ?WORKSAFE_CODES.filter(c=>!c.cat||allowedCats.includes(c.cat))
+    :WORKSAFE_CODES;
   const allInvoices=claims.flatMap(c=>(c.invoices||[]).map(inv=>({...inv,claimId:c.id,patientName:c.patientName})));
   const totalInvoiced=allInvoices.reduce((s,i)=>s+(parseFloat(i.amount)||0),0);
   const totalCollected=allInvoices.filter(i=>i.status==="Paid").reduce((s,i)=>s+(parseFloat(i.amount)||0),0);
@@ -3057,6 +3066,26 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
 // Lookup map for quick fee retrieval
 const WORKSAFE_FEE_MAP={};
 WORKSAFE_CODES.forEach(c=>{if(c.value)WORKSAFE_FEE_MAP[c.value]=c.amount||"";});
+
+const PROF_INVOICE_CATS={
+  "General Practitioner":    ["GP","RTW","Reports","Gym/Swim"],
+  "Pain Specialist":         ["Specialist","RTW","Reports","Gym/Swim"],
+  "Orthopaedic Surgeon":     ["Specialist","Reports","Gym/Swim"],
+  "Psychiatrist":            ["Specialist","RTW","Reports","Gym/Swim"],
+  "Neurologist":             ["Specialist","Reports","Gym/Swim"],
+  "Rehabilitation Physician":["Specialist","RTW","Reports","Gym/Swim"],
+  "Rheumatologist":          ["Specialist","Reports","Gym/Swim"],
+  "Other Specialist":        ["Specialist","Reports","Gym/Swim"],
+  "Physiotherapist":         ["Physiotherapy","Reports","Gym/Swim","Household"],
+  "Osteopath":               ["Osteopathy","Reports","Household","Gym/Swim"],
+  "Chiropractor":            ["Chiropractic","Reports","Household","Gym/Swim"],
+  "Podiatrist":              ["Physiotherapy","Reports","Gym/Swim"],
+  "Exercise Physiologist":   ["Exercise Physiology","Reports","Gym/Swim"],
+  "Psychologist":            ["Psychology","Reports","Gym/Swim"],
+  "Occupational Therapist":  ["Physiotherapy","Reports","Household"],
+  "Hand Therapist":          ["Physiotherapy","Reports","Gym/Swim"],
+};
+
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.2rem",marginBottom:4}},"Invoicing"),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Track invoices per claim and monitor collection status."),
@@ -3066,9 +3095,10 @@ WORKSAFE_CODES.forEach(c=>{if(c.value)WORKSAFE_FEE_MAP[c.value]=c.amount||"";});
         div({key:"h",style:{fontWeight:700,marginBottom:16}},"Add invoice"),
         saved&&e(OK,{key:"ok"},"Invoice added"),
         div({key:"cl",style:{marginBottom:16}},[e("label",{key:"l",style:S.label},"Claim / patient *"),div({key:"sw",style:{position:"relative"}},[  inp({key:"i",className:"cb-input",style:S.inp,placeholder:"Search patient name or claim number...",    value:patientSearch,onChange:ev=>{setPatientSearch(ev.target.value);setSelClaim("");},    onFocus:()=>setShowPatientDd(true),onBlur:()=>setTimeout(()=>setShowPatientDd(false),200)}),  selClaim&&div({key:"sel",style:{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",    fontSize:"0.75rem",color:"#00C9A7",pointerEvents:"none"}},"✓ Selected"),  showPatientDd&&patientSearch.length>0&&div({key:"dd",style:{position:"absolute",top:"100%",left:0,right:0,    background:"#112240",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,zIndex:100,    marginTop:4,maxHeight:200,overflow:"auto",boxShadow:"0 8px 30px rgba(0,0,0,0.3)"}},[    ...activeClaims.filter(c=>{      const q=patientSearch.toLowerCase();      return (c.patientName||"").toLowerCase().includes(q)||(c.claimNumber||"").toLowerCase().includes(q);    }).map(c=>div({key:c.id,onClick:()=>{setSelClaim(c.id);setPatientSearch((c.patientName||"Unnamed")+(c.claimNumber?" — "+c.claimNumber:""));setShowPatientDd(false);},      style:{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.05)",        fontSize:"0.87rem"}},[      div({key:"n",style:{fontWeight:600}},c.patientName||"Unnamed"),      div({key:"d",style:{fontSize:"0.74rem",color:"#5B7A99"}},c.claimNumber||"No claim #"),    ])),    activeClaims.filter(c=>{const q=patientSearch.toLowerCase();return (c.patientName||"").toLowerCase().includes(q)||(c.claimNumber||"").toLowerCase().includes(q);}).length===0&&    div({key:"empty",style:{padding:"12px 14px",color:"#5B7A99",fontSize:"0.84rem"}},"No matching claims"),  ]),]),]),
-        div({key:"ic",style:{marginBottom:16}},[e("label",{key:"l",style:S.label},"Item code"),e("select",{key:"s",className:"cb-sel",style:S.sel,value:form.itemCode,onChange:ev=>{  const v=ev.target.value;  const fee=WORKSAFE_FEE_MAP[v]||"";  const item=WORKSAFE_CODES.find(c=>c.value===v);  setForm({...form,itemCode:v,amount:fee,description:item&&item.value?item.label.replace(item.value+" — ",""):""})}},[e("option",{key:"",value:""},"Select item code..."),...Object.entries(WORKSAFE_CODES.slice(1).reduce((acc,c)=>{(acc[c.cat]=acc[c.cat]||[]).push(c);return acc;},{})).map(([cat,items])=>e("optgroup",{key:cat,label:cat},  items.map(c=>e("option",{key:c.value,value:c.value},c.label))))]),]),
+        div({key:"ic",style:{marginBottom:16}},[e("label",{key:"l",style:S.label},"Item code"),e("select",{key:"s",className:"cb-sel",style:S.sel,value:form.itemCode,onChange:ev=>{  const v=ev.target.value;  const fee=WORKSAFE_FEE_MAP[v]||"";  const item=WORKSAFE_CODES.find(c=>c.value===v);  setForm({...form,itemCode:v,amount:fee,description:item&&item.value?item.label.replace(item.value+" — ",""):""})}},[e("option",{key:"",value:""},"Select item code..."),...Object.entries(filteredCodes.slice(1).reduce((acc,c)=>{(acc[c.cat]=acc[c.cat]||[]).push(c);return acc;},{})).map(([cat,items])=>e("optgroup",{key:cat,label:cat},  items.map(c=>e("option",{key:c.value,value:c.value},c.label))))]),]),
         e(Inp,{key:"desc",label:"Description",value:form.description,onChange:v=>setForm({...form,description:v}),placeholder:"e.g. Certificate of Capacity \u2014 May 2026",required:true}),
-        div({key:"g",style:S.g2},[e(Inp,{key:"amt",label:"Amount (excl. GST)",value:form.amount,onChange:v=>setForm({...form,amount:v}),placeholder:"0.00",mb:0}),e(Inp,{key:"date",label:"Invoice date",value:form.date,onChange:v=>setForm({...form,date:v}),type:"date",mb:0})]),
+        div({key:"g",style:S.g2},[claimProf&&div({key:"prof-note",style:{fontSize:"0.76rem",color:"rgba(0,201,167,0.7)",marginTop:-10,marginBottom:12}},"Showing codes for "+claimProf+(allowedCats?" ("+allowedCats.join(", ")+")":"")),
+        e(Inp,{key:"amt",label:"Amount (excl. GST)",value:form.amount,onChange:v=>setForm({...form,amount:v}),placeholder:"0.00",mb:0}),e(Inp,{key:"date",label:"Invoice date",value:form.date,onChange:v=>setForm({...form,date:v}),type:"date",mb:0})]),
         div({key:"gst",style:{marginTop:16,marginBottom:16}},[e("label",{key:"l",style:S.label},"GST applicable"),div({key:"btns",style:{display:"flex",gap:8}},["yes","no"].map(v=>btn({key:v,onClick:()=>setForm({...form,gst:v}),style:{...S.pill,...(form.gst===v?S.pillT:S.pillM),padding:"8px 18px"}},v==="yes"?"Yes (add 10%)":"No GST")))]),
         form.amount&&div({key:"total",style:{...S.ok,marginBottom:14}},[span({key:"l",style:{color:"#5B7A99"}},"Total inc. GST: "),span({key:"v",style:{fontWeight:700}},fmtAUD(form.gst==="yes"?parseFloat(form.amount||0)*1.1:parseFloat(form.amount||0)))]),
         btn({key:"add",style:{...S.btnP,width:"100%"},onClick:addInvoice},"+ Add invoice"),
@@ -3100,7 +3130,6 @@ const INSURER_AP_DEFAULTS={
   dxc:"ap@dxcclaims.com.au",
   tac:"accounts.payable@tac.vic.gov.au",
 };
-
 function SettingsPage({clinic,bankSettings,onSaveBank,insurerEmails,onSaveInsurerEmails}){
   const[bank,setBank]=useState(bankSettings||{bsb:"",accountNo:"",accountName:""});
   const[emails,setEmails]=useState(insurerEmails||{});
