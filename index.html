@@ -124,6 +124,7 @@ const PSYCH_FLAGS=[
 const PRESCRIBING=["General Practitioner","Pain Specialist","Orthopaedic Surgeon","Psychiatrist","Neurologist","Rehabilitation Physician","Rheumatologist","Other Specialist"];
 const PROFESSIONS=["General Practitioner","Physiotherapist","Osteopath","Chiropractor","Pain Specialist","Orthopaedic Surgeon","Occupational Therapist","Exercise Physiologist","Psychologist","Podiatrist","Other"];
 const SPECIALTIES=["Orthopaedic Surgeon","Pain Specialist / Anaesthetist","Neurologist","Rheumatologist","Psychiatrist","Rehabilitation Physician","Physiotherapist","Osteopath","Chiropractor","Podiatrist","Exercise Physiologist (GP referral required)","Occupational Therapist (GP referral required)","Psychologist","Hand Therapist","Other Specialist"];
+const SPECIALTIES_ALLIED_HEALTH=["Physiotherapist","Osteopath","Chiropractor","Podiatrist","Exercise Physiologist","Occupational Therapist","Psychologist","Pain Specialist / Anaesthetist","Hand Therapist","Other Allied Health"];
 
 const RTW_DB={
   "Low back pain":{mod:[1,2],normal:[2,6],notes:"Non-specific LBP. Early activity encouraged."},
@@ -1627,9 +1628,9 @@ function fmtY(d)  { try { return new Date(d).getFullYear().toString(); } catch {
 // Helper to map claim capacity key → radio value (/0=Can, /1=WithMods, /2=Cannot)
 function capVal(capMap, key) {
   const v = capMap[key];
-  if (v === "Can")      return "/0";
-  if (v === "Modified") return "/1";
-  if (v === "Cannot")   return "/2";
+  if (v === "Can")      return "Can";
+  if (v === "Modified") return "With modifications";
+  if (v === "Cannot")   return "Cannot";
   return null;
 }
 
@@ -1673,7 +1674,8 @@ async function generateAHRMPPdf(claim, prac, clinic) {
   setText("Diagnosis areas being treated", (claim.diagnoses||[]).map(d=>d.label).join("; ")||"");
 
   // Section 3: Work status
-  setRadio("Are you providing certificates of capacity?", claim.providingCOC==="No"?"/No":"/Yes");
+  // "Are you providing certificates of capacity?" is a checkbox not radio
+  try { const cocCb = form.getCheckBox("Are you providing certificates of capacity?"); claim.providingCOC==="No" ? cocCb.uncheck() : cocCb.check(); } catch(e) { console.warn("COC checkbox:", e.message); }
   checkBox("Not working", claim.fitnessForWork === "Unfit for all work");
   checkBox("Pre-injury duties", claim.fitnessForWork === "Fit for normal duties");
   checkBox("Alternativemodified duties", claim.fitnessForWork === "Fit with restrictions");
@@ -1790,7 +1792,7 @@ async function generateHouseholdPdf(claim, prac, clinic) {
     setText("8 Household help commencement", fmtAU(hh.commenceDate || claim.txFrom));
   }
   // Default to 6 weeks
-  setRadio("8 Service requested for", "/0");
+  setRadio("8 Service requested for", "6 weeks");
 
   // Section 10: Declaration & provider
   checkBox("10 Declaration", true);
@@ -2025,9 +2027,9 @@ async function generateGymSwimPdf(claim, prac, clinic) {
   // Page 1 -------
   // Membership type checkboxes (tick marks at approximate positions)
   const gymType = gd.type || claim.gymType || "";
-  if (gymType.includes("Gym") && !gymType.includes("Swim")) draw(p1, 133, 150, "✓", 10);
-  else if (gymType.includes("Swim") && !gymType.includes("Gym")) draw(p1, 193, 150, "✓", 10);
-  else if (gymType.includes("Gym") && gymType.includes("Swim")) draw(p1, 255, 150, "✓", 10);
+  if (gymType.includes("Gym") && !gymType.includes("Swim")) draw(p1, 133, 150, "X", 10);
+  else if (gymType.includes("Swim") && !gymType.includes("Gym")) draw(p1, 193, 150, "X", 10);
+  else if (gymType.includes("Gym") && gymType.includes("Swim")) draw(p1, 255, 150, "X", 10);
 
   // Worker details row (y≈216 in structure = input area below label at y≈216)
   draw(p1, 28,  228, patName);
@@ -2084,10 +2086,10 @@ async function generateGymSwimPdf(claim, prac, clinic) {
 
   // Profession checkboxes (y≈346)
   const prof = claim.practitionerProfession||"";
-  if (prof === "General Practitioner") draw(p2, 85, 347, "✓", 10);
-  else if (prof === "Physiotherapist")  draw(p2, 213, 347, "✓", 10);
-  else if (prof === "Chiropractor")     draw(p2, 322, 347, "✓", 10);
-  else if (prof === "Osteopath")        draw(p2, 413, 347, "✓", 10);
+  if (prof === "General Practitioner") draw(p2, 85, 347, "X", 10);
+  else if (prof === "Physiotherapist")  draw(p2, 213, 347, "X", 10);
+  else if (prof === "Chiropractor")     draw(p2, 322, 347, "X", 10);
+  else if (prof === "Osteopath")        draw(p2, 413, 347, "X", 10);
 
   const patFileN = (claim.patientLastName||claim.patientName||"patient").replace(/\s+/g,"_");
   dlPdf(await pdfDoc.save(), `GymSwim_${patFileN}_${new Date().toISOString().split("T")[0]}.pdf`);
