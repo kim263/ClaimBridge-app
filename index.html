@@ -1490,7 +1490,6 @@ function Tab5({claim,up,clinic,practitioners}){
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Official WorkSafe VIC form (FOR844/03/07.15) — auto-populated from all clinical screens."),
     div({key:"print-btn",style:{marginBottom:20,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}},[
       btn({key:"pdf",style:{...S.btnP,display:"inline-flex",alignItems:"center",gap:8},onClick:async()=>{setPdfLoading(true);try{await generateCOCPdf(claim,prac,clinic);}catch(e){alert("PDF error: "+e.message);}finally{setPdfLoading(false);}},disabled:pdfLoading},pdfLoading?"⏳ Generating...":"📄 Download Official COC (PDF)"),
-      btn({key:"p",style:{...S.btnS,display:"inline-flex",alignItems:"center",gap:8},onClick:()=>setPrintMode(true)},"🖨️ Preview form"),
       div({key:"hint",style:{fontSize:"0.78rem",color:"#5B7A99",width:"100%"}},"Downloads the official WorkSafe VIC FOR844 PDF pre-filled with claim data."),
     ]),
     e(OK,{key:"ok1"},"Patient, diagnosis and capacity details auto-populated from clinical screens."),
@@ -1629,9 +1628,9 @@ function fmtY(d)  { try { return new Date(d).getFullYear().toString(); } catch {
 // Helper to map claim capacity key → radio value (/0=Can, /1=WithMods, /2=Cannot)
 function capVal(capMap, key) {
   const v = capMap[key];
-  if (v === "Can")      return "/0";
-  if (v === "Modified") return "/1";
-  if (v === "Cannot")   return "/2";
+  if (v === "Can")      return "Can";
+  if (v === "Modified") return "With modifications";
+  if (v === "Cannot")   return "Cannot";
   return null;
 }
 
@@ -1698,6 +1697,7 @@ async function generateAHRMPPdf(claim, prac, clinic) {
   const allFlags = [...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
   const barrierText = [allFlags.join("; "), claim.barriers].filter(Boolean).join("\n");
   setText("Specify any physical personal andor environmental barriers that may influence the worker", barrierText);
+  try { form.getTextField("Specify any physical personal andor environmental barriers that may influence the worker").setFontSize(10); } catch(e) {}
 
   // Section 5: Goals (3 rows)
   [1,2,3].forEach(n => {
@@ -1781,6 +1781,7 @@ async function generateHouseholdPdf(claim, prac, clinic) {
   // Additional comments
   const physComments = [claim.physicalNotes, claim.workRestrictions, hh.tasks].filter(Boolean).join("\n");
   setText("3 Capacity - Additional comments", physComments);
+  try { form.getTextField("3 Capacity - Additional comments").setFontSize(10); } catch(e) {}
 
   // Section 7: Services requested
   checkBox("6 Housework or cleaning tasks", true);
@@ -2027,9 +2028,9 @@ async function generateGymSwimPdf(claim, prac, clinic) {
   // Page 1 -------
   // Membership type checkboxes (tick marks at approximate positions)
   const gymType = gd.type || claim.gymType || "";
-  if (gymType.includes("Gym") && !gymType.includes("Swim")) draw(p1, 133, 150, "✓", 10);
-  else if (gymType.includes("Swim") && !gymType.includes("Gym")) draw(p1, 193, 150, "✓", 10);
-  else if (gymType.includes("Gym") && gymType.includes("Swim")) draw(p1, 255, 150, "✓", 10);
+  if (gymType.includes("Gym") && !gymType.includes("Swim")) draw(p1, 133, 150, "X", 10);
+  else if (gymType.includes("Swim") && !gymType.includes("Gym")) draw(p1, 193, 150, "X", 10);
+  else if (gymType.includes("Gym") && gymType.includes("Swim")) draw(p1, 255, 150, "X", 10);
 
   // Worker details row (y≈216 in structure = input area below label at y≈216)
   draw(p1, 28,  228, patName);
@@ -2086,10 +2087,10 @@ async function generateGymSwimPdf(claim, prac, clinic) {
 
   // Profession checkboxes (y≈346)
   const prof = claim.practitionerProfession||"";
-  if (prof === "General Practitioner") draw(p2, 85, 347, "✓", 10);
-  else if (prof === "Physiotherapist")  draw(p2, 213, 347, "✓", 10);
-  else if (prof === "Chiropractor")     draw(p2, 322, 347, "✓", 10);
-  else if (prof === "Osteopath")        draw(p2, 413, 347, "✓", 10);
+  if (prof === "General Practitioner") draw(p2, 85, 347, "X", 10);
+  else if (prof === "Physiotherapist")  draw(p2, 213, 347, "X", 10);
+  else if (prof === "Chiropractor")     draw(p2, 322, 347, "X", 10);
+  else if (prof === "Osteopath")        draw(p2, 413, 347, "X", 10);
 
   const patFileN = (claim.patientLastName||claim.patientName||"patient").replace(/\s+/g,"_");
   dlPdf(await pdfDoc.save(), `GymSwim_${patFileN}_${new Date().toISOString().split("T")[0]}.pdf`);
@@ -2773,6 +2774,8 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
   const cocTo=fmtD(claim.cocTo||claim.fitRestrictTo||claim.unfitTo);
   const timeline=[...refs.map(r=>({id:r.id,type:"referral",date:r.statusDate||claim.createdAt,label:r.specialty+(r.name?" \u2014 "+r.name:""),status:r.status||"Pending"})),...letters.map(l=>({id:l.id,type:"letter",date:l.generatedAt,label:l.template,status:"Generated",content:l.content}))].sort((a,b)=>new Date(b.date)-new Date(a.date));
   const[expanded,setExpanded]=useState(null);
+  const[tlPage,setTlPage]=useState(0);
+  const TL_PAGE_SIZE=5;
   return div({style:{padding:"0"}},[
     div({key:"hdr",style:{...S.card,marginBottom:16,padding:"20px 24px"}},[
       div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}},[
@@ -2816,7 +2819,7 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
           div({key:"h",style:{fontWeight:700,marginBottom:4}},"Correspondence timeline"),
           div({key:"s",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:16}},"All referrals and generated letters, most recent first"),
           timeline.length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",padding:"20px 0",textAlign:"center"}},"No correspondence recorded yet"):
-          timeline.map((item,i)=>div({key:item.id,style:{borderBottom:"1px solid rgba(255,255,255,0.05)",paddingBottom:12,marginBottom:12}},[
+          timeline.slice(tlPage*TL_PAGE_SIZE,(tlPage+1)*TL_PAGE_SIZE).map((item,i)=>div({key:item.id,style:{borderBottom:"1px solid rgba(255,255,255,0.05)",paddingBottom:12,marginBottom:12}},[
             div({key:"row",style:{display:"flex",alignItems:"flex-start",gap:12}},[
               div({key:"dot",style:{width:8,height:8,borderRadius:"50%",background:item.status==="Approved"?"#00C9A7":item.status==="Declined"||item.status==="Disputed"?"#FF4D6D":"#5B7A99",marginTop:6,flexShrink:0}}),
               div({key:"info",style:{flex:1}},[
@@ -2829,6 +2832,7 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
             ]),
           ])),
         ]),
+        timeline.length>TL_PAGE_SIZE&&div({key:"tl-nav",style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:12,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.07)"}},[div({key:"info",style:{fontSize:"0.76rem",color:"#5B7A99"}},(tlPage*TL_PAGE_SIZE+1)+"-"+Math.min((tlPage+1)*TL_PAGE_SIZE,timeline.length)+" of "+timeline.length),div({key:"btns",style:{display:"flex",gap:8}},[btn({key:"prev",style:{...S.btnS,padding:"5px 12px",fontSize:"0.78rem"},onClick:()=>setTlPage(p=>Math.max(0,p-1)),disabled:tlPage===0},"\u2190 Prev"),btn({key:"next",style:{...S.btnS,padding:"5px 12px",fontSize:"0.78rem"},onClick:()=>setTlPage(p=>Math.min(Math.ceil(timeline.length/TL_PAGE_SIZE)-1,p+1)),disabled:(tlPage+1)*TL_PAGE_SIZE>=timeline.length},"Next \u2192")])]),
       ]),
       div({key:"right"},[
         div({key:"coc",style:{...S.card,marginBottom:16}},[
