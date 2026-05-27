@@ -584,12 +584,12 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
         curTab===7&&e(TabClaimLog,{key:"t7",claim,up,clinic,practitioners,setActiveEpId,setEpTab}),
       ];
     })(),
-    (()=>{const _isLog=(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId;return _isLog?null:div({key:"nav",style:{...S.fb,marginTop:28,paddingTop:20,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
+    div({key:"nav",style:{...S.fb,marginTop:28,paddingTop:20,borderTop:"1px solid rgba(255,255,255,0.07)",display:(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId?"none":"flex"}},
+    [
       btn({key:"prev",style:{...S.btnS,...((activeEpId?epTab:tab)===0?{opacity:0.3,pointerEvents:"none"}:{})},onClick:()=>{if(activeEpId)setEpTab(t=>Math.max(0,t-1));else setTab(t=>Math.max(0,t-1));window.scrollTo(0,0);}},"<- Previous"),
       span({key:"pg",style:{fontSize:"0.76rem",color:"#5B7A99"}},((activeEpId?epTab:tab)+1)+" / "+TABS.length),
-      (()=>{const isLast=(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId;return btn({key:"next",style:S.btnP,onClick:()=>{if(isLast){if(onInvoice)onInvoice();}else{if(activeEpId)setEpTab(t=>Math.min(TABS.length-1,t+1));else setTab(t=>Math.min(TABS.length-1,t+1));window.scrollTo(0,0);}}},isLast?"Finish & Invoice ->":"Next ->");})(),
+      btn({key:"next",style:S.btnP,onClick:()=>{const _last=(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId;if(_last){if(onInvoice)onInvoice();}else{if(activeEpId)setEpTab(t=>Math.min(TABS.length-1,t+1));else setTab(t=>Math.min(TABS.length-1,t+1));window.scrollTo(0,0);}}},(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId?"Finish & Invoice ->":"Next ->"),
     ]),
-  })(),
   ]);
 }
 
