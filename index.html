@@ -588,7 +588,7 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
     [
       btn({key:"prev",style:{...S.btnS,...((activeEpId?epTab:tab)===0?{opacity:0.3,pointerEvents:"none"}:{})},onClick:()=>{if(activeEpId)setEpTab(t=>Math.max(0,t-1));else setTab(t=>Math.max(0,t-1));window.scrollTo(0,0);}},"<- Previous"),
       span({key:"pg",style:{fontSize:"0.76rem",color:"#5B7A99"}},((activeEpId?epTab:tab)+1)+" / "+TABS.length),
-      btn({key:"next",style:S.btnP,onClick:()=>{const _last=(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId;if(_last){if(onInvoice)onInvoice();}else{if(activeEpId)setEpTab(t=>Math.min(TABS.length-1,t+1));else setTab(t=>Math.min(TABS.length-1,t+1));window.scrollTo(0,0);}}},(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId?"Finish & Invoice ->":"Next ->"),
+      btn({key:"next",style:S.btnP,onClick:()=>{const _cur=activeEpId?epTab:tab;const _isRefTab=_cur===TABS.length-2&&!activeEpId;const _isLogTab=_cur===TABS.length-1&&!activeEpId;if(_isRefTab||_isLogTab){if(onInvoice)onInvoice();}else{if(activeEpId)setEpTab(t=>Math.min(TABS.length-1,t+1));else setTab(t=>Math.min(TABS.length-1,t+1));window.scrollTo(0,0);}}},(activeEpId?epTab:tab)>=TABS.length-2&&!activeEpId?"Finish & Invoice ->":"Next ->"),
     ]),
   ]);
 }
@@ -1403,7 +1403,7 @@ function Tab5({claim,up,clinic,practitioners}){
               e("th",{key:"cn",style:{...CELL,background:"#f5f5f5",textAlign:"center"}},"Cannot"),
               e("th",{key:"cm",style:{...CELL,background:"#f5f5f5",textAlign:"left"}},"Comments"),
             ])),
-            e("tbody",{key:"tbody"},physFns.map(f=>{const cap=capMap[f.id];return e("tr",{key:f.id},[e("td",{key:"l",style:{...CELL}},f.label),e("td",{key:"c",style:{...CELL,textAlign:"center"}},cap==="Can"?"☑":"☐"),e("td",{key:"m",style:{...CELL,textAlign:"center"}},cap==="Modified"?"☑":"☐"),e("td",{key:"cn",style:{...CELL,textAlign:"center"}},cap==="Cannot"?"☑":"☐"),e("td",{key:"cm",style:{...CELL,minWidth:80}},""),]);}))
+            e("tbody",{key:"tbody"},physFns.map(f=>{const cap=capMap[f.id];return e("tr",{key:f.id},[e("td",{key:"l",style:{...CELL}},f.label),e("td",{key:"c",style:{...CELL,textAlign:"center"}},cap==="Can"?"☑":"☐"),e("td",{key:"m",style:{...CELL,textAlign:"center"}},cap==="Modified"?"☑":"☐"),e("td",{key:"cn",style:{...CELL,textAlign:"center"}},cap==="Cannot"?"☑":"☐"),e("td",{key:"cm",style:{...CELL,minWidth:80}},"")]);}))
           ]),
           claim.physicalNotes&&div({key:"pn",style:{fontSize:10,marginBottom:8}},[span({key:"l",style:{color:"#555"}},"Physical notes: "),claim.physicalNotes]),
           claim.workRestrictions&&div({key:"wr",style:{fontSize:10,marginBottom:8}},[span({key:"l",style:{color:"#555"}},"Work restrictions: "),claim.workRestrictions]),
@@ -1416,7 +1416,7 @@ function Tab5({claim,up,clinic,practitioners}){
               e("th",{key:"sev",style:{...CELL,background:"#f5f5f5",textAlign:"left"}},"Severity if Affected"),
               e("th",{key:"cm",style:{...CELL,background:"#f5f5f5",textAlign:"left"}},"Comments"),
             ])),
-            e("tbody",{key:"tbody"},mentalFns.map(f=>{const aff=claim.mentalStatus==="Affected";const sev=(claim.mentalSeverity||{})[f.id];return e("tr",{key:f.id},[e("td",{key:"l",style:{...CELL}},f.label),e("td",{key:"na",style:{...CELL,textAlign:"center"}},(!aff||(aff&&!sev))?"☑":"☐"),e("td",{key:"af",style:{...CELL,textAlign:"center"}},(aff&&sev)?"☑":"☐"),e("td",{key:"sev",style:{...CELL,fontSize:9}},sev||""),e("td",{key:"cm",style:{...CELL}},""),]);}))
+            e("tbody",{key:"tbody"},mentalFns.map(f=>{const aff=claim.mentalStatus==="Affected";const sev=(claim.mentalSeverity||{})[f.id];return e("tr",{key:f.id},[e("td",{key:"l",style:{...CELL}},f.label),e("td",{key:"na",style:{...CELL,textAlign:"center"}},(!aff||(aff&&!sev))?"☑":"☐"),e("td",{key:"af",style:{...CELL,textAlign:"center"}},(aff&&sev)?"☑":"☐"),e("td",{key:"sev",style:{...CELL,fontSize:9}},sev||""),e("td",{key:"cm",style:{...CELL}},"")]);}))
           ]),
           claim.mentalNotes&&div({key:"mn",style:{fontSize:10,marginBottom:6}},[span({key:"l",style:{color:"#555"}},"Mental function notes: "),claim.mentalNotes]),
           latestOutcomes.length>0&&div({key:"om"},[
@@ -1638,8 +1638,8 @@ function capVal(capMap, key) {
 // ── AHRMP PDF MERGE ────────────────────────────────────────────────────────────
 async function generateAHRMPPdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = await fetchPdf(FORM_URLS.ahrmp); }
-  catch { alert("Could not fetch the AHRMP PDF from WorkSafe. Check your internet connection."); return; }
+  try { pdfBytes = b64ToBuffer(PDF_DATA.ahrmp); }
+  catch(err) { alert("Could not load PDF: " + (err&&err.message||String(err))); return; }
 
   const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -1732,8 +1732,8 @@ async function generateAHRMPPdf(claim, prac, clinic) {
 // ── HOUSEHOLD HELP PDF MERGE ───────────────────────────────────────────────────
 async function generateHouseholdPdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = await fetchPdf(FORM_URLS.household); }
-  catch { alert("Could not fetch the Household Help PDF from WorkSafe. Check your internet connection."); return; }
+  try { pdfBytes = b64ToBuffer(PDF_DATA.household); }
+  catch(err) { alert("Could not load PDF: " + (err&&err.message||String(err))); return; }
 
   const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -1810,8 +1810,8 @@ async function generateHouseholdPdf(claim, prac, clinic) {
 // ── PS604 PDF MERGE ────────────────────────────────────────────────────────────
 async function generatePS604Pdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = await fetchPdf(FORM_URLS.ps604); }
-  catch { alert("Could not fetch the PS604 PDF from WorkSafe. Check your internet connection."); return; }
+  try { pdfBytes = b64ToBuffer(PDF_DATA.ps604); }
+  catch(err) { alert("Could not load PDF: " + (err&&err.message||String(err))); return; }
 
   const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -1901,8 +1901,8 @@ async function generatePS604Pdf(claim, prac, clinic) {
 // ── PS109 PDF MERGE ────────────────────────────────────────────────────────────
 async function generatePS109Pdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = await fetchPdf(FORM_URLS.ps109); }
-  catch { alert("Could not fetch the PS109 PDF from WorkSafe. Check your internet connection."); return; }
+  try { pdfBytes = b64ToBuffer(PDF_DATA.ps109); }
+  catch(err) { alert("Could not load PDF: " + (err&&err.message||String(err))); return; }
 
   const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -2001,8 +2001,8 @@ async function generatePS109Pdf(claim, prac, clinic) {
 // Coordinates derived from structure extraction (y inverted: pdfY = 841.9 - structureY)
 async function generateGymSwimPdf(claim, prac, clinic) {
   let pdfBytes;
-  try { pdfBytes = await fetchPdf(FORM_URLS.gym_swim); }
-  catch { alert("Could not fetch the Gym/Swim PDF from WorkSafe. Check your internet connection."); return; }
+  try { pdfBytes = b64ToBuffer(PDF_DATA.gym_swim); }
+  catch(err) { alert("Could not load PDF: " + (err&&err.message||String(err))); return; }
 
   const { PDFDocument, rgb, StandardFonts } = PDFLib;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
@@ -2275,7 +2275,7 @@ function Tab6({claim,up,clinic,practitioners}){
     prof&&div({key:"prof-note",style:{...S.ok,marginBottom:16}},"Showing forms for "+prof),
     div({key:"pills",style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}},visibleForms.map(f=>btn({key:f.id,onClick:()=>{setSel(f.id);up("alliedForm",f.id);},style:{...S.pill,...(selForm===f.id?S.pillT:S.pillM),fontSize:"0.8rem",padding:"8px 16px"}},f.label))),
     selForm==="ahrmp"&&div({key:"ahrmp"},[div({key:"card",style:{...S.card,borderTop:"3px solid #F5A623"}},[
-      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Allied Health Recovery Management Plan"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR912/04/06.25")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generateAHRMPPdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF"),btn({key:"prev",style:{...S.btnS,fontSize:"0.78rem",padding:"8px 12px"},onClick:()=>setPrintForm("ahrmp")},"Preview")])]),
+      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Allied Health Recovery Management Plan"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR912/04/06.25")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generateAHRMPPdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF")])]),
       e(OK,{key:"ok"},"Patient, diagnosis and capacity details pre-populated from Treatment Plan"),
       e(Ta,{key:"g",label:"Specific goals for this referral",value:ah.goals||"",onChange:upAH("goals"),placeholder:"Goals...",rows:4}),
       div({key:"gr",style:S.g2},[e(Sel,{key:"t",label:"Treatment type",value:ah.treatment||"",onChange:upAH("treatment"),options:["Physiotherapy","Chiropractic","Osteopathy","Podiatry","EIPF Physiotherapy","Exercise Physiology","Occupational Therapy"],mb:0}),e(Inp,{key:"f",label:"Frequency",value:ah.frequency||"",onChange:upAH("frequency"),placeholder:"e.g. 2x per week",mb:0})]),
@@ -2286,7 +2286,7 @@ function Tab6({claim,up,clinic,practitioners}){
       e(Ta,{key:"b",label:"Barriers to recovery",value:ah.barriers||"",onChange:upAH("barriers"),placeholder:"Identified barriers...",rows:3}),
     ])]),
     selForm==="household"&&div({key:"hh"},[div({key:"card",style:{...S.card,borderTop:"3px solid #F5A623"}},[
-      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Household Help Request"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR592/03/11.25")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generateHouseholdPdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF"),btn({key:"prev",style:{...S.btnS,fontSize:"0.78rem",padding:"8px 12px"},onClick:()=>setPrintForm("household")},"Preview")])]),
+      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Household Help Request"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR592/03/11.25")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generateHouseholdPdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF")])]),
       e(OK,{key:"ok"},"Capacity limitations auto-populated from diagnosis screen"),
       e(Ta,{key:"t",label:"Tasks patient cannot perform",value:hh.tasks||"",onChange:upHH("tasks"),placeholder:"e.g. Vacuuming, mopping..."}),
       div({key:"g",style:S.g2},[e(Inp,{key:"f",label:"Frequency required",value:hh.frequency||"",onChange:upHH("frequency"),placeholder:"e.g. 2x per week"}),e(Inp,{key:"d",label:"Duration requested",value:hh.duration||"",onChange:upHH("duration"),placeholder:"e.g. 4 weeks"})]),
@@ -2294,7 +2294,7 @@ function Tab6({claim,up,clinic,practitioners}){
       e(Ta,{key:"j",label:"Clinical justification",value:hh.justification||"",onChange:upHH("justification"),placeholder:"Clinical reasoning...",rows:4}),
     ])]),
     selForm==="gym_swim"&&div({key:"gs"},[div({key:"card",style:{...S.card,borderTop:"3px solid #F5A623"}},[
-      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Gym / Swim Membership Request"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR919/02/06.20")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generateGymSwimPdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF"),btn({key:"prev",style:{...S.btnS,fontSize:"0.78rem",padding:"8px 12px"},onClick:()=>setPrintForm("gym_swim")},"Preview")])]),
+      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Gym / Swim Membership Request"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR919/02/06.20")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generateGymSwimPdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF")])]),
       e(Sel,{key:"t",label:"Type",value:gd.type||"",onChange:upGD("type"),options:["Gym membership","Hydrotherapy / pool access","Gym + hydrotherapy combined"]}),
       e(Sel,{key:"sup",label:"Supervised or unsupervised",value:gd.supervised||"",onChange:upGD("supervised"),options:["Supervised","Unsupervised","Either"]}),
       e(Ta,{key:"j",label:"Clinical justification",value:gd.justification||"",onChange:upGD("justification"),placeholder:"Why gym/swim is clinically appropriate..."}),
@@ -2302,7 +2302,7 @@ function Tab6({claim,up,clinic,practitioners}){
       e(Inp,{key:"d",label:"Duration requested",value:gd.duration||"",onChange:upGD("duration"),placeholder:"e.g. 3 months"}),
     ])]),
     selForm==="ps604"&&div({key:"ps604"},[div({key:"card",style:{...S.card,borderTop:"3px solid #1a3a6a"}},[
-      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"PS604 \u2014 Psychology Treatment Planning Form"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR972/02/05.24")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generatePS604Pdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF"),btn({key:"prev",style:{...S.btnS,fontSize:"0.78rem",padding:"8px 12px"},onClick:()=>setPrintForm("ps604")},"Preview")])]),
+      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"PS604 \u2014 Psychology Treatment Planning Form"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR972/02/05.24")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generatePS604Pdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF")])]),
       e(OK,{key:"ok"},"Psychological diagnoses, outcome measures and mental function auto-populated"),
       e(Ta,{key:"d",label:"Psychological diagnosis (DSM-5 / ICD-11)",value:p4.diagnosis||"",onChange:upP4("diagnosis"),placeholder:"e.g. Adjustment Disorder..."}),
       e(Ta,{key:"r",label:"Relationship to compensable injury",value:p4.relationship||"",onChange:upP4("relationship"),placeholder:"How does the condition relate..."}),
@@ -2313,7 +2313,7 @@ function Tab6({claim,up,clinic,practitioners}){
       e(Inp,{key:"ahpra",label:"AHPRA registration number",value:p4.ahpra||"",onChange:upP4("ahpra"),placeholder:"PSY0001234"}),
     ])]),
     selForm==="ps109"&&div({key:"ps109"},[div({key:"card",style:{...S.card,borderTop:"3px solid #1a3a6a"}},[
-      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"PS109 \u2014 Psychology Treatment Review Form"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR973/02/05.24")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generatePS109Pdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF"),btn({key:"prev",style:{...S.btnS,fontSize:"0.78rem",padding:"8px 12px"},onClick:()=>setPrintForm("ps109")},"Preview")])]),
+      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"PS109 \u2014 Psychology Treatment Review Form"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR973/02/05.24")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generatePS109Pdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF")])]),
       e(OK,{key:"ok"},"Outcome measures, mental function and RTW data auto-populated"),
       e(Inp,{key:"sc",label:"Sessions completed to date",value:p9.sessionsCompleted||"",onChange:upP9("sessionsCompleted"),placeholder:"e.g. 8 sessions"}),
       e(Inp,{key:"pd",label:"PS604 reference date",value:p9.ps604Date||"",onChange:upP9("ps604Date"),type:"date"}),
