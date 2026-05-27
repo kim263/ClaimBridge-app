@@ -6,7 +6,7 @@
 <title>ClaimBridge</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#07101E;color:#EFF6FF;font-size:16px;min-height:100vh;}
@@ -1186,9 +1186,150 @@ function MedSection({claim,up}){
   ]);
 }
 
+
+// ── COC PDF MERGE ─────────────────────────────────────────────────────────────
+async function generateCOCPdf(claim, prac, clinic) {
+  const COC_PDF_URL = "https://www.worksafe.vic.gov.au/sites/default/files/2022-11/Certificate_of_capacity.pdf";
+  let pdfBytes;
+  try {
+    const res = await fetch(COC_PDF_URL);
+    if (!res.ok) throw new Error("fetch failed");
+    pdfBytes = await res.arrayBuffer();
+  } catch {
+    alert("Could not fetch the official WorkSafe PDF.\n\nTip: Try opening the app in a browser (not a preview) — the PDF is fetched directly from worksafe.vic.gov.au");
+    return;
+  }
+  const { PDFDocument } = PDFLib;
+  const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const form = pdfDoc.getForm();
+
+  const fmtD = d => { try { return new Date(d).getDate().toString().padStart(2,"0"); } catch { return ""; }};
+  const fmtM = d => { try { return (new Date(d).getMonth()+1).toString().padStart(2,"0"); } catch { return ""; }};
+  const fmtY = d => { try { return new Date(d).getFullYear().toString(); } catch { return ""; }};
+
+  const setText = (name, val) => { try { form.getTextField(name).setText(val||""); } catch(e) { console.warn("Field not found:", name); }};
+  const checkBox = (name, check) => { try { const f = form.getCheckBox(name); check ? f.check() : f.uncheck(); } catch(e) { console.warn("Checkbox not found:", name); }};
+
+  // Section 1: Worker Details
+  setText("Worker First Name", claim.patientFirstName || claim.patientName || "");
+  setText("Worker Last Name", claim.patientLastName || "");
+  setText("Claim Number if known", claim.claimNumber || "");
+  setText("Date of Injury Day", fmtD(claim.dateOfInjury));
+  setText("Date of Injury Month", fmtM(claim.dateOfInjury));
+  setText("Date of Injury Year", fmtY(claim.dateOfInjury));
+  setText("Date of Birth Day", fmtD(claim.dob));
+  setText("Date of Birth Month", fmtM(claim.dob));
+  setText("Date of Birth Year", fmtY(claim.dob));
+  setText("Worker Address", claim.patientAddress || "");
+  setText("Postcode", claim.patientPostcode || "");
+
+  // Scheme checkboxes
+  checkBox("TAC Claim", claim.scheme === "TAC");
+  checkBox("VWA Claim", claim.scheme === "WorkCover");
+
+  // Section 2: Diagnosis
+  setText("Date of Examination Day", fmtD(claim.dateExamined || new Date().toISOString()));
+  setText("Date of Examination Month", fmtM(claim.dateExamined || new Date().toISOString()));
+  setText("Date of Examination Year", fmtY(claim.dateExamined || new Date().toISOString()));
+  setText("My Clinical Diagnosis/es", (claim.diagnoses||[]).map(d=>d.label).join("; ") || "");
+
+  // Section 3: Physical capacity
+  // Form rows: 1=Sit,2=Stand/Walk,3=Bend,4=Squat,5=Kneel,6=Reach above shoulder,7=Use injured arm/hand,8=Lift,9=Neck movement
+  const capMap = claim.capacity || {};
+  const physMapping = [
+    { claimKey: "sit",        can: "Check Box1",  mod: "Check Box2",  cannot: "Check Box3"  },
+    { claimKey: "stand",      can: "Check Box4",  mod: "Check Box5",  cannot: "Check Box6"  },
+    { claimKey: "bend",       can: "Check Box7",  mod: "Check Box8",  cannot: "Check Box9"  },
+    { claimKey: "kneel",      can: "Check Box10", mod: "Check Box11", cannot: "Check Box12" }, // Squat row
+    { claimKey: "kneel",      can: "Check Box13", mod: "Check Box14", cannot: "Check Box15" }, // Kneel row
+    { claimKey: "overhead",   can: "Check Box16", mod: "Check Box17", cannot: "Check Box18" },
+    { claimKey: "fine_motor", can: "Check Box19", mod: "Check Box20", cannot: "Check Box21" },
+    { claimKey: "lift_light", can: "Check Box22", mod: "Check Box23", cannot: "Check Box24" },
+    { claimKey: "walk",       can: "Check Box25", mod: "Check Box26", cannot: "Check Box27" }, // Neck movement row
+  ];
+  physMapping.forEach(({ claimKey, can, mod, cannot }) => {
+    const val = capMap[claimKey];
+    checkBox(can, val === "Can");
+    checkBox(mod, val === "Modified");
+    checkBox(cannot, val === "Cannot");
+  });
+  setText("Physical Function", [claim.physicalNotes, claim.workRestrictions].filter(Boolean).join("\n"));
+
+  // Mental health checkboxes
+  const mentalMapping = [
+    { claimKey: "concentration", notAff: "Check Box28", aff: "Check Box29" },
+    { claimKey: "memory",        notAff: "Check Box30", aff: "Check Box31" },
+    { claimKey: "stress",        notAff: "Check Box32", aff: "Check Box33" },
+  ];
+  const isAffected = claim.mentalStatus === "Affected";
+  mentalMapping.forEach(({ claimKey, notAff, aff }) => {
+    const sevMap = claim.mentalSeverity || {};
+    const thisAff = isAffected && sevMap[claimKey];
+    checkBox(notAff, !thisAff);
+    checkBox(aff, !!thisAff);
+  });
+  setText("Mental Health Function", claim.mentalNotes || "");
+  setText("Other Functional Considerations - not listed above (1)", claim.otherConsiderations || "");
+  setText("Work Environment Considerations", claim.workEnvironment || "");
+
+  // Section 4: Certification
+  const fit = claim.fitnessForWork || "";
+  checkBox("4A", fit === "Fit for normal duties");
+  checkBox("4B", fit === "Fit with restrictions");
+  checkBox("4C", fit === "Unfit for all work");
+
+  const fromDate = claim.fitNormalFrom || claim.fitRestrictFrom || claim.unfitFrom || claim.cocFrom || "";
+  const toDate   = claim.fitRestrictTo || claim.unfitTo || claim.cocTo || "";
+
+  if (fit === "Fit for normal duties" && fromDate) {
+    setText("Have a capacity for pre-injury employment from Day", fmtD(fromDate));
+    setText("Have a capacity for pre-injury employment from Month", fmtM(fromDate));
+    setText("Have a capacity for pre-injury employment from Year", fmtY(fromDate));
+  }
+  if (fit === "Fit with restrictions") {
+    if (fromDate) { setText("Have a capacity for suitable employment from Day 1", fmtD(fromDate)); setText("Have a capacity for suitable employment from Month 1", fmtM(fromDate)); setText("Have a capacity for suitable employment from Year 1", fmtY(fromDate)); }
+    if (toDate)   { setText("Have a capacity for suitable employment to Day 2", fmtD(toDate)); setText("Have a capacity for suitable employment to Month 2", fmtM(toDate)); setText("Have a capacity for suitable employment to Year 2", fmtY(toDate)); }
+  }
+  if (fit === "Unfit for all work") {
+    if (fromDate) { setText("Have no capacity for employment from Day 1", fmtD(fromDate)); setText("Have no capacity for employment from Month 1", fmtM(fromDate)); setText("Have no capacity for employment from Year 1", fmtY(fromDate)); }
+    if (toDate)   { setText("Have no capacity for employment to Day 2", fmtD(toDate)); setText("Have no capacity for employment to Month 2", fmtM(toDate)); setText("Have no capacity for employment to Year 2", fmtY(toDate)); }
+  }
+
+  // Section 5: Treatment plan
+  setText("Treatment Plan", [claim.treatmentPlan, claim.goalsShort, claim.selfManagement, claim.barriers].filter(Boolean).join("\n\n") || "");
+
+  // Section 6: Certifier Declaration
+  const pracName = prac && prac.name || "";
+  const pracAddr = prac && prac.address || clinic && clinic.address || "";
+  const pracPhone = prac && prac.phone || clinic && clinic.phone || "";
+  const pracPostcode = prac && prac.postcode || clinic && clinic.postcode || "";
+  setText("Provider name address and phone no or practice stamp", [pracName, pracAddr, pracPhone].filter(Boolean).join("\n"));
+  setText("Postcode_2", pracPostcode);
+  const phoneMatch = (pracPhone || "").match(/^(\d{2})\s*(.+)$/);
+  setText("Area Code", phoneMatch ? phoneMatch[1] : "");
+  setText("Telephone", phoneMatch ? phoneMatch[2] : pracPhone || "");
+  setText("Provider number or hospital name 1", prac && prac.providerNo || "");
+  const today = new Date();
+  setText("Date issued Day", today.getDate().toString().padStart(2,"0"));
+  setText("Date issued Month", (today.getMonth()+1).toString().padStart(2,"0"));
+  setText("Date issued Year", today.getFullYear().toString());
+
+  const filledBytes = await pdfDoc.save();
+  const blob = new Blob([filledBytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const patName = (claim.patientLastName || claim.patientName || "patient").replace(/\s+/g,"_");
+  a.href = url;
+  a.download = `COC_${patName}_${today.toISOString().split("T")[0]}.pdf`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+
 // ── TAB 5: CERTIFICATE OF CAPACITY (OFFICIAL FORM) ───────────────────────────
 function Tab5({claim,up,clinic,practitioners}){
   const[printMode,setPrintMode]=useState(false);
+  const[pdfLoading,setPdfLoading]=useState(false);
   const prac=practitioners.find(p=>p.id===claim.practitionerId)||{};
   const cocNum=claim.cocCount||1;
   const diags=(claim.diagnoses||[]).map(d=>d.label).join("; ")||"";
@@ -1348,9 +1489,10 @@ function Tab5({claim,up,clinic,practitioners}){
   return div({className:"no-print"},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Certificate of Capacity"),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Official WorkSafe VIC form (FOR844/03/07.15) — auto-populated from all clinical screens."),
-    div({key:"print-btn",style:{marginBottom:20}},[
-      btn({key:"p",style:{...S.btnP,display:"inline-flex",alignItems:"center",gap:8},onClick:()=>setPrintMode(true)},"🖨️ Preview & Print COC"),
-      span({key:"hint",style:{marginLeft:12,fontSize:"0.78rem",color:"#5B7A99"}},"Opens official form layout ready to print or save as PDF"),
+    div({key:"print-btn",style:{marginBottom:20,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}},[
+      btn({key:"pdf",style:{...S.btnP,display:"inline-flex",alignItems:"center",gap:8},onClick:async()=>{setPdfLoading(true);try{await generateCOCPdf(claim,prac,clinic);}catch(e){alert("PDF error: "+e.message);}finally{setPdfLoading(false);}},disabled:pdfLoading},pdfLoading?"⏳ Generating...":"📄 Download Official COC (PDF)"),
+      btn({key:"p",style:{...S.btnS,display:"inline-flex",alignItems:"center",gap:8},onClick:()=>setPrintMode(true)},"🖨️ Preview form"),
+      div({key:"hint",style:{fontSize:"0.78rem",color:"#5B7A99",width:"100%"}},"Downloads the official WorkSafe VIC FOR844 PDF pre-filled with claim data."),
     ]),
     e(OK,{key:"ok1"},"Patient, diagnosis and capacity details auto-populated from clinical screens."),
     latestOutcomes.length>0&&e(OK,{key:"ok2"},"Outcome measure scores imported: "+latestOutcomes.map(o=>o.measure).join(", ")),
@@ -1438,6 +1580,510 @@ function Tab5({claim,up,clinic,practitioners}){
 }
 
 
+
+// ── WORKSAFE FORMS PDF MERGE ──────────────────────────────────────────────────
+// Results: AHRMP=fillable(83 fields), Household=fillable(42 fields),
+//          PS604=fillable(59 fields), PS109=fillable(86 fields),
+//          Gym/Swim=FLAT (coordinate overlay required)
+
+const FORM_URLS = {
+  coc:       "https://www.worksafe.vic.gov.au/sites/default/files/2022-11/Certificate_of_capacity.pdf",
+  ahrmp:     "https://content-v2.api.worksafe.vic.gov.au/sites/default/files/2025-08/Allied-health-recovery-management-plan-2025-08.pdf",
+  household: "https://content-v2.api.worksafe.vic.gov.au/sites/default/files/2025-11/WSV%20Request%20form%20for%20household%20help%20services-2025-11.pdf",
+  ps604:     "https://content-v2.api.worksafe.vic.gov.au/sites/default/files/2024-07/Psychology-treatment-planning-form-PS604-2024-07.pdf",
+  ps109:     "https://content-v2.api.worksafe.vic.gov.au/sites/default/files/2024-06/Psychology-treatment-review-form-PS109-2024-07.pdf",
+  gym_swim:  "https://content-v2.api.worksafe.vic.gov.au/sites/default/files/2020-06/ISBN-Three-month-gym-swim-membership-request-2020-06.pdf",
+};
+
+async function fetchPdf(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("HTTP " + res.status + " fetching " + url);
+  return res.arrayBuffer();
+}
+
+function dlPdf(bytes, filename) {
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function fmtAU(d) { try { return new Date(d).toLocaleDateString("en-AU"); } catch { return d||""; } }
+function fmtD(d)  { try { return new Date(d).getDate().toString().padStart(2,"0"); } catch { return ""; } }
+function fmtM(d)  { try { return (new Date(d).getMonth()+1).toString().padStart(2,"0"); } catch { return ""; } }
+function fmtY(d)  { try { return new Date(d).getFullYear().toString(); } catch { return ""; } }
+
+// Helper to map claim capacity key → radio value (/0=Can, /1=WithMods, /2=Cannot)
+function capVal(capMap, key) {
+  const v = capMap[key];
+  if (v === "Can")      return "/0";
+  if (v === "Modified") return "/1";
+  if (v === "Cannot")   return "/2";
+  return null;
+}
+
+// ── AHRMP PDF MERGE ────────────────────────────────────────────────────────────
+async function generateAHRMPPdf(claim, prac, clinic) {
+  let pdfBytes;
+  try { pdfBytes = await fetchPdf(FORM_URLS.ahrmp); }
+  catch { alert("Could not fetch the AHRMP PDF from WorkSafe. Check your internet connection."); return; }
+
+  const { PDFDocument } = PDFLib;
+  const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const form = pdfDoc.getForm();
+  const setText = (n,v) => { try { form.getTextField(n).setText(v||""); } catch(e) { console.warn("AHRMP field:",n,e.message); }};
+  const checkBox = (n,v) => { try { const f=form.getCheckBox(n); v?f.check():f.uncheck(); } catch(e) { console.warn("AHRMP cb:",n,e.message); }};
+  const setRadio = (n,v) => { try { if(v) form.getRadioGroup(n).select(v); } catch(e) { console.warn("AHRMP radio:",n,e.message); }};
+
+  const ah = claim.ahrmData || {};
+  const prof = claim.practitionerProfession || "";
+
+  // Section 1: Plan type
+  checkBox("Initial", !claim.cocType || claim.cocType === "First");
+  checkBox("Subsequent", claim.cocType === "Subsequent");
+
+  // Discipline checkboxes
+  checkBox("Physiotherapy",    prof === "Physiotherapist");
+  checkBox("Osteopathy",       prof === "Osteopath");
+  checkBox("Chiropractic",     prof === "Chiropractor");
+  checkBox("Podiatry",         prof === "Podiatrist");
+  checkBox("Exercise Physiologist", prof === "Exercise Physiologist");
+  try { if (prof === "Occupational Therapist") form.getRadioGroup("Occupational Therapist").select("/Yes"); } catch {}
+  checkBox("EIPF Physiotherapy", false);
+
+  // Worker details
+  setText("Worker's name",    (claim.patientFirstName||"") + " " + (claim.patientLastName||"").trim() || claim.patientName||"");
+  setText("Date2_af_date",    fmtAU(claim.dob));
+  setText("Occupation",       claim.occupation||"");
+  setText("Date4_af_date",    fmtAU(claim.dateOfInjury));
+  setText("Claim number",     claim.claimNumber||"");
+
+  // Section 2: Diagnosis
+  setText("Diagnosis areas being treated", (claim.diagnoses||[]).map(d=>d.label).join("; ")||"");
+
+  // Section 3: Work status
+  setRadio("Are you providing certificates of capacity?", claim.providingCOC==="No"?"/No":"/Yes");
+  checkBox("Not working", claim.fitnessForWork === "Unfit for all work");
+  checkBox("Pre-injury duties", claim.fitnessForWork === "Fit for normal duties");
+  checkBox("Alternativemodified duties", claim.fitnessForWork === "Fit with restrictions");
+
+  // Section 4: Outcome measures (populate first 3 rows from outcomeScores)
+  const allScores = claim.outcomeScores || {};
+  const scoreKeys = Object.keys(allScores);
+  const rowSuffixes = [["Row2","Row1","Row1_2","Row1_3"],["Row3","Row2","Row2_2","Row2_3"],["Row4","Row3","Row3_2","Row3_3"]];
+  scoreKeys.slice(0,3).forEach((key, i) => {
+    const scores = [...(allScores[key]||[])].sort((a,b)=>new Date(a.date)-new Date(b.date));
+    const [labelFld, d1, d2, d3] = rowSuffixes[i];
+    setText("4 Assessment Standardised outcome measures"+labelFld, key);
+    if (scores[0]) { setText("Date"+d1.replace("Row","Row"), fmtAU(scores[0].date)); setText("Score"+d1.replace("Row","Row"), scores[0].score||""); }
+    if (scores[1]) { setText("Date"+d2.replace("Row","Row"), fmtAU(scores[1].date)); setText("Score"+d2.replace("Row","Row"), scores[1].score||""); }
+    if (scores[2]) { setText("Date"+d3.replace("Row","Row"), fmtAU(scores[2].date)); setText("Score"+d3.replace("Row","Row"), scores[2].score||""); }
+  });
+
+  // Barriers
+  const flags = claim.psychosocial||{};
+  const allFlags = [...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
+  const barrierText = [allFlags.join("; "), claim.barriers].filter(Boolean).join("\n");
+  setText("Specify any physical personal andor environmental barriers that may influence the worker", barrierText);
+
+  // Section 5: Goals (3 rows)
+  [1,2,3].forEach(n => {
+    setText("Current activity/functional limitations_"+n, claim["ahGoalLim"+n] || ah["lim"+n] || "");
+    setText("Related activity goals_"+n, claim["ahGoalTarget"+n] || ah["goal"+n] || "");
+    setText("Estimated date of achievement"+n, claim["ahGoalDate"+n] ? fmtAU(claim["ahGoalDate"+n]) : (ah["date"+n]||""));
+  });
+
+  // Section 6: Proposed treatment plan
+  setText("over", claim.txNum || ah.sessions || "");
+  setText("number of weeks", claim.txWeeks || ah.duration || "");
+  setText("From", claim.txFrom ? fmtAU(claim.txFrom) : "");
+  setText("to", claim.txTo ? fmtAU(claim.txTo) : "");
+  setText("Date11_af_date", claim.txDischarge ? fmtAU(claim.txDischarge) : "");
+
+  // Section 7: Treatment methods
+  setText("Treatment details", claim.treatmentPlan || ah.justification || "");
+  setText("Self management  indicate strategies that the worker will use to manage their condition", claim.selfManagement || "");
+
+  // Section 8: Provider details
+  setText("Treating provider\u2019s name",    prac&&prac.name || "");
+  setText("Treating provider\u2019s address", prac&&prac.address || clinic&&clinic.address || "");
+  setText("Email address",                    prac&&prac.email || "");
+  setText("Telephone",                        prac&&prac.phone || clinic&&clinic.phone || "");
+  setText("WorkSafe provider number",         prac&&prac.providerNo || "");
+  setText("Date9_af_date",                    fmtAU(new Date().toISOString()));
+
+  const patName = (claim.patientLastName||claim.patientName||"patient").replace(/\s+/g,"_");
+  dlPdf(await pdfDoc.save(), `AHRMP_${patName}_${new Date().toISOString().split("T")[0]}.pdf`);
+}
+
+// ── HOUSEHOLD HELP PDF MERGE ───────────────────────────────────────────────────
+async function generateHouseholdPdf(claim, prac, clinic) {
+  let pdfBytes;
+  try { pdfBytes = await fetchPdf(FORM_URLS.household); }
+  catch { alert("Could not fetch the Household Help PDF from WorkSafe. Check your internet connection."); return; }
+
+  const { PDFDocument } = PDFLib;
+  const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const form = pdfDoc.getForm();
+  const setText = (n,v) => { try { form.getTextField(n).setText(v||""); } catch(e) { console.warn("HH field:",n,e.message); }};
+  const checkBox = (n,v) => { try { const f=form.getCheckBox(n); v?f.check():f.uncheck(); } catch(e) { console.warn("HH cb:",n,e.message); }};
+  const setRadio = (n,v) => { try { if(v!==null) form.getRadioGroup(n).select(v); } catch(e) { console.warn("HH radio:",n,e.message); }};
+
+  const hh = claim.hhData || {};
+  const capMap = claim.capacity || {};
+
+  // Section 1: Worker details
+  setText("1 Worker's name",   (claim.patientFirstName||"") + " " + (claim.patientLastName||"").trim() || claim.patientName||"");
+  setText("1 Claim number",    claim.claimNumber||"");
+
+  // Section 2: Injury details
+  const injText = [(claim.diagnoses||[]).map(d=>d.label).join("; "), claim.injuryDescription].filter(Boolean).join("\n");
+  setText("2 Details of work-related injury", injText);
+
+  // Section 3: Capacity assessment type
+  setRadio("4 Household help services deterioration 2", null); // initial/subsequent/other
+  checkBox("4 Household help services deterioration 2", false);
+  checkBox("4 Household help services deterioration 3", false);
+  checkBox("4 Household help services deterioration 4", false);
+
+  // Capacity radio groups (0=Can, 1=WithMods, 2=Cannot)
+  const capFields = [
+    ["3 Capacity - Sit", "sit"],
+    ["3 Capacity - Stand/Walk", "stand"],
+    ["3 Capacity - Bend", "bend"],
+    ["3 Capacity - Squat", "kneel"],
+    ["3 Capacity - Kneel", "kneel"],
+    ["3 Capacity - Reach above shoulder", "overhead"],
+    ["3 Capacity - Use injured arm/hand", "fine_motor"],
+    ["3 Capacity - Lift", "lift_light"],
+    ["3 Capacity - Neck movement", "walk"],
+    ["3 Capacity - Push", "push_pull"],
+    ["3 Capacity - Pull", "push_pull"],
+  ];
+  capFields.forEach(([fieldName, claimKey]) => {
+    const v = capVal(capMap, claimKey);
+    if (v) setRadio(fieldName, v);
+  });
+
+  // Additional comments
+  const physComments = [claim.physicalNotes, claim.workRestrictions, hh.tasks].filter(Boolean).join("\n");
+  setText("3 Capacity - Additional comments", physComments);
+
+  // Section 7: Services requested
+  checkBox("6 Housework or cleaning tasks", true);
+  checkBox("6 Lawn mowing/edging", false);
+  checkBox("6 Other", false);
+
+  // Section 8: Commencement date & duration
+  if (hh.commenceDate || claim.txFrom) {
+    setText("8 Household help commencement", fmtAU(hh.commenceDate || claim.txFrom));
+  }
+  // Default to 6 weeks
+  setRadio("8 Service requested for", "/0");
+
+  // Section 10: Declaration & provider
+  checkBox("10 Declaration", true);
+  const providerText = [prac&&prac.name, prac&&prac.address||clinic&&clinic.address, prac&&prac.phone||clinic&&clinic.phone].filter(Boolean).join("\n");
+  setText("10 Provider details",                prac&&prac.name ? providerText : "");
+  setText("10 Postcode",                        prac&&prac.postcode || clinic&&clinic.postcode || "");
+  setText("10 Telephone",                       prac&&prac.phone || clinic&&clinic.phone || "");
+  setText("10 Provider number or hospital name", prac&&prac.providerNo || "");
+  setText("10 Date issued",                     fmtAU(new Date().toISOString()));
+
+  const patName = (claim.patientLastName||claim.patientName||"patient").replace(/\s+/g,"_");
+  dlPdf(await pdfDoc.save(), `HouseholdHelp_${patName}_${new Date().toISOString().split("T")[0]}.pdf`);
+}
+
+// ── PS604 PDF MERGE ────────────────────────────────────────────────────────────
+async function generatePS604Pdf(claim, prac, clinic) {
+  let pdfBytes;
+  try { pdfBytes = await fetchPdf(FORM_URLS.ps604); }
+  catch { alert("Could not fetch the PS604 PDF from WorkSafe. Check your internet connection."); return; }
+
+  const { PDFDocument } = PDFLib;
+  const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const form = pdfDoc.getForm();
+  const setText = (n,v) => { try { form.getTextField(n).setText(v||""); } catch(e) { console.warn("PS604:",n,e.message); }};
+
+  const p4 = claim.ps604Data || {};
+  const flags = claim.psychosocial||{};
+  const allFlags = [...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
+
+  // Header details
+  setText("Worker\u2019s name",     (claim.patientFirstName||"")+" "+(claim.patientLastName||"").trim() || claim.patientName||"");
+  setText("Claim number",           claim.claimNumber||"");
+  setText("Occupation/job title",   claim.occupation||"");
+  setText("Referrer\u2019s name",   claim.referrerName || p4.referrerName || "");
+  setText("Date of referral_af_date", fmtAU(p4.referralDate || claim.dateOfInjury));
+  setText("Date of first session_af_date", fmtAU(p4.firstSessionDate || new Date().toISOString()));
+
+  // Section 1: DSM diagnosis
+  const psychDiags = (claim.diagnoses||[]).filter(d=>d.cat==="Psychological").map(d=>d.label).join("; ");
+  setText("Your DSM diagnosis (or provisional diagnosis) with respect to the claimable injury, using the latest published version of DSM",
+    p4.diagnosis || psychDiags || "");
+
+  // Section 2: Symptoms
+  setText("With respect to the claimable injury, describe the psychological and physical symptoms the worker is currently presenting",
+    p4.symptoms || claim.clinicalPresentation || "");
+
+  // Section 3: Impact areas
+  setText("Home life",             p4.homeLife || "");
+  setText("Social engagement",     p4.socialEngagement || "");
+  setText("Emotional wellbeing/quality of life", p4.emotionalWellbeing || "");
+  setText("Readiness to return to work or progress with the support of occupational rehabilitation services", p4.rtwReadiness || claim.rtwPlan || "");
+  setText("Other",                 p4.other || "");
+
+  // Section 4: Other conditions
+  setText("4. Details of any other psychological or physical conditions", p4.otherConditions || "");
+  setText("4. Considerations for treatment and additional support", p4.otherConsiderations || "");
+
+  // Section 5: Enhancing factors
+  setText("Details of any factors that could enhance recovery (personal strengths or situational factors)", p4.enhancingFactors || "");
+
+  // Section 6: Impeding factors (barriers)
+  const impedingText = [allFlags.join("; "), claim.barriers, p4.impedingFactors].filter(Boolean).join("\n");
+  setText("6. Details of any factors that may impede recovery", impedingText);
+  setText("6. Considerations for treatment and additional support", p4.impedingConsiderations || "");
+
+  // Section 7: Goals & treatment
+  setText("Goals - Home life",                 p4.goalHomeLife || "");
+  setText("Treatment modality/interventions/strategies - Home life", p4.txHomeLife || "");
+  setText("Goals - Social engagement",         p4.goalSocial || "");
+  setText("Treatment modality/interventions/strategies - Social engagement", p4.txSocial || "");
+  setText("Goals - Emotional wellbeing/quality of life", p4.goalEmotional || "");
+  setText("Treatment modality/interventions/strategies - Emotional wellbeing/quality of life", p4.txEmotional || "");
+  setText("Goals - Developing work/training capacity", p4.goalWork || claim.goalsLong || "");
+  setText("Treatment modality/interventions/strategies - Developing worktraining capacity", p4.txWork || claim.treatmentPlan || "");
+  setText("Goals - Other",                     p4.goalOther || "");
+  setText("Treatment modality/interventions/strategies - Other", p4.txOther || "");
+
+  // Section 8: Outcome measures
+  const allScores = claim.outcomeScores || {};
+  const scoreKeys = Object.keys(allScores);
+  const omRows = [["8.Scale_Row2","8.Date_Row2_af_date","8.Result_Row2","8.Interpretation_Row2"],
+                  ["8.Scale_Row3","8.Date_Row3_af_date","8.Result_Row3","8.Interpretation_Row3"]];
+  scoreKeys.slice(0,2).forEach((key, i) => {
+    const scores = [...(allScores[key]||[])].sort((a,b)=>new Date(a.date)-new Date(b.date));
+    const [sf, df, rf, inf] = omRows[i];
+    setText(sf, key);
+    if (scores[0]) { setText(df, fmtAU(scores[0].date)); setText(rf, scores[0].score||""); }
+  });
+
+  // Section 9: Treatment frequency
+  setText("1. How many sessions do you anticipate are needed within the next 3-6 months?", p4.sessions || "");
+  setText("2 What frequency",                 p4.frequency || "");
+  setText("3 Face to face or Telehealth",     p4.deliveryMode || "Face to face");
+  setText("Please provide a clinical rationale for the treatment frequency", p4.modality || p4.rationale || "");
+
+  // Section 12: Psychologist details
+  setText("12.Name",           prac&&prac.name || "");
+  setText("12.Address",        prac&&prac.address || clinic&&clinic.address || "");
+  setText("Provider Number",   prac&&prac.providerNo || "");
+  setText("12.Date_af_date",   fmtAU(new Date().toISOString()));
+
+  const patName = (claim.patientLastName||claim.patientName||"patient").replace(/\s+/g,"_");
+  dlPdf(await pdfDoc.save(), `PS604_${patName}_${new Date().toISOString().split("T")[0]}.pdf`);
+}
+
+// ── PS109 PDF MERGE ────────────────────────────────────────────────────────────
+async function generatePS109Pdf(claim, prac, clinic) {
+  let pdfBytes;
+  try { pdfBytes = await fetchPdf(FORM_URLS.ps109); }
+  catch { alert("Could not fetch the PS109 PDF from WorkSafe. Check your internet connection."); return; }
+
+  const { PDFDocument } = PDFLib;
+  const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const form = pdfDoc.getForm();
+  const setText = (n,v) => { try { form.getTextField(n).setText(v||""); } catch(e) { console.warn("PS109:",n,e.message); }};
+  const checkBox = (n,v) => { try { const f=form.getCheckBox(n); v?f.check():f.uncheck(); } catch(e) { console.warn("PS109 cb:",n,e.message); }};
+
+  const p9 = claim.ps109Data || {};
+  const p4 = claim.ps604Data || {};
+
+  // Header
+  setText("Worker\u2019s name",   (claim.patientFirstName||"")+" "+(claim.patientLastName||"").trim() || claim.patientName||"");
+  setText("Claim number",         claim.claimNumber||"");
+  setText("Occupation/job title", claim.occupation||"");
+  setText("Referrer\u2019s name", claim.referrerName || p4.referrerName || "");
+  setText("Date of referral_af_date", fmtAU(p4.referralDate || claim.dateOfInjury));
+  setText("Date of first session_af_date", fmtAU(p4.firstSessionDate||""));
+  // Sessions to date - note PS109 has "Number of sessions to date" field sharing same ID
+  // It's in the header row
+
+  // Section 1: DSM diagnosis (current)
+  const psychDiags = (claim.diagnoses||[]).filter(d=>d.cat==="Psychological").map(d=>d.label).join("; ");
+  setText("1  Your DSM diagnosis where appropriate using the latest published version of DSM",
+    p9.diagnosis || p4.diagnosis || psychDiags || "");
+
+  // Section 2: Non-work conditions
+  setText("2. Details of any non-work related psychological and/or physical conditions impacting mental state functioningcapacity",
+    p9.nonWorkConditions || "");
+
+  // Section 3: Changes
+  setText("Home life",           p9.homeLife || "");
+  setText("Social life",         p9.socialLife || "");
+  setText("Emotional wellbeing/quality of life", p9.emotionalWellbeing || "");
+  setText("Readiness to return to work or progress with the support of occupational rehabilitation services", p9.rtwReadiness || claim.rtwPlan || "");
+  setText("Other areas",         p9.otherAreas || "");
+
+  // Section 4: Goal progress checkboxes (mark "Progressing towards goal" for each by default)
+  checkBox("Progressing towards goal",   true);
+  checkBox("Progressing towards goal_2", true);
+  checkBox("Progressing towards goal_3", true);
+  checkBox("Progressing towards goal_4", true);
+
+  // Section 5: Outcome measures
+  const allScores = claim.outcomeScores || {};
+  const scoreKeys = Object.keys(allScores);
+  // 5.1 previous (from PS604), 5.2 follow-up
+  const omRows52 = [
+    ["5.2.Scale_Row2","5.2.Date_Row2_af_date","5.2.Result_Row2","5.2.Interpretation_Row2"],
+    ["5.2.Scale_Row3","5.2.Date_Row3_af_date","5.2.Result_Row3","5.2.Interpretation_Row3"],
+  ];
+  scoreKeys.slice(0,2).forEach((key, i) => {
+    const scores = [...(allScores[key]||[])].sort((a,b)=>new Date(a.date)-new Date(b.date));
+    const [sf,df,rf,inf] = omRows52[i];
+    // 5.1 = initial score
+    if (scores[0]) {
+      setText("5.1.Scale_Row1",          key);
+      setText("5.2.Date_Row1_af_date",   fmtAU(scores[0].date));
+      setText("5.2.Result_Row1",         scores[0].score||"");
+    }
+    // 5.2 = follow-up
+    const last = scores[scores.length-1];
+    if (last && last !== scores[0]) {
+      setText(sf, key);
+      setText(df, fmtAU(last.date));
+      setText(rf, last.score||"");
+    }
+  });
+
+  // Section 6 & 7: Recovery factors
+  const flags = claim.psychosocial||{};
+  const allFlags = [...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
+  setText("1. Factors that are impeding recovery", allFlags.join("; ") || p9.impedingFactors || "");
+  setText("1. How may these be addressed", p9.addressImpeding || "");
+  setText("7. Details of factors that are improving recovery (personal strengths or situational factors)", p9.improvingFactors || "");
+
+  // Section 8: What else would help
+  setText("8. What else would help the worker with their recovery at this time?", p9.whatElseHelps || "");
+
+  // Section 9: Treatment
+  setText("9.1 How many sessions have you provided", p9.sessionsCompleted || p9.sessionsProvided || "");
+  setText("9.2 How many sessions do you anticipate are needed and at what frequency", p9.sessionsAnticipated || "");
+  setText("9.3  What is your clinical rationale for the treatment frequency", p9.clinicalRationale || "");
+
+  // Section 11 (Psychologist details) — note PS109 uses same field IDs as PS604
+  setText("12.Name",          prac&&prac.name || "");
+  setText("12.Address",       prac&&prac.address || clinic&&clinic.address || "");
+  setText("Provider Number",  prac&&prac.providerNo || "");
+  setText("12.Date_af_date",  fmtAU(new Date().toISOString()));
+
+  const patName = (claim.patientLastName||claim.patientName||"patient").replace(/\s+/g,"_");
+  dlPdf(await pdfDoc.save(), `PS109_${patName}_${new Date().toISOString().split("T")[0]}.pdf`);
+}
+
+// ── GYM/SWIM PDF — COORDINATE TEXT OVERLAY (flat PDF) ─────────────────────────
+// Page dimensions: 595.3 x 841.9 pts (A4). PDF y=0 is bottom of page.
+// Coordinates derived from structure extraction (y inverted: pdfY = 841.9 - structureY)
+async function generateGymSwimPdf(claim, prac, clinic) {
+  let pdfBytes;
+  try { pdfBytes = await fetchPdf(FORM_URLS.gym_swim); }
+  catch { alert("Could not fetch the Gym/Swim PDF from WorkSafe. Check your internet connection."); return; }
+
+  const { PDFDocument, rgb, StandardFonts } = PDFLib;
+  const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const pages = pdfDoc.getPages();
+  const p1 = pages[0];
+  const p2 = pages[1];
+  const H = 841.9; // page height
+  const fs = 9;    // font size
+  const col = rgb(0,0,0);
+
+  // Helper: draw text at structure coords (y measured from top, converted to PDF bottom-origin)
+  const draw = (page, x, structY, text, size=fs) => {
+    if (!text) return;
+    const y = H - structY - (size * 0.8); // align to middle of field row
+    page.drawText(String(text), { x, y, size, font, color: col });
+  };
+
+  const gd = claim.gymData || {};
+  const patName = (claim.patientFirstName||"") + " " + (claim.patientLastName||"").trim() || claim.patientName||"";
+
+  // Page 1 -------
+  // Membership type checkboxes (tick marks at approximate positions)
+  const gymType = gd.type || claim.gymType || "";
+  if (gymType.includes("Gym") && !gymType.includes("Swim")) draw(p1, 133, 150, "✓", 10);
+  else if (gymType.includes("Swim") && !gymType.includes("Gym")) draw(p1, 193, 150, "✓", 10);
+  else if (gymType.includes("Gym") && gymType.includes("Swim")) draw(p1, 255, 150, "✓", 10);
+
+  // Worker details row (y≈216 in structure = input area below label at y≈216)
+  draw(p1, 28,  228, patName);
+  draw(p1, 388, 228, fmtAU(claim.dob));
+
+  // Occupation / DOI / Claim row (y≈256)
+  draw(p1, 28,  268, claim.occupation||"");
+  draw(p1, 208, 268, fmtAU(claim.dateOfInjury));
+  draw(p1, 388, 268, claim.claimNumber||"");
+
+  // Diagnosis (y≈327, input area starts ~345)
+  draw(p1, 28, 345, (claim.diagnoses||[]).map(d=>d.label).join("; "));
+
+  // Work status (current hours / duties row ~ y 455)
+  // Pre-injury hours
+  draw(p1, 143, 450, claim.preInjuryHours||"");
+  // Current hours
+  draw(p1, 143, 466, claim.currentHours||"");
+
+  // Outcome measures table (header row y≈539, first data row ~558)
+  const allScores = claim.outcomeScores || {};
+  const scoreKeys = Object.keys(allScores);
+  const omStartY = 558;
+  scoreKeys.slice(0,3).forEach((key, i) => {
+    const scores = [...(allScores[key]||[])].sort((a,b)=>new Date(a.date)-new Date(b.date));
+    const rowY = omStartY + i*18;
+    draw(p1, 50,  rowY, key, 8);
+    if (scores[0]) { draw(p1, 186, rowY, fmtAU(scores[0].date), 8); draw(p1, 250, rowY, scores[0].score||"", 8); }
+    if (scores[1]) { draw(p1, 321, rowY, fmtAU(scores[1].date), 8); draw(p1, 385, rowY, scores[1].score||"", 8); }
+    if (scores[2]) { draw(p1, 456, rowY, fmtAU(scores[2].date), 8); draw(p1, 520, rowY, scores[2].score||"", 8); }
+  });
+
+  // Goals section (section 6, page 2, y≈74 structure = goals row 1)
+  const goalLim1 = claim.ahGoalLim1 || gd.lim1 || "";
+  const goalLim2 = claim.ahGoalLim2 || gd.lim2 || "";
+  const goalLim3 = claim.ahGoalLim3 || gd.lim3 || "";
+  const goalTgt1 = claim.ahGoalTarget1 || gd.goal1 || "";
+  const goalTgt2 = claim.ahGoalTarget2 || gd.goal2 || "";
+  const goalTgt3 = claim.ahGoalTarget3 || gd.goal3 || "";
+  draw(p2, 34,  86, goalLim1, 9); draw(p2, 304, 86, goalTgt1, 9);
+  draw(p2, 34, 106, goalLim2, 9); draw(p2, 304,106, goalTgt2, 9);
+  draw(p2, 34, 126, goalLim3, 9); draw(p2, 304,126, goalTgt3, 9);
+
+  // Provider details (section 7, page 2, y≈166+)
+  draw(p2, 28,  178, prac&&prac.name || "");
+  draw(p2, 298, 178, prac&&prac.phone || clinic&&clinic.phone || "");
+  // Fax (skip)
+  draw(p2, 28,  218, prac&&prac.address || clinic&&clinic.address || "");
+  draw(p2, 501, 218, prac&&prac.postcode || clinic&&clinic.postcode || "");
+  // Time/availability
+  draw(p2, 28,  258, "");
+  // Date (right side, y≈285 for signature row)
+  draw(p2, 501, 298, fmtAU(new Date().toISOString()));
+
+  // Profession checkboxes (y≈346)
+  const prof = claim.practitionerProfession||"";
+  if (prof === "General Practitioner") draw(p2, 85, 347, "✓", 10);
+  else if (prof === "Physiotherapist")  draw(p2, 213, 347, "✓", 10);
+  else if (prof === "Chiropractor")     draw(p2, 322, 347, "✓", 10);
+  else if (prof === "Osteopath")        draw(p2, 413, 347, "✓", 10);
+
+  const patFileN = (claim.patientLastName||claim.patientName||"patient").replace(/\s+/g,"_");
+  dlPdf(await pdfDoc.save(), `GymSwim_${patFileN}_${new Date().toISOString().split("T")[0]}.pdf`);
+}
+
+
 // ── TAB 6: ALLIED HEALTH FORMS (rebuilt) ─────────────────────────────────────
 const WS_PRINT_STYLE=`
 @media print {
@@ -1469,7 +2115,7 @@ function WSPrintWrap({title,code,onBack,children}){
   return div({style:{background:"white",color:"black",fontFamily:"Arial,sans-serif",fontSize:11,padding:24,maxWidth:760,margin:"0 auto"}},[
     e("style",{key:"ps"},WS_PRINT_STYLE),
     div({key:"btns",className:"ws-no-print",style:{position:"sticky",top:0,zIndex:10,background:"rgba(12,26,46,0.97)",borderBottom:"1px solid rgba(255,255,255,0.1)",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",marginBottom:16,marginLeft:-24,marginRight:-24,paddingLeft:24,paddingRight:24}},[
-      div({key:"l",style:{fontSize:"0.82rem",color:"#5B7A99"}},title+" \u2014 Preview"),
+      div({key:"l",style:{display:"flex",flexDirection:"column",gap:2}},[div({key:"t",style:{fontSize:"0.82rem",color:"#5B7A99"}},title+" \u2014 Preview"),div({key:"coc",style:{fontSize:"0.68rem",color:"rgba(0,201,167,0.7)"}},"\u2190 Close to return  |  COC tab = Certificate of Capacity")]),
       div({key:"r",style:{display:"flex",gap:10}},[
         btn({key:"p",onClick:()=>window.print(),style:{...S.btnP,fontSize:"0.82rem"}},"\uD83D\uDDA8\uFE0F Print / Save PDF"),
         btn({key:"b",onClick:onBack,style:{...S.btnS,fontSize:"0.82rem"}},"\u2715 Close preview"),
@@ -1588,6 +2234,7 @@ function PS109Print({claim,clinic,practitioners,onBack}){
 }
 
 function Tab6({claim,up,clinic,practitioners}){
+  const prac=practitioners.find(p=>p.id===claim.practitionerId)||{};
   const[sel,setSel]=useState(claim.alliedForm||"");
   const[printForm,setPrintForm]=useState(null);
   const prof=claim.practitionerProfession||"";
@@ -1616,7 +2263,7 @@ function Tab6({claim,up,clinic,practitioners}){
     prof&&div({key:"prof-note",style:{...S.ok,marginBottom:16}},"Showing forms for "+prof),
     div({key:"pills",style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}},visibleForms.map(f=>btn({key:f.id,onClick:()=>{setSel(f.id);up("alliedForm",f.id);},style:{...S.pill,...(selForm===f.id?S.pillT:S.pillM),fontSize:"0.8rem",padding:"8px 16px"}},f.label))),
     selForm==="ahrmp"&&div({key:"ahrmp"},[div({key:"card",style:{...S.card,borderTop:"3px solid #F5A623"}},[
-      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Allied Health Recovery Management Plan"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR912/04/06.25")]),btn({key:"print",style:{...S.btnP,fontSize:"0.82rem",display:"flex",alignItems:"center",gap:6},onClick:()=>setPrintForm("ahrmp")},"\uD83D\uDDA8\uFE0F Print Form")]),
+      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Allied Health Recovery Management Plan"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR912/04/06.25")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generateAHRMPPdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF"),btn({key:"prev",style:{...S.btnS,fontSize:"0.78rem",padding:"8px 12px"},onClick:()=>setPrintForm("ahrmp")},"Preview")])]),
       e(OK,{key:"ok"},"Patient, diagnosis and capacity details pre-populated from Treatment Plan"),
       e(Ta,{key:"g",label:"Specific goals for this referral",value:ah.goals||"",onChange:upAH("goals"),placeholder:"Goals...",rows:4}),
       div({key:"gr",style:S.g2},[e(Sel,{key:"t",label:"Treatment type",value:ah.treatment||"",onChange:upAH("treatment"),options:["Physiotherapy","Chiropractic","Osteopathy","Podiatry","EIPF Physiotherapy","Exercise Physiology","Occupational Therapy"],mb:0}),e(Inp,{key:"f",label:"Frequency",value:ah.frequency||"",onChange:upAH("frequency"),placeholder:"e.g. 2x per week",mb:0})]),
@@ -1627,7 +2274,7 @@ function Tab6({claim,up,clinic,practitioners}){
       e(Ta,{key:"b",label:"Barriers to recovery",value:ah.barriers||"",onChange:upAH("barriers"),placeholder:"Identified barriers...",rows:3}),
     ])]),
     selForm==="household"&&div({key:"hh"},[div({key:"card",style:{...S.card,borderTop:"3px solid #F5A623"}},[
-      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Household Help Request"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR592/03/11.25")]),btn({key:"print",style:{...S.btnP,fontSize:"0.82rem",display:"flex",alignItems:"center",gap:6},onClick:()=>setPrintForm("household")},"\uD83D\uDDA8\uFE0F Print Form")]),
+      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Household Help Request"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR592/03/11.25")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generateHouseholdPdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF"),btn({key:"prev",style:{...S.btnS,fontSize:"0.78rem",padding:"8px 12px"},onClick:()=>setPrintForm("household")},"Preview")])]),
       e(OK,{key:"ok"},"Capacity limitations auto-populated from diagnosis screen"),
       e(Ta,{key:"t",label:"Tasks patient cannot perform",value:hh.tasks||"",onChange:upHH("tasks"),placeholder:"e.g. Vacuuming, mopping..."}),
       div({key:"g",style:S.g2},[e(Inp,{key:"f",label:"Frequency required",value:hh.frequency||"",onChange:upHH("frequency"),placeholder:"e.g. 2x per week"}),e(Inp,{key:"d",label:"Duration requested",value:hh.duration||"",onChange:upHH("duration"),placeholder:"e.g. 4 weeks"})]),
@@ -1635,7 +2282,7 @@ function Tab6({claim,up,clinic,practitioners}){
       e(Ta,{key:"j",label:"Clinical justification",value:hh.justification||"",onChange:upHH("justification"),placeholder:"Clinical reasoning...",rows:4}),
     ])]),
     selForm==="gym_swim"&&div({key:"gs"},[div({key:"card",style:{...S.card,borderTop:"3px solid #F5A623"}},[
-      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Gym / Swim Membership Request"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR919/02/06.20")]),btn({key:"print",style:{...S.btnP,fontSize:"0.82rem",display:"flex",alignItems:"center",gap:6},onClick:()=>setPrintForm("gym_swim")},"\uD83D\uDDA8\uFE0F Print Form")]),
+      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Gym / Swim Membership Request"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR919/02/06.20")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generateGymSwimPdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF"),btn({key:"prev",style:{...S.btnS,fontSize:"0.78rem",padding:"8px 12px"},onClick:()=>setPrintForm("gym_swim")},"Preview")])]),
       e(Sel,{key:"t",label:"Type",value:gd.type||"",onChange:upGD("type"),options:["Gym membership","Hydrotherapy / pool access","Gym + hydrotherapy combined"]}),
       e(Sel,{key:"sup",label:"Supervised or unsupervised",value:gd.supervised||"",onChange:upGD("supervised"),options:["Supervised","Unsupervised","Either"]}),
       e(Ta,{key:"j",label:"Clinical justification",value:gd.justification||"",onChange:upGD("justification"),placeholder:"Why gym/swim is clinically appropriate..."}),
@@ -1643,7 +2290,7 @@ function Tab6({claim,up,clinic,practitioners}){
       e(Inp,{key:"d",label:"Duration requested",value:gd.duration||"",onChange:upGD("duration"),placeholder:"e.g. 3 months"}),
     ])]),
     selForm==="ps604"&&div({key:"ps604"},[div({key:"card",style:{...S.card,borderTop:"3px solid #1a3a6a"}},[
-      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"PS604 \u2014 Psychology Treatment Planning Form"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR972/02/05.24")]),btn({key:"print",style:{...S.btnP,fontSize:"0.82rem",display:"flex",alignItems:"center",gap:6},onClick:()=>setPrintForm("ps604")},"\uD83D\uDDA8\uFE0F Print Form")]),
+      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"PS604 \u2014 Psychology Treatment Planning Form"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR972/02/05.24")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generatePS604Pdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF"),btn({key:"prev",style:{...S.btnS,fontSize:"0.78rem",padding:"8px 12px"},onClick:()=>setPrintForm("ps604")},"Preview")])]),
       e(OK,{key:"ok"},"Psychological diagnoses, outcome measures and mental function auto-populated"),
       e(Ta,{key:"d",label:"Psychological diagnosis (DSM-5 / ICD-11)",value:p4.diagnosis||"",onChange:upP4("diagnosis"),placeholder:"e.g. Adjustment Disorder..."}),
       e(Ta,{key:"r",label:"Relationship to compensable injury",value:p4.relationship||"",onChange:upP4("relationship"),placeholder:"How does the condition relate..."}),
@@ -1654,7 +2301,7 @@ function Tab6({claim,up,clinic,practitioners}){
       e(Inp,{key:"ahpra",label:"AHPRA registration number",value:p4.ahpra||"",onChange:upP4("ahpra"),placeholder:"PSY0001234"}),
     ])]),
     selForm==="ps109"&&div({key:"ps109"},[div({key:"card",style:{...S.card,borderTop:"3px solid #1a3a6a"}},[
-      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"PS109 \u2014 Psychology Treatment Review Form"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR973/02/05.24")]),btn({key:"print",style:{...S.btnP,fontSize:"0.82rem",display:"flex",alignItems:"center",gap:6},onClick:()=>setPrintForm("ps109")},"\uD83D\uDDA8\uFE0F Print Form")]),
+      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"PS109 \u2014 Psychology Treatment Review Form"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR973/02/05.24")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generatePS109Pdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF"),btn({key:"prev",style:{...S.btnS,fontSize:"0.78rem",padding:"8px 12px"},onClick:()=>setPrintForm("ps109")},"Preview")])]),
       e(OK,{key:"ok"},"Outcome measures, mental function and RTW data auto-populated"),
       e(Inp,{key:"sc",label:"Sessions completed to date",value:p9.sessionsCompleted||"",onChange:upP9("sessionsCompleted"),placeholder:"e.g. 8 sessions"}),
       e(Inp,{key:"pd",label:"PS604 reference date",value:p9.ps604Date||"",onChange:upP9("ps604Date"),type:"date"}),
@@ -1823,6 +2470,281 @@ function Tab8({claim,up,clinic,practitioners}){
   ]);
 }
 
+
+// ── WARM HANDOVER PACKAGE PDF ─────────────────────────────────────────────────
+function generateHandoverPdf(claim, practitioners, clinic) {
+  const { jsPDF } = window.jspdf;
+  // Use jsPDF since it's already loaded (replacing jspdf with pdf-lib would need different approach)
+  // Actually we have pdf-lib now - use that approach
+  // Simple approach: generate as printable HTML page
+  const prac = practitioners.find(p=>p.id===claim.practitionerId)||{};
+  const allPracs = (claim.episodes||[]).map(ep=>ep.practitionerName).filter(Boolean);
+  const uniquePracs = [...new Set(allPracs)];
+  const fmtD = d=>{if(!d)return'—';try{return new Date(d).toLocaleDateString('en-AU');}catch{return d;}};
+  const diags = (claim.diagnoses||[]).map(d=>d.label+' ('+d.icd10+')').join('; ')||'—';
+  const flags = claim.psychosocial||{};
+  const allFlags = [...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
+  const allScores = claim.outcomeScores||{};
+  const refs = claim.referrals||[];
+  const episodes = claim.episodes||[];
+  const meds = claim.medications||[];
+  
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Warm Handover Package — ${claim.patientName||'Patient'}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1a1a; background: white; padding: 20px; }
+  .header { border-bottom: 3px solid #006B5E; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .logo { font-size: 18px; font-weight: 800; color: #006B5E; }
+  .title { font-size: 14px; font-weight: 700; margin-top: 4px; }
+  .meta { font-size: 9px; color: #666; text-align: right; }
+  .confidential { background: #FEF3C7; border: 1px solid #F59E0B; padding: 6px 10px; margin-bottom: 14px; font-size: 9px; font-weight: 600; color: #92400E; }
+  .section { margin-bottom: 14px; }
+  .sec-hdr { background: #006B5E; color: white; padding: 5px 10px; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0; }
+  .sec-body { border: 1px solid #ccc; border-top: none; padding: 8px 10px; }
+  .row { display: grid; gap: 8px; margin-bottom: 5px; }
+  .row-2 { grid-template-columns: 1fr 1fr; }
+  .row-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .lbl { font-size: 9px; color: #555; margin-bottom: 2px; }
+  .val { font-weight: 600; border-bottom: 1px solid #eee; padding-bottom: 2px; min-height: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 6px; }
+  th { border: 1px solid #ccc; padding: 4px 6px; background: #f0f0f0; font-weight: 700; font-size: 9px; text-align: left; }
+  td { border: 1px solid #ccc; padding: 4px 6px; vertical-align: top; }
+  .flag { display: inline-block; padding: 2px 6px; border-radius: 10px; font-size: 9px; margin: 2px; }
+  .flag-y { background: #FEF3C7; color: #92400E; }
+  .flag-b { background: #DBEAFE; color: #1E40AF; }
+  .flag-bk { background: #F3F4F6; color: #374151; }
+  .flag-o { background: #FEE2E2; color: #991B1B; }
+  .note { font-size: 9px; color: #666; font-style: italic; margin-top: 8px; }
+  .footer { margin-top: 16px; padding-top: 8px; border-top: 1px solid #ddd; font-size: 8px; color: #999; text-align: center; }
+  @media print { @page { margin: 12mm; size: A4; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <div class="logo">ClaimBridge</div>
+    <div class="title">Warm Handover Package</div>
+    <div style="font-size:9px;color:#666;margin-top:3px;">Prepared for incoming treating practitioner</div>
+  </div>
+  <div class="meta">
+    <div><strong>Date prepared:</strong> ${new Date().toLocaleDateString('en-AU')}</div>
+    <div><strong>Prepared by:</strong> ${prac.name||clinic.name||'—'}</div>
+    <div><strong>Clinic:</strong> ${clinic.name||'—'}</div>
+  </div>
+</div>
+
+<div class="confidential">⚠️ CONFIDENTIAL — This document contains private health information. For clinical handover use only. Patient consent obtained.</div>
+
+<div class="section">
+  <div class="sec-hdr">1. Patient & Claim Details</div>
+  <div class="sec-body">
+    <div class="row row-3">
+      <div><div class="lbl">Full name</div><div class="val">${claim.patientName||'—'}</div></div>
+      <div><div class="lbl">Date of birth</div><div class="val">${fmtD(claim.dob)}</div></div>
+      <div><div class="lbl">Claim number</div><div class="val">${claim.claimNumber||'—'}</div></div>
+    </div>
+    <div class="row row-3" style="margin-top:6px">
+      <div><div class="lbl">Scheme</div><div class="val">${claim.scheme||'WorkCover'}</div></div>
+      <div><div class="lbl">Insurer / Agent</div><div class="val">${claim.insurerName||claim.insurerNameCustom||'—'}</div></div>
+      <div><div class="lbl">Date of injury</div><div class="val">${fmtD(claim.dateOfInjury)}</div></div>
+    </div>
+    <div class="row row-2" style="margin-top:6px">
+      <div><div class="lbl">Address</div><div class="val">${claim.patientAddress||'—'}</div></div>
+      <div><div class="lbl">Employer</div><div class="val">${claim.employerName||'—'}</div></div>
+    </div>
+    <div class="row row-3" style="margin-top:6px">
+      <div><div class="lbl">Phone</div><div class="val">${claim.patientPhone||'—'}</div></div>
+      <div><div class="lbl">Email</div><div class="val">${claim.patientEmail||'—'}</div></div>
+      <div><div class="lbl">Claim status</div><div class="val">${claim.status||'Active'}</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">2. Diagnosis</div>
+  <div class="sec-body">
+    <div class="lbl">Clinical diagnoses (ICD-10)</div>
+    <div class="val" style="margin-bottom:8px">${diags}</div>
+    ${claim.preExisting ? `<div class="lbl">Pre-existing conditions</div><div class="val">${claim.preExisting}</div>` : ''}
+    ${claim.injuryMechanism ? `<div class="lbl" style="margin-top:6px">Mechanism of injury</div><div class="val">${claim.injuryMechanism}${claim.injuryDescription?' — '+claim.injuryDescription:''}</div>` : ''}
+    ${claim.injuryCausation ? `<div class="lbl" style="margin-top:6px">Causation / pathophysiology</div><div class="val">${claim.injuryCausation}</div>` : ''}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">3. Current Capacity Assessment</div>
+  <div class="sec-body">
+    <table>
+      <thead><tr><th>Physical function</th><th>Can</th><th>With modifications</th><th>Cannot</th></tr></thead>
+      <tbody>
+        ${['sit','stand','walk','bend','kneel','stairs','lift_light','lift_mod','lift_heavy','push_pull','overhead','fine_motor','drive','heights'].map(id=>{
+          const labels={sit:'Sit',stand:'Stand',walk:'Walk',bend:'Bend/Stoop',kneel:'Kneel/Squat',stairs:'Climb stairs',lift_light:'Lift <5kg',lift_mod:'Lift 5-15kg',lift_heavy:'Lift >15kg',push_pull:'Push/Pull',overhead:'Reach overhead',fine_motor:'Fine motor',drive:'Drive',heights:'Work at heights'};
+          const c=(claim.capacity||{})[id];
+          if(!c) return '';
+          return `<tr><td>${labels[id]||id}</td><td style="text-align:center">${c==='Can'?'☑':'☐'}</td><td style="text-align:center">${c==='Modified'?'☑':'☐'}</td><td style="text-align:center">${c==='Cannot'?'☑':'☐'}</td></tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    ${claim.physicalNotes ? `<div class="lbl">Physical notes</div><div style="font-size:10px;padding:3px 0">${claim.physicalNotes}</div>` : ''}
+    <div class="lbl" style="margin-top:6px">Mental function</div>
+    <div style="font-size:10px;padding:3px 0">${claim.mentalStatus||'Not assessed'}${claim.mentalNotes?' — '+claim.mentalNotes:''}</div>
+    ${claim.workRestrictions ? `<div class="lbl" style="margin-top:6px">Work restrictions</div><div style="font-size:10px;padding:3px 0">${claim.workRestrictions}</div>` : ''}
+    ${claim.activityRestrictions ? `<div class="lbl" style="margin-top:6px">Activity restrictions</div><div style="font-size:10px;padding:3px 0">${claim.activityRestrictions}</div>` : ''}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">4. Current Certificate of Capacity</div>
+  <div class="sec-body">
+    <div class="row row-3">
+      <div><div class="lbl">Fitness for work</div><div class="val">${claim.fitnessForWork||'Not issued'}</div></div>
+      <div><div class="lbl">Valid from</div><div class="val">${fmtD(claim.cocFrom||claim.fitNormalFrom||claim.fitRestrictFrom||claim.unfitFrom)}</div></div>
+      <div><div class="lbl">Valid to</div><div class="val">${fmtD(claim.cocTo||claim.fitRestrictTo||claim.unfitTo)}</div></div>
+    </div>
+    <div class="row row-2" style="margin-top:6px">
+      <div><div class="lbl">Next review date</div><div class="val">${fmtD(claim.nextReviewDate)}</div></div>
+      <div><div class="lbl">Certificate number</div><div class="val">${claim.cocCount||1}</div></div>
+    </div>
+    ${claim.fitnessRestrictions ? `<div class="lbl" style="margin-top:6px">Restrictions detail</div><div style="font-size:10px;padding:3px 0">${claim.fitnessRestrictions}</div>` : ''}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">5. Outcome Measures</div>
+  <div class="sec-body">
+    ${Object.keys(allScores).length===0 ? '<div style="color:#999;font-style:italic;font-size:10px">No outcome measures recorded</div>' : `
+    <table>
+      <thead><tr><th>Measure</th><th>Initial date</th><th>Initial score</th><th>Latest date</th><th>Latest score</th><th>Trend</th></tr></thead>
+      <tbody>
+        ${Object.keys(allScores).map(key=>{
+          const scores=[...(allScores[key]||[])].sort((a,b)=>new Date(a.date)-new Date(b.date));
+          const m=OUTCOME_MEASURES[key]||{unit:''};
+          const first=scores[0]||{};const last=scores[scores.length-1]||{};
+          const trend=scores.length>1?(m.higherBetter?(parseFloat(last.score)>parseFloat(first.score)?'↑ Improving':'↓ Declining'):(parseFloat(last.score)<parseFloat(first.score)?'↑ Improving':'↓ Declining')):'—';
+          return `<tr><td><strong>${key}</strong></td><td>${first.date?new Date(first.date).toLocaleDateString('en-AU'):''}</td><td>${first.score?(first.score+m.unit):''}</td><td>${last.date&&last.date!==first.date?new Date(last.date).toLocaleDateString('en-AU'):''}</td><td>${last.score&&last.score!==first.score?(last.score+m.unit):''}</td><td>${trend}</td></tr>`;
+        }).join('')}
+      </tbody>
+    </table>`}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">6. Treatment History</div>
+  <div class="sec-body">
+    ${claim.treatmentPlan ? `<div class="lbl">Treatment plan / management approach</div><div style="font-size:10px;padding:3px 0 6px">${claim.treatmentPlan}</div>` : ''}
+    ${claim.goalsShort ? `<div class="lbl">Short-term goals</div><div style="font-size:10px;padding:3px 0 6px">${claim.goalsShort}</div>` : ''}
+    ${claim.goalsLong ? `<div class="lbl">Long-term goals</div><div style="font-size:10px;padding:3px 0 6px">${claim.goalsLong}</div>` : ''}
+    ${episodes.length>0 ? `
+    <div class="lbl" style="margin-top:4px">Consultation episodes</div>
+    <table style="margin-top:4px">
+      <thead><tr><th>#</th><th>Date</th><th>Practitioner</th><th>Label</th><th>Referrals</th></tr></thead>
+      <tbody>
+        ${episodes.map(ep=>`<tr><td>${ep.episodeNo||'—'}</td><td>${new Date(ep.date).toLocaleDateString('en-AU')}</td><td>${ep.practitionerName||'—'}${ep.practitionerProfession?' ('+ep.practitionerProfession+')':''}</td><td>${ep.label||'—'}</td><td>${(ep.referrals||[]).length}</td></tr>`).join('')}
+      </tbody>
+    </table>` : ''}
+    ${uniquePracs.length>0 ? `<div class="note">All treating practitioners: ${uniquePracs.join(', ')}</div>` : ''}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">7. Referrals & Approvals</div>
+  <div class="sec-body">
+    ${refs.length===0 ? '<div style="color:#999;font-style:italic;font-size:10px">No referrals recorded</div>' : `
+    <table>
+      <thead><tr><th>Specialty</th><th>Practitioner</th><th>Priority</th><th>Status</th><th>Updated</th></tr></thead>
+      <tbody>
+        ${refs.map(r=>`<tr><td>${r.specialty||'—'}</td><td>${r.name||'—'}${r.clinic?' ('+r.clinic+')':''}</td><td>${r.priority||'—'}</td><td><strong>${r.status||'Pending'}</strong></td><td>${r.statusDate?new Date(r.statusDate).toLocaleDateString('en-AU'):'—'}</td></tr>`).join('')}
+      </tbody>
+    </table>`}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">8. Psychosocial Flags</div>
+  <div class="sec-body">
+    ${allFlags.length===0 ? '<div style="color:#999;font-style:italic;font-size:10px">No flags recorded</div>' : `
+    <div style="margin-bottom:6px">
+      ${(flags.yellow||[]).map(f=>`<span class="flag flag-y">⚑ ${f}</span>`).join('')}
+      ${(flags.blue||[]).map(f=>`<span class="flag flag-b">⚑ ${f}</span>`).join('')}
+      ${(flags.black||[]).map(f=>`<span class="flag flag-bk">⚑ ${f}</span>`).join('')}
+      ${(flags.orange||[]).map(f=>`<span class="flag flag-o">⚑ ${f}</span>`).join('')}
+    </div>
+    ${claim.psychosocialNotes ? `<div class="lbl">Psychosocial notes</div><div style="font-size:10px">${claim.psychosocialNotes}</div>` : ''}`}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">9. RTW Plan</div>
+  <div class="sec-body">
+    <div class="row row-2">
+      <div><div class="lbl">Estimated RTW — modified duties</div><div class="val">${fmtD(claim.rtwModifiedDate)}</div></div>
+      <div><div class="lbl">Estimated RTW — normal duties</div><div class="val">${fmtD(claim.rtwNormalDate)}</div></div>
+    </div>
+    ${claim.rtwPlan ? `<div class="lbl" style="margin-top:6px">RTW plan</div><div style="font-size:10px;padding:3px 0">${claim.rtwPlan}</div>` : ''}
+    ${claim.modifiedDuties ? `<div class="lbl" style="margin-top:6px">Modified duties available</div><div style="font-size:10px;padding:3px 0">${claim.modifiedDuties}</div>` : ''}
+    ${claim.barriers ? `<div class="lbl" style="margin-top:6px">Barriers to recovery</div><div style="font-size:10px;padding:3px 0">${claim.barriers}</div>` : ''}
+  </div>
+</div>
+
+${meds.length>0 ? `
+<div class="section">
+  <div class="sec-hdr">10. Current Medications</div>
+  <div class="sec-body">
+    <table>
+      <thead><tr><th>Medication</th><th>Dosage</th><th>Frequency</th><th>Duration</th></tr></thead>
+      <tbody>
+        ${meds.map(m=>`<tr><td><strong>${m.name||'—'}</strong></td><td>${m.dosage||'—'}</td><td>${m.frequency||'—'}</td><td>${m.duration||'—'}</td></tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+</div>` : ''}
+
+<div class="section">
+  <div class="sec-hdr">11. Imaging & Investigations</div>
+  <div class="sec-body">
+    ${(claim.imagingReports||[]).length===0 && !claim.otherInvestigations ? '<div style="color:#999;font-style:italic;font-size:10px">No imaging or investigations recorded</div>' : ''}
+    ${(claim.imagingReports||[]).map(r=>`<div style="font-size:10px;margin-bottom:4px"><strong>${r.name}</strong> — uploaded ${new Date(r.uploadedAt).toLocaleDateString('en-AU')}${r.summary?' — '+r.summary.clinicalSummary:''}</div>`).join('')}
+    ${claim.otherInvestigations ? `<div class="lbl" style="margin-top:4px">Other investigations</div><div style="font-size:10px">${claim.otherInvestigations}</div>` : ''}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">12. Referring Practitioner Details</div>
+  <div class="sec-body">
+    <div class="row row-3">
+      <div><div class="lbl">Name</div><div class="val">${prac.name||'—'}</div></div>
+      <div><div class="lbl">Profession</div><div class="val">${prac.profession||'—'}</div></div>
+      <div><div class="lbl">Provider number</div><div class="val">${prac.providerNo||'—'}</div></div>
+    </div>
+    <div class="row row-2" style="margin-top:6px">
+      <div><div class="lbl">Phone</div><div class="val">${prac.phone||clinic.phone||'—'}</div></div>
+      <div><div class="lbl">Email</div><div class="val">${prac.email||'—'}</div></div>
+    </div>
+    <div class="lbl" style="margin-top:6px">Clinic</div>
+    <div class="val">${clinic.name||'—'} — ${prac.address||clinic.address||'—'}</div>
+  </div>
+</div>
+
+<div class="footer">
+  Warm Handover Package — Generated by ClaimBridge on ${new Date().toLocaleDateString('en-AU')} — CONFIDENTIAL — For clinical use only<br>
+  Patient: ${claim.patientName||'—'} | Claim: ${claim.claimNumber||'—'} | ${claim.scheme||'WorkCover'}
+</div>
+
+</body>
+</html>`;
+
+  // Open in new window for printing
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => win.print(), 500);
+}
+
+
 // ── TAB: OVERVIEW ─────────────────────────────────────────────────────────────
 function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,createEpisode,setEpTab}){
   const prac=practitioners.find(p=>p.id===claim.practitionerId);
@@ -1853,6 +2775,7 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
           ]),
         ]),
         div({key:"r",style:{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8}},[
+          btn({key:"handover",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 14px",marginBottom:4,display:"flex",alignItems:"center",gap:6},onClick:()=>generateHandoverPdf(claim,practitioners,clinic)},"Handover Package"),
           span({key:"status",style:{...S.pill,...statusStyle(claim.status||"Active"),cursor:"default"}},claim.status||"Active"),
           claim.nextReviewDate&&div({key:"rev",style:{fontSize:"0.76rem",color:"#5B7A99"}},"Next review: "+fmtD(claim.nextReviewDate)),
         ]),
