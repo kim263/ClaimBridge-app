@@ -1192,11 +1192,9 @@ async function generateCOCPdf(claim, prac, clinic) {
   const COC_PDF_URL = "https://www.worksafe.vic.gov.au/sites/default/files/2022-11/Certificate_of_capacity.pdf";
   let pdfBytes;
   try {
-    const res = await fetch(COC_PDF_URL);
-    if (!res.ok) throw new Error("fetch failed");
-    pdfBytes = await res.arrayBuffer();
-  } catch {
-    alert("Could not fetch the official WorkSafe PDF.\n\nTip: Try opening the app in a browser (not a preview) — the PDF is fetched directly from worksafe.vic.gov.au");
+    pdfBytes = await fetchPdf(COC_PDF_URL);
+  } catch(err) {
+    alert("Could not fetch the Certificate of Capacity PDF.\n\n" + err.message + "\n\nCheck your internet connection and try again.");
     return;
   }
   const { PDFDocument } = PDFLib;
@@ -1596,9 +1594,19 @@ const FORM_URLS = {
 };
 
 async function fetchPdf(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("HTTP " + res.status + " fetching " + url);
-  return res.arrayBuffer();
+  // Try direct fetch first (works in some environments)
+  // Fall back to CORS proxy if blocked
+  try {
+    const res = await fetch(url, {mode:"cors"});
+    if (res.ok) return res.arrayBuffer();
+    throw new Error("direct failed");
+  } catch(e) {
+    // Use CORS proxy for cross-origin PDF fetch
+    const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(url);
+    const res = await fetch(proxyUrl);
+    if (!res.ok) throw new Error("Could not fetch PDF (HTTP " + res.status + "). Check your internet connection.");
+    return res.arrayBuffer();
+  }
 }
 
 function dlPdf(bytes, filename) {
