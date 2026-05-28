@@ -770,7 +770,7 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
         curTab===3&&e(Tab4,{key:"t3",claim:viewClaim,up,clinic,practitioners}),
         curTab===4&&e(Tab5,{key:"t4",claim:viewClaim,up,clinic,practitioners}),
         curTab===5&&e(Tab6,{key:"t5",claim:viewClaim,up,clinic,practitioners}),
-        curTab===6&&e(Tab8,{key:"t6",claim:viewClaim,up,clinic,practitioners}),
+        curTab===6&&e(Tab8,{key:"t6",claim:viewClaim,up,clinic,practitioners,onInvoice}),
         curTab===7&&e(TabClaimLog,{key:"t7",claim,up,clinic,practitioners,setActiveEpId,setEpTab}),
       ];
     })(),
@@ -1396,14 +1396,7 @@ function Tab4({claim,up,clinic,practitioners}){
           up("referrals",updated);
           up("newRef",{specialty:"",name:"",clinic:"",email:"",priority:"Routine (within 4 weeks)",reasoning:""});
         }},"+ Add referral"),
-        (claim.referrals||[]).length>0&&div({key:"ref-send",style:{marginTop:14,paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
-                    div({key:"h",style:{fontWeight:600,fontSize:"0.85rem",marginBottom:8}},"Generate & send referral letter"),
-                    div({key:"btns",style:{display:"flex",gap:10,flexWrap:"wrap"}},[
-                      btn({key:"gs",style:{...S.btnP,fontSize:"0.82rem"},onClick:()=>{const l=buildQuickLetter("allied_health",claim,practitioners,clinic);if(!l)return;sendQuickLetter({letter:l,toEmail:claim.caseManagerEmail||"",toName:claim.caseManagerName||claim.insurerName,ccEmail:claim.patientEmail,claim,up,subject:"Request for Allied Health Referral — "+claim.patientName});}},"📨 Send to case manager"),
-                      btn({key:"gp",style:{...S.btnS,fontSize:"0.82rem"},onClick:()=>{const l=buildQuickLetter("allied_health",claim,practitioners,clinic);const r=(claim.referrals||[])[0]||{};if(!l)return;sendQuickLetter({letter:l,toEmail:r.email||"",toName:r.name||r.specialty,ccEmail:claim.patientEmail,claim,up,subject:"Referral — "+claim.patientName});}},"📨 Send to practitioner"),
-                    ]),
-                    div({key:"note",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:6}},"Patient automatically CC'd. Saved to claim log."),
-                  ]),
+        
         (claim.referrals||[]).length>0&&div({key:"list",style:{marginTop:16}},[
           ...(claim.referrals||[]).map(r=>div({key:r.id,style:{...S.cardSm,marginBottom:8}},[
             div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}},[
@@ -1451,6 +1444,14 @@ function Tab4({claim,up,clinic,practitioners}){
                                     onChange:ev=>up("referrals",(claim.referrals||[]).map(x=>x.id===r.id?{...x,travelReasoning:ev.target.value}:x))}),
                               ]),
             ]),
+              div({key:"send-r-"+r.id,style:{marginTop:10,paddingTop:8,borderTop:"1px solid rgba(255,255,255,0.06)"}},[
+                                div({key:"h",style:{fontSize:"0.73rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",color:"#5B7A99",marginBottom:6}},"Generate & send letter"),
+                                div({key:"btns",style:{display:"flex",gap:8,flexWrap:"wrap"}},[
+                                  btn({key:"cm",style:{...S.btnP,fontSize:"0.76rem",padding:"5px 12px"},onClick:()=>{const cr={...claim,referrals:[r]};const l=buildQuickLetter("allied_health",cr,practitioners,clinic);if(!l)return;sendQuickLetter({letter:l,toEmail:claim.caseManagerEmail||"",toName:claim.caseManagerName||claim.insurerName,ccEmail:claim.patientEmail,claim,up,subject:"Referral Request — "+r.specialty.replace(" (GP referral required)","")+" — "+claim.patientName});}},"\ud83d\udce8 Case manager"),
+                                  r.email&&btn({key:"pr",style:{...S.btnS,fontSize:"0.76rem",padding:"5px 12px"},onClick:()=>{const cr={...claim,referrals:[r]};const l=buildQuickLetter("allied_health",cr,practitioners,clinic);if(!l)return;sendQuickLetter({letter:l,toEmail:r.email,toName:r.name||r.specialty,ccEmail:claim.patientEmail,claim,up,subject:"Referral — "+r.specialty.replace(" (GP referral required)","")+" — "+claim.patientName});}},"\ud83d\udce8 Practitioner"),
+                                ]),
+                                div({key:"n",style:{fontSize:"0.69rem",color:"#5B7A99",marginTop:3}},"Patient CC'd · Saved to claim log"),
+                              ]),
           ])),
         ]),
       ]),
@@ -2947,7 +2948,7 @@ function Tab7({claim,up}){
 }
 
 // ── TAB 8: REFERRAL & EXPORT ────────────────────────────────────────────────
-function Tab8({claim,up,clinic,practitioners}){
+function Tab8({claim,up,clinic,practitioners,onInvoice}){
   const[tmpl,setTmpl]=useState("");
   const[letter,setLetter]=useState("");
   const[gen,setGen]=useState(false);
@@ -3374,6 +3375,11 @@ I am satisfied that this procedure is reasonable, necessary, and causally relate
           div({key:"note",style:{fontSize:"0.75rem",color:"#5B7A99"}},"Clicking Send opens your default email client with the letter pre-filled. Sending is logged to the audit trail and matching referral status is set to Pending."),
         ]),
       ]),
+    div({key:"finish-invoice",style:{marginTop:20,paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",justifyContent:"flex-end"}},[
+            btn({key:"fi",style:{...S.btnP,display:"inline-flex",alignItems:"center",gap:8,padding:"11px 22px"},
+              onClick:()=>{if(onInvoice)onInvoice();}},
+              "🧾 Finish & Invoice ->"),
+          ]),
     ]),
   ]);
 }
@@ -3798,6 +3804,29 @@ function TabClaimLog({claim,up,clinic,practitioners,setActiveEpId,setEpTab}){
         ]);
       }),
     ]),
+    // COC history
+    (claim.cocHistory||[]).length>0&&div({key:"coc-hist-log",style:{...S.card,marginBottom:16}},[
+            div({key:"h",style:{...S.fb,marginBottom:12}},[
+              div({key:"t",style:{fontWeight:700}},"Certificate of Capacity — Saved snapshots"),
+              span({key:"c",style:{fontSize:"0.76rem",color:"#5B7A99"}},(claim.cocHistory||[]).length+" saved"),
+            ]),
+            div({key:"list"},
+              [...(claim.cocHistory||[])].reverse().map(snap=>div({key:snap.id,style:{
+                display:"flex",justifyContent:"space-between",alignItems:"flex-start",
+                padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
+                div({key:"l"},[
+                  div({key:"top",style:{display:"flex",gap:8,alignItems:"center",marginBottom:3}},[
+                    span({key:"type",style:{...S.pill,...S.pillT,fontSize:"0.7rem",cursor:"default",padding:"2px 8px"}},snap.type+" Certificate #"+snap.number),
+                    span({key:"fit",style:{...S.pill,...S.pillM,fontSize:"0.7rem",cursor:"default",padding:"2px 8px"}},snap.fitness||"Not specified"),
+                  ]),
+                  snap.diagnoses&&div({key:"diag",style:{fontSize:"0.78rem",color:"#5B7A99",marginTop:2}},snap.diagnoses),
+                  div({key:"date",style:{fontSize:"0.74rem",color:"#5B7A99",marginTop:2}},"Saved: "+new Date(snap.generatedAt).toLocaleString("en-AU",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})),
+                ]),
+                btn({key:"reprint",style:{...S.btnS,fontSize:"0.76rem",padding:"5px 12px",flexShrink:0},
+                  onClick:async()=>{if(typeof generateCOCPdf==="function"){try{await generateCOCPdf(claim,practitioners.find(p=>p.id===claim.practitionerId)||{},clinic);}catch(e){alert("PDF error: "+e.message);}}}},"\ud83d\udcc4 Reprint"),
+              ]))
+            ),
+          ]),
     div({key:"letters",style:{...S.card,marginBottom:16}},[
       div({key:"h",style:{...S.fb,marginBottom:4}},[div({key:"t",style:{fontWeight:700}},"Letter history"),span({key:"c",style:{fontSize:"0.76rem",color:"#5B7A99"}},letters.length+" letter"+(letters.length!==1?"s":""))]),
       letters.length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",padding:"16px 0",textAlign:"center"}},"No letters generated yet"):
