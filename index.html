@@ -886,7 +886,7 @@ function Tab2({claim,up}){
   const capText={Can:"#00C9A7",Modified:"#FFB830",Cannot:"#FF4D6D"};
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Diagnosis"),
-    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:12}},"Search and add conditions. Capacity limitations auto-populate the Certificate of Capacity."),
+    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Search and add conditions. Capacity limitations auto-populate the Certificate of Capacity."),
     div({key:"dsubtabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:24}},
       DSUB.map((t,i)=>e("button",{key:t,onClick:()=>setDSubTab(i),style:{padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:dSubTab===i?"rgba(0,201,167,0.1)":"transparent",color:dSubTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:dSubTab===i?"2px solid #00C9A7":"none"}},(i+1)+". "+t))
     ),
@@ -1236,13 +1236,13 @@ function Tab4({claim,up,clinic,practitioners}){
   const subStyle=i=>({padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:subTab===i?"rgba(0,201,167,0.1)":"transparent",color:subTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:subTab===i?"2px solid #00C9A7":"none"});
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Treatment Plan"),
-    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Complete the sections relevant to this consultation."),
-    div({key:"subtabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:24,flexWrap:"wrap"}},
+    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Complete the sections relevant to this consultation."),
+    div({key:"subtabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:28,flexWrap:"wrap"}},
       SUB.map((t,i)=>e("button",{key:t,onClick:()=>setSubTab(i),style:subStyle(i)},t))
     ),
 
     subTab===SUB.indexOf("Treatment & Recovery")&&div({key:"goals"},[
-      diags.length>0&&div({key:"rtw-banner",style:{...S.card,marginBottom:16,padding:"14px 18px",borderColor:"rgba(0,201,167,0.15)"}},[
+      diags.length>0&&div({key:"rtw-banner",style:{...S.card,marginBottom:20,padding:"14px 18px",borderColor:"rgba(0,201,167,0.15)"}},[
                 div({key:"h",style:{...S.fb,marginBottom:10}},[
                   div({key:"t",style:{fontWeight:700,fontSize:"0.88rem"}},"Suggested recovery timeframes"),
                   adjustments.length>0&&span({key:"adj",style:{...S.pill,...S.pillA,fontSize:"0.68rem",cursor:"default"}},adjustments.length+" psychosocial barrier"+(adjustments.length>1?"s":"")),
@@ -1281,7 +1281,7 @@ function Tab4({claim,up,clinic,practitioners}){
       div({key:"goals-om-layout",style:{display:"grid",gridTemplateColumns:"1fr 340px",gap:16,alignItems:"start"}},[
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:14}},"Goals & management"),
-        div({key:"nrd",style:{marginBottom:16}},[div({key:"g",style:S.g2},[e(Inp,{key:"nrd",label:"Next review date",value:claim.nextReviewDate,onChange:v=>up("nextReviewDate",v),type:"date",mb:0}),div({key:"sp"})])]),
+        div({key:"nrd",style:{marginBottom:20}},[div({key:"g",style:S.g2},[e(Inp,{key:"nrd",label:"Next review date",value:claim.nextReviewDate,onChange:v=>up("nextReviewDate",v),type:"date",mb:0}),div({key:"sp"})])]),
         isAlliedHealth?[
           div({key:"note",style:{...S.warn,marginBottom:14}},"\u25b9 Activity/functional limitations and SMART goals (AHRMP format)"),
           ...[1,2,3].filter(n=>{
@@ -1323,13 +1323,14 @@ function Tab4({claim,up,clinic,practitioners}){
       ]),,
       div({key:"om-sidebar",style:{...S.card,padding:"16px"}},[
         div({key:"h",style:{fontWeight:700,fontSize:"0.88rem",marginBottom:12}},"Outcome measures"),
+        div({key:"om-div",style:{height:12}}),
         e(OutcomeMeasuresCompact,{key:"omc",claim,up}),
       ]),
     ]),
 
       div({key:"work-inline",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:6}},"Work & activity restrictions"),
-        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:14}},"Restrictions auto-populate into the Certificate of Capacity."),
+        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:12}},"Restrictions auto-populate into the Certificate of Capacity."),
         e(Ta,{key:"wr",label:"Work restrictions",value:claim.workRestrictions,onChange:v=>up("workRestrictions",v),placeholder:"e.g. No lifting >5kg, avoid prolonged sitting >30 min, no overhead work..."}),
         e(Ta,{key:"ar",label:"Activity restrictions",value:claim.activityRestrictions,onChange:v=>up("activityRestrictions",v),placeholder:"e.g. No driving, avoid stairs, limit walking to 20 min..."}),
         e(Ta,{key:"we",label:"Work environment considerations",value:claim.workEnvironment,onChange:v=>up("workEnvironment",v),placeholder:"e.g. Temperature, noise, space, lighting considerations..."}),
@@ -1337,7 +1338,7 @@ function Tab4({claim,up,clinic,practitioners}){
 
       div({key:"rtw-merged",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:6}},"Return to work"),
-        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:14}},"RTW timeframes are research-based guidelines \u2014 clinical judgement applies."),
+        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:12}},"RTW timeframes are research-based guidelines \u2014 clinical judgement applies."),
         div({key:"g",style:S.g2},[
           e(Inp,{key:"nd",label:"Estimated RTW \u2014 normal duties",value:claim.rtwNormalDate,onChange:v=>up("rtwNormalDate",v),type:"date",mb:0}),
           e(Inp,{key:"md",label:"Estimated RTW \u2014 modified duties",value:claim.rtwModifiedDate,onChange:v=>up("rtwModifiedDate",v),type:"date",mb:0}),
@@ -1350,7 +1351,7 @@ function Tab4({claim,up,clinic,practitioners}){
     subTab===SUB.indexOf("Proposed Procedure / Surgery")&&div({key:"proc-tab"},[
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:6}},"Proposed procedure / surgery"),
-        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Select from the list or type a custom procedure. This will autopopulate to the Procedure / Surgery referral letter."),
+        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:12}},"Select from the list or type a custom procedure. This will autopopulate to the Procedure / Surgery referral letter."),
         e(Sel,{key:"proc",label:"Proposed procedure",value:claim.proposedProcedure&&!["Arthroscopic knee surgery (meniscectomy / chondroplasty)","ACL reconstruction","Total knee replacement (TKR)","Total hip replacement (THR)","Hip arthroscopy / labral repair","Rotator cuff repair","Shoulder arthroscopy / decompression","Shoulder stabilisation / Bankart repair","SLAP repair","Acromioclavicular joint reconstruction","Carpal tunnel release","Trigger finger release","Dupuytren's fasciectomy","Wrist arthroscopy / TFCC repair","Distal radius ORIF","Cervical spine discectomy / fusion (ACDF)","Lumbar discectomy / microdiscectomy","Lumbar spinal fusion","Lumbar laminectomy / decompression","Facet joint injection / denervation","Spinal cord stimulator implantation","Pain management program","Injection therapy (corticosteroid / PRP / hydrocortisone)","Nerve block / epidural steroid injection","Achilles tendon repair","Ankle arthroscopy","Plantar fascia release","Elbow arthroscopy","Cubital tunnel release (ulnar nerve transposition)"].includes(claim.proposedProcedure)?"Other \u2014 enter below":claim.proposedProcedure,onChange:v=>up("proposedProcedure",v==="Other \u2014 enter below"?"":v),options:["Arthroscopic knee surgery (meniscectomy / chondroplasty)","ACL reconstruction","Total knee replacement (TKR)","Total hip replacement (THR)","Hip arthroscopy / labral repair","Rotator cuff repair","Shoulder arthroscopy / decompression","Shoulder stabilisation / Bankart repair","SLAP repair","Acromioclavicular joint reconstruction","Carpal tunnel release","Trigger finger release","Dupuytren's fasciectomy","Wrist arthroscopy / TFCC repair","Distal radius ORIF","Cervical spine discectomy / fusion (ACDF)","Lumbar discectomy / microdiscectomy","Lumbar spinal fusion","Lumbar laminectomy / decompression","Facet joint injection / denervation","Spinal cord stimulator implantation","Pain management program","Injection therapy (corticosteroid / PRP / hydrocortisone)","Nerve block / epidural steroid injection","Achilles tendon repair","Ankle arthroscopy","Plantar fascia release","Elbow arthroscopy","Cubital tunnel release (ulnar nerve transposition)","Other \u2014 enter below"]}),
         (claim.proposedProcedure===""||!["Arthroscopic knee surgery (meniscectomy / chondroplasty)","ACL reconstruction","Total knee replacement (TKR)","Total hip replacement (THR)","Hip arthroscopy / labral repair","Rotator cuff repair","Shoulder arthroscopy / decompression","Shoulder stabilisation / Bankart repair","SLAP repair","Acromioclavicular joint reconstruction","Carpal tunnel release","Trigger finger release","Dupuytren's fasciectomy","Wrist arthroscopy / TFCC repair","Distal radius ORIF","Cervical spine discectomy / fusion (ACDF)","Lumbar discectomy / microdiscectomy","Lumbar spinal fusion","Lumbar laminectomy / decompression","Facet joint injection / denervation","Spinal cord stimulator implantation","Pain management program","Injection therapy (corticosteroid / PRP / hydrocortisone)","Nerve block / epidural steroid injection","Achilles tendon repair","Ankle arthroscopy","Plantar fascia release","Elbow arthroscopy","Cubital tunnel release (ulnar nerve transposition)"].includes(claim.proposedProcedure))&&e(Inp,{key:"proc-custom",label:"Enter procedure / surgery",value:["","Other \u2014 enter below"].includes(claim.proposedProcedure)?"":claim.proposedProcedure,onChange:v=>up("proposedProcedure",v),placeholder:"e.g. L4/L5 microdiscectomy with foraminotomy...",mb:0}),
         claim.proposedProcedure&&claim.proposedProcedure!=="Other \u2014 enter below"&&div({key:"note",style:{...S.ok,marginTop:12,marginBottom:16}},"\u2705 Will appear in the Procedure / Surgery referral letter."),
@@ -1377,7 +1378,7 @@ function Tab4({claim,up,clinic,practitioners}){
     subTab===SUB.indexOf("Referrals")&&div({key:"refs"},[
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:6}},"Specialist & Allied Health Referrals"),
-        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:14}},"Only complete this section if a referral is required for this consultation."),
+        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:12}},"Only complete this section if a referral is required for this consultation."),
         div({key:"g",style:S.g2},[
           e(Sel,{key:"sp",label:"Specialty / profession",value:(claim.newRef&&claim.newRef.specialty)||"",onChange:v=>up("newRef",{...(claim.newRef||{}),specialty:v}),options:isAlliedHealth?SPECIALTIES_ALLIED_HEALTH:SPECIALTIES}),
           e(Sel,{key:"pr",label:"Priority",value:(claim.newRef&&claim.newRef.priority)||"Routine (within 4 weeks)",onChange:v=>up("newRef",{...(claim.newRef||{}),priority:v}),options:["Routine (within 4 weeks)","Soon (within 2 weeks)","Urgent (within 48 hours)","Emergency"]}),
@@ -1957,7 +1958,7 @@ function Tab5({claim,up,clinic,practitioners}){
   }
   return div({className:"no-print"},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Certificate of Capacity"),
-    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Official WorkSafe VIC form (FOR844/03/07.15) — auto-populated from all clinical screens."),
+    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Official WorkSafe VIC form (FOR844/03/07.15) — auto-populated from all clinical screens."),
     div({key:"print-btn",style:{marginBottom:20,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}},[
       btn({key:"pdf",style:{...S.btnP,display:"inline-flex",alignItems:"center",gap:8},onClick:async()=>{setPdfLoading(true);try{await generateCOCPdf(claim,prac,clinic);}catch(e){alert("PDF error: "+e.message);}finally{setPdfLoading(false);}},disabled:pdfLoading},pdfLoading?"⏳ Generating...":"📄 Download Official COC (PDF)"),
       div({key:"hint",style:{fontSize:"0.78rem",color:"#5B7A99",width:"100%"}},"Downloads the official WorkSafe VIC FOR844 PDF pre-filled with claim data."),
@@ -3893,6 +3894,7 @@ function generateInvoicePdf(inv,claim,clinic,practitioners,paymentTerms){
   return doc;
 }
 function InvoicingPage({clinic,claims,onSaveClaim}){
+  const[invTab,setInvTab]=useState("overview");
   const[selClaim,setSelClaim]=useState("");
   const[selEpisode,setSelEpisode]=useState("");
   const[lineItems,setLineItems]=useState([{id:"li_1",itemCode:"",description:"",amount:"",qty:1,treatmentDate:new Date().toISOString().slice(0,10)}]);
@@ -3906,11 +3908,17 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
   const[bankSettings,setBankSettings]=useState({});
   const[paymentTerms,setPaymentTerms]=useState(30);
   const[expandedMonths,setExpandedMonths]=useState({});
+  // History filters
+  const[histSearch,setHistSearch]=useState("");
+  const[histStatus,setHistStatus]=useState("All");
+  const[histPrac,setHistPrac]=useState("All");
+
   useEffect(()=>{
     sget("practitioners:"+clinic.id).then(p=>setPractitioners(p||[]));
     sget("banksettings:"+clinic.id).then(b=>{if(b)setBankSettings(b);});
     sget("paymentterms:"+clinic.id).then(t=>{if(t)setPaymentTerms(parseInt(t)||30);});
   },[clinic.id]);
+
   const activeClaims=claims.filter(c=>c.status!=="Closed");
   const claim=claims.find(c=>c.id===selClaim);
   const claimPrac=claim&&practitioners.find(p=>p.id===claim.practitionerId);
@@ -3919,17 +3927,36 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
   const filteredCodes=allowedCats?WORKSAFE_CODES.filter(c=>!c.cat||allowedCats.includes(c.cat)):WORKSAFE_CODES;
   const episodes=claim?(claim.episodes||[]):[];
   const now=new Date();
-  const allInvoices=claims.flatMap(c=>(c.invoices||[]).map(inv=>({...inv,claimId:c.id,patientName:c.patientName,claimNumber:c.claimNumber})));
+
+  const allInvoices=claims.flatMap(c=>(c.invoices||[]).map(inv=>({
+    ...inv,claimId:c.id,patientName:c.patientName,claimNumber:c.claimNumber,
+    pracName:(practitioners.find(p=>p.id===c.practitionerId)||{}).name||"",
+    insurerName:c.insurerName||c.insurerNameCustom||"",
+  })));
+
   const getTotal=inv=>{
     const sub=inv.lineItems?inv.lineItems.reduce((s,l)=>(parseFloat(l.amount)||0)*(l.qty||1)+s,0):(parseFloat(inv.amount)||0);
     return sub*(inv.gst==="yes"?1.1:1);
   };
   const isOverdue=inv=>inv.status!=="Paid"&&(()=>{const d=new Date(inv.date||inv.createdAt);d.setDate(d.getDate()+(paymentTerms||30));return d<now;})();
+  const effStatus=inv=>isOverdue(inv)?"Overdue":inv.status;
+
   const totalInv=allInvoices.reduce((s,i)=>s+getTotal(i),0);
   const totalColl=allInvoices.filter(i=>i.status==="Paid").reduce((s,i)=>s+getTotal(i),0);
   const totalOut=totalInv-totalColl;
+  const overdueInvoices=allInvoices.filter(isOverdue);
+
   const fmtAUD=n=>"$"+parseFloat(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,",");
-  const fmtDate=d=>{try{return new Date(d).toLocaleDateString("en-AU");}catch{return d||"\u2014";}};
+  const fmtDate=d=>{try{return new Date(d).toLocaleDateString("en-AU");}catch{return d||"—";}};
+
+  // Current month invoices for overview
+  const thisMonthKey=new Date().toLocaleDateString("en-AU",{month:"long",year:"numeric"});
+  const thisMonthInvoices=allInvoices.filter(inv=>{
+    const d=new Date(inv.date||inv.createdAt);
+    return d.toLocaleDateString("en-AU",{month:"long",year:"numeric"})===thisMonthKey;
+  });
+
+  // History: all invoices grouped by month
   const grouped={};
   [...allInvoices].sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).forEach(inv=>{
     const d=new Date(inv.date||inv.createdAt);
@@ -3937,22 +3964,54 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
     if(!grouped[key])grouped[key]=[];
     grouped[key].push(inv);
   });
+
+  // History filtered
+  const histFiltered=allInvoices.filter(inv=>{
+    const q=histSearch.toLowerCase();
+    const matchQ=!q||(inv.patientName||"").toLowerCase().includes(q)||(inv.claimNumber||"").toLowerCase().includes(q)||(inv.invoiceNumber||"").toLowerCase().includes(q);
+    const matchS=histStatus==="All"||effStatus(inv)===histStatus;
+    const matchP=histPrac==="All"||(inv.pracName||"")===(histPrac);
+    return matchQ&&matchS&&matchP;
+  });
+  const histGrouped={};
+  [...histFiltered].sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).forEach(inv=>{
+    const d=new Date(inv.date||inv.createdAt);
+    const key=d.toLocaleDateString("en-AU",{month:"long",year:"numeric"});
+    if(!histGrouped[key])histGrouped[key]=[];
+    histGrouped[key].push(inv);
+  });
+
+  // Reporting data
+  const pracTotals=practitioners.map(p=>{
+    const pinv=allInvoices.filter(i=>(i.pracName||"")===(p.name||""));
+    return{name:p.name,profession:p.profession,invoiced:pinv.reduce((s,i)=>s+getTotal(i),0),collected:pinv.filter(i=>i.status==="Paid").reduce((s,i)=>s+getTotal(i),0),count:pinv.length};
+  }).filter(p=>p.count>0);
+
+  const monthlyTotals=Object.entries(grouped).map(([month,invs])=>({
+    month,
+    invoiced:invs.reduce((s,i)=>s+getTotal(i),0),
+    collected:invs.filter(i=>i.status==="Paid").reduce((s,i)=>s+getTotal(i),0),
+    count:invs.length,
+  }));
+
   const nextInvNumber=()=>{
     const year=new Date().getFullYear();
     const seq=allInvoices.filter(i=>i.invoiceNumber&&i.invoiceNumber.startsWith("INV-"+year)).length+1;
     return "INV-"+year+"-"+String(seq).padStart(4,"0");
   };
+
   const addInvoice=()=>{
     if(!selClaim||!lineItems.some(l=>l.description&&l.amount))return;
     const inv={id:"inv_"+Date.now(),invoiceNumber:nextInvNumber(),episodeId:selEpisode,lineItems,
       amount:String(lineItems.reduce((s,l)=>(parseFloat(l.amount)||0)*(l.qty||1)+s,0).toFixed(2)),
       date:invoiceDate,gst,status:"Invoiced",createdAt:new Date().toISOString(),bankSettings};
-    const logEntry={event:"Invoice created",detail:inv.invoiceNumber+" \u2014 "+fmtAUD(getTotal(inv)),timestamp:new Date().toISOString(),by:claimPrac?claimPrac.name:clinic.name};
+    const logEntry={event:"Invoice created",detail:inv.invoiceNumber+" — "+fmtAUD(getTotal(inv)),timestamp:new Date().toISOString(),by:claimPrac?claimPrac.name:clinic.name};
     const updated={...claim,invoices:[...(claim.invoices||[]),inv],auditTrail:[...(claim.auditTrail||[]),logEntry]};
     onSaveClaim(updated);setSaved(true);setTimeout(()=>setSaved(false),2500);
     setLineItems([{id:"li_1",itemCode:"",description:"",amount:"",qty:1,treatmentDate:invoiceDate}]);
     setSelEpisode("");setGst("no");setPatientSearch("");setSelClaim("");
   };
+
   const updateStatus=(claimId,invId,status)=>{
     const c=claims.find(x=>x.id===claimId);if(!c)return;
     const inv=(c.invoices||[]).find(i=>i.id===invId);
@@ -3962,6 +4021,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
       auditTrail:logEntry?[...(c.auditTrail||[]),logEntry]:(c.auditTrail||[])};
     onSaveClaim(updated);
   };
+
   const downloadInvoice=inv=>{
     const c=claims.find(x=>x.id===inv.claimId);if(!c)return;
     const doc=generateInvoicePdf(inv,c,clinic,practitioners,paymentTerms);
@@ -3974,15 +4034,45 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
     doc.save((inv.invoiceNumber||"invoice")+".pdf");
     const toEmail=c.insurerApEmail||inv.insurerApEmail||"";
     const ccEmail=c.patientEmail||"";
-    const subj="Tax Invoice "+(inv.invoiceNumber||"")+" \u2014 "+(c.patientName||"")+" | Claim "+(c.claimNumber||"");
-    const body="Please find attached tax invoice "+(inv.invoiceNumber||"")+" for services rendered.\n\nPatient: "+(c.patientName||"")+"\nClaim: "+(c.claimNumber||"")+"\nAmount due: "+fmtAUD(getTotal(inv))+"\n\nPlease quote the invoice number on payment.\n\n"+(clinic.name||"");
+    const subj="Tax Invoice "+(inv.invoiceNumber||"")+" — "+(c.patientName||"")+" | Claim "+(c.claimNumber||"");
+    const body=["Please find attached tax invoice "+(inv.invoiceNumber||"")+" for services rendered.","","Patient: "+(c.patientName||""),"Claim: "+(c.claimNumber||""),"Amount due: "+fmtAUD(getTotal(inv)),"","Please quote the invoice number on payment.","",clinic.name||""].join("\n");
     window.open("mailto:"+toEmail+(ccEmail?"?cc="+encodeURIComponent(ccEmail)+"&subject=":"?subject=")+encodeURIComponent(subj)+"&body="+encodeURIComponent(body));
   };
+
   const addLineItem=()=>setLineItems(p=>[...p,{id:"li_"+Date.now(),itemCode:"",description:"",amount:"",qty:1,treatmentDate:invoiceDate}]);
   const updLine=(id,f,v)=>setLineItems(p=>p.map(l=>l.id===id?{...l,[f]:v}:l));
   const remLine=id=>setLineItems(p=>p.filter(l=>l.id!==id));
   const statusPill=s=>s==="Paid"?S.pillT:s==="Overdue"?S.pillR:S.pillA;
   const subTotal=lineItems.reduce((s,l)=>(parseFloat(l.amount)||0)*(l.qty||1)+s,0);
+
+  // Shared invoice card renderer
+  const InvCard=({inv})=>{
+    const c=claims.find(x=>x.id===inv.claimId)||{};
+    const total=getTotal(inv);const es=effStatus(inv);
+    return div({key:inv.id,className:"card-hover",
+      style:{...S.cardSm,marginBottom:8,cursor:"pointer",borderColor:es==="Overdue"?"rgba(255,77,109,0.25)":"rgba(255,255,255,0.08)"},
+      onClick:()=>setPreviewInv(inv)},[
+      div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}},[
+        div({key:"l"},[
+          div({key:"n",style:{fontWeight:600,fontSize:"0.87rem"}},inv.patientName||"—"),
+          div({key:"desc",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:1}},(inv.lineItems?inv.lineItems.map(l=>l.description).filter(Boolean).join(", "):inv.description)||"—"),
+          div({key:"meta",style:{fontSize:"0.7rem",color:"#5B7A99",marginTop:1}},(inv.invoiceNumber||"")+(inv.lineItems&&inv.lineItems[0]&&inv.lineItems[0].itemCode?" · "+inv.lineItems[0].itemCode:"")),
+        ]),
+        div({key:"r",style:{textAlign:"right",flexShrink:0}},[
+          div({key:"amt",style:{fontWeight:700,fontSize:"0.95rem"}},fmtAUD(total)),
+          div({key:"d",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:1}},fmtDate(inv.date||inv.createdAt)),
+        ]),
+      ]),
+      div({key:"btns",style:{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}},[
+        span({key:"s",style:{...S.pill,...statusPill(es),fontSize:"0.68rem",padding:"2px 8px",cursor:"default"}},es),
+        inv.status!=="Paid"&&btn({key:"pay",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 8px"},onClick:ev=>{ev.stopPropagation();updateStatus(inv.claimId,inv.id,"Paid");}},"Mark paid"),
+        btn({key:"dl",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 8px"},onClick:ev=>{ev.stopPropagation();downloadInvoice(inv);}},"⬇ PDF"),
+        btn({key:"send",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 8px"},onClick:ev=>{ev.stopPropagation();sendInvoice(inv);}},"📨 Send"),
+        span({key:"hint",style:{fontSize:"0.67rem",color:"rgba(255,255,255,0.2)",marginLeft:2}},"click to preview"),
+      ]),
+    ]);
+  };
+
   return div({style:{padding:"28px",maxWidth:1100,margin:"0 auto"}},[
     // Preview modal
     previewInv&&(()=>{
@@ -3994,11 +4084,11 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
       return div({key:"modal",style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
         div({style:{background:"#0C1A2E",borderRadius:16,width:"100%",maxWidth:660,maxHeight:"90vh",overflow:"auto",border:"1px solid rgba(255,255,255,0.1)"}},[
           div({key:"mhdr",style:{...S.fb,padding:"14px 20px",borderBottom:"1px solid rgba(255,255,255,0.08)"}},[
-            div({key:"t",style:{fontWeight:700,fontSize:"0.95rem"}},(previewInv.invoiceNumber||"Invoice")+" \u2014 "+(c.patientName||"")),
+            div({key:"t",style:{fontWeight:700,fontSize:"0.95rem"}},(previewInv.invoiceNumber||"Invoice")+" — "+(c.patientName||"")),
             div({key:"btns",style:{display:"flex",gap:8}},[
-              btn({key:"dl",style:{...S.btnP,fontSize:"0.82rem",padding:"7px 14px"},onClick:()=>downloadInvoice(previewInv)},"\u2b07 Download PDF"),
-              btn({key:"send",style:{...S.btnS,fontSize:"0.82rem",padding:"7px 14px"},onClick:()=>sendInvoice(previewInv)},"\u{1F4E8} Send to insurer"),
-              btn({key:"x",style:{...S.btnS,padding:"7px 12px"},onClick:()=>setPreviewInv(null)},"\u2715"),
+              btn({key:"dl",style:{...S.btnP,fontSize:"0.82rem",padding:"7px 14px"},onClick:()=>downloadInvoice(previewInv)},"⬇ Download PDF"),
+              btn({key:"send",style:{...S.btnS,fontSize:"0.82rem",padding:"7px 14px"},onClick:()=>sendInvoice(previewInv)},"📨 Send to insurer"),
+              btn({key:"x",style:{...S.btnS,padding:"7px 12px"},onClick:()=>setPreviewInv(null)},"✕"),
             ]),
           ]),
           div({key:"preview",style:{background:"white",color:"#1a1a2e",margin:16,borderRadius:10,overflow:"hidden",fontFamily:"Arial,sans-serif",fontSize:10}},[
@@ -4008,41 +4098,16 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
             ]),
             div({key:"body",style:{padding:"14px 16px"}},[
               div({key:"top",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}},[
-                div({key:"cl"},[
-                  div({key:"n",style:{fontWeight:700,fontSize:11,marginBottom:2}},clinic.name||""),
-                  div({key:"a",style:{color:"#5B7A99",lineHeight:1.5,fontSize:9}},clinic.address||""),
-                  clinic.abn&&div({key:"abn",style:{color:"#5B7A99",fontSize:9}},"ABN: "+clinic.abn),
-                ]),
-                div({key:"inv",style:{textAlign:"right"}},[
-                  div({key:"no",style:{fontWeight:700,fontSize:11,marginBottom:2}},previewInv.invoiceNumber||""),
-                  div({key:"d",style:{color:"#5B7A99",fontSize:9}},"Date: "+fmtDate(previewInv.date)),
-                  div({key:"due",style:{color:"#5B7A99",fontSize:9}},"Due: "+dueDate),
-                  div({key:"terms",style:{color:"#5B7A99",fontSize:9}},"Terms: "+(paymentTerms||30)+" days"),
-                ]),
+                div({key:"cl"},[div({key:"n",style:{fontWeight:700,fontSize:11,marginBottom:2}},clinic.name||""),div({key:"a",style:{color:"#5B7A99",lineHeight:1.5,fontSize:9}},clinic.address||""),clinic.abn&&div({key:"abn",style:{color:"#5B7A99",fontSize:9}},"ABN: "+clinic.abn)]),
+                div({key:"inv",style:{textAlign:"right"}},[div({key:"no",style:{fontWeight:700,fontSize:11,marginBottom:2}},previewInv.invoiceNumber||""),div({key:"d",style:{color:"#5B7A99",fontSize:9}},"Date: "+fmtDate(previewInv.date)),div({key:"due",style:{color:"#5B7A99",fontSize:9}},"Due: "+dueDate),div({key:"terms",style:{color:"#5B7A99",fontSize:9}},"Terms: "+(paymentTerms||30)+" days")]),
               ]),
               div({key:"boxes",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}},[
-                div({key:"bill",style:{background:"#f0f7f5",borderRadius:5,padding:"7px 9px"}},[
-                  div({key:"h",style:{fontWeight:700,color:"#00C9A7",fontSize:7.5,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:3}},"Bill To"),
-                  div({key:"i",style:{fontSize:9}},c.insurerName||c.insurerNameCustom||""),
-                  c.caseManagerName&&div({key:"cm",style:{color:"#5B7A99",fontSize:9}},"Attn: "+c.caseManagerName),
-                ]),
-                div({key:"claim",style:{background:"#f0f7f5",borderRadius:5,padding:"7px 9px"}},[
-                  div({key:"h",style:{fontWeight:700,color:"#00C9A7",fontSize:7.5,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:3}},"Patient / Claim"),
-                  div({key:"p",style:{fontSize:9}},c.patientName||""),
-                  div({key:"cn",style:{color:"#5B7A99",fontSize:9}},"Claim: "+(c.claimNumber||"\u2014")),
-                  div({key:"doi",style:{color:"#5B7A99",fontSize:9}},"DOI: "+fmtDate(c.dateOfInjury)),
-                ]),
+                div({key:"bill",style:{background:"#f0f7f5",borderRadius:5,padding:"7px 9px"}},[div({key:"h",style:{fontWeight:700,color:"#00C9A7",fontSize:7.5,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:3}},"Bill To"),div({key:"i",style:{fontSize:9}},c.insurerName||c.insurerNameCustom||""),c.caseManagerName&&div({key:"cm",style:{color:"#5B7A99",fontSize:9}},"Attn: "+c.caseManagerName)]),
+                div({key:"claim",style:{background:"#f0f7f5",borderRadius:5,padding:"7px 9px"}},[div({key:"h",style:{fontWeight:700,color:"#00C9A7",fontSize:7.5,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:3}},"Patient / Claim"),div({key:"p",style:{fontSize:9}},c.patientName||""),div({key:"cn",style:{color:"#5B7A99",fontSize:9}},"Claim: "+(c.claimNumber||"—")),div({key:"doi",style:{color:"#5B7A99",fontSize:9}},"DOI: "+fmtDate(c.dateOfInjury))]),
               ]),
               e("table",{key:"tbl",style:{width:"100%",borderCollapse:"collapse",marginBottom:10,fontSize:9}},[
-                e("thead",{key:"th"},e("tr",{style:{background:"#07101E",color:"white"}},
-                  ["Tx Date","Code","Description","Qty","Unit Price","Amount"].map(h=>e("th",{key:h,style:{padding:"4px 7px",fontWeight:600,textAlign:["Qty","Unit Price","Amount"].includes(h)?"right":"left",fontSize:7.5}},h))
-                )),
-                e("tbody",{key:"tb"},items.map((item,i)=>
-                  e("tr",{key:item.id||i,style:{background:i%2===0?"white":"#f8fbfd"}},
-                    [fmtDate(item.treatmentDate||previewInv.date),item.itemCode||"\u2014",item.description||"",(item.qty||1),fmtAUD(parseFloat(item.amount||0)),fmtAUD((parseFloat(item.amount)||0)*(item.qty||1))]
-                    .map((v,j)=>e("td",{key:j,style:{padding:"4px 7px",borderBottom:"1px solid #f0f0f0",textAlign:j>=3?"right":"left"}},v))
-                  )
-                )),
+                e("thead",{key:"th"},e("tr",{style:{background:"#07101E",color:"white"}},["Tx Date","Code","Description","Qty","Unit Price","Amount"].map(h=>e("th",{key:h,style:{padding:"4px 7px",fontWeight:600,textAlign:["Qty","Unit Price","Amount"].includes(h)?"right":"left",fontSize:7.5}},h)))),
+                e("tbody",{key:"tb"},items.map((item,i)=>e("tr",{key:item.id||i,style:{background:i%2===0?"white":"#f8fbfd"}},[fmtDate(item.treatmentDate||previewInv.date),item.itemCode||"—",item.description||"",(item.qty||1),fmtAUD(parseFloat(item.amount||0)),fmtAUD((parseFloat(item.amount)||0)*(item.qty||1))].map((v,j)=>e("td",{key:j,style:{padding:"4px 7px",borderBottom:"1px solid #f0f0f0",textAlign:j>=3?"right":"left"}},v))))),
               ]),
               div({key:"tots",style:{display:"flex",justifyContent:"flex-end",marginBottom:12}},[
                 div({key:"t",style:{minWidth:170,fontSize:9}},[
@@ -4058,163 +4123,265 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
                 div({key:"ref",style:{color:"#5B7A99"}},"Reference: "+(previewInv.invoiceNumber||"")),
               ]),
             ]),
-            div({key:"ftr",style:{background:"#00C9A7",padding:"5px 16px",textAlign:"center",fontSize:7.5,color:"#07101E"}},"Generated by ClaimBridge \u2014 WorkCover & TAC Documentation Platform"),
+            div({key:"ftr",style:{background:"#00C9A7",padding:"5px 16px",textAlign:"center",fontSize:7.5,color:"#07101E"}},"Generated by ClaimBridge — WorkCover & TAC Documentation Platform"),
           ]),
         ])
       );
     })(),
+
+    // Page header
     div({key:"h",style:{fontWeight:800,fontSize:"1.2rem",marginBottom:4}},"Invoicing"),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Generate tax invoices per episode and track collection."),
-    div({key:"totals",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}},[
+
+    // Summary cards
+    div({key:"totals",style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}},[
       {label:"Total invoiced (inc. GST)",val:totalInv,col:"#60A5FA"},
       {label:"Total collected",val:totalColl,col:"#00C9A7"},
       {label:"Outstanding",val:totalOut,col:totalOut>0?"#FFB830":"#5B7A99"},
-    ].map(m=>div({key:m.label,style:{...S.card,textAlign:"center",padding:"20px",marginBottom:0}},[
-      div({key:"v",style:{fontWeight:800,fontSize:"1.5rem",color:m.col,lineHeight:1,marginBottom:6}},fmtAUD(m.val)),
-      div({key:"l",style:{fontSize:"0.76rem",color:"#5B7A99"}},m.label),
+      {label:"Overdue",val:overdueInvoices.length,col:overdueInvoices.length>0?"#FF4D6D":"#5B7A99",isCount:true},
+    ].map(m=>div({key:m.label,style:{...S.card,textAlign:"center",padding:"18px 12px",marginBottom:0}},[
+      div({key:"v",style:{fontWeight:800,fontSize:m.isCount?"1.8rem":"1.4rem",color:m.col,lineHeight:1,marginBottom:6}},m.isCount?m.val:fmtAUD(m.val)),
+      div({key:"l",style:{fontSize:"0.74rem",color:"#5B7A99",lineHeight:1.3}},m.label),
     ]))),
-    div({key:"cols",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}},[
-      // Create invoice form
-      div({key:"form",style:S.card},[
-        div({key:"h",style:{fontWeight:700,marginBottom:16}},"Create invoice"),
-        saved&&e(OK,{key:"ok"},"Invoice created \u2713"),
-        div({key:"pt",style:{marginBottom:16}},[
-          e("label",{key:"l",style:S.label},"Claim / patient *"),
-          div({key:"sw",style:{position:"relative"}},[
-            inp({key:"i",className:"cb-input",style:S.inp,placeholder:"Search patient name or claim number...",
-              value:patientSearch,onChange:ev=>{setPatientSearch(ev.target.value);setShowPatientDd(true);setSelClaim("");},
-              onFocus:()=>setShowPatientDd(true),onBlur:()=>setTimeout(()=>setShowPatientDd(false),200)}),
-            selClaim&&span({key:"ck",style:{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",color:"#00C9A7",fontSize:"0.75rem",pointerEvents:"none"}},"\u2713"),
-            showPatientDd&&patientSearch.length>0&&div({key:"dd",style:{position:"absolute",top:"100%",left:0,right:0,background:"#112240",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,zIndex:100,marginTop:4,maxHeight:200,overflow:"auto"}},[
-              ...activeClaims.filter(c=>{const q=patientSearch.toLowerCase();return(c.patientName||"").toLowerCase().includes(q)||(c.claimNumber||"").toLowerCase().includes(q);})
-                .map(c=>div({key:c.id,onClick:()=>{setSelClaim(c.id);setPatientSearch((c.patientName||"")+(c.claimNumber?" \u2014 "+c.claimNumber:""));setShowPatientDd(false);},
-                  style:{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
-                  div({key:"n",style:{fontWeight:600,fontSize:"0.87rem"}},c.patientName||"Unnamed"),
-                  div({key:"d",style:{fontSize:"0.74rem",color:"#5B7A99"}},(c.claimNumber||"No claim #")+" \u00b7 "+(c.scheme||"WorkCover")),
-                ])),
-              activeClaims.filter(c=>{const q=patientSearch.toLowerCase();return(c.patientName||"").toLowerCase().includes(q)||(c.claimNumber||"").toLowerCase().includes(q);}).length===0&&
-                div({key:"none",style:{padding:"12px 14px",color:"#5B7A99",fontSize:"0.84rem"}},"No matches"),
+
+    // Tab switcher
+    div({key:"tabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:28}},[
+      ...["overview","history","reporting"].map(t=>btn({key:t,onClick:()=>setInvTab(t),style:{
+        padding:"10px 20px",borderRadius:"8px 8px 0 0",border:"none",
+        background:invTab===t?"rgba(0,201,167,0.1)":"transparent",
+        color:invTab===t?"#00C9A7":"rgba(255,255,255,0.45)",
+        fontSize:"0.85rem",fontWeight:500,cursor:"pointer",
+        borderBottom:invTab===t?"2px solid #00C9A7":"none",
+      }},t==="overview"?"Overview":t==="history"?"Invoice History":"Reporting")),
+    ]),
+
+    // ── OVERVIEW TAB ──────────────────────────────────────────────────────────
+    invTab==="overview"&&div({key:"overview"},[
+      // Overdue alert
+      overdueInvoices.length>0&&div({key:"overdue-alert",style:{...S.card,borderColor:"rgba(255,77,109,0.3)",marginBottom:20}},[
+        div({key:"h",style:{...S.fb,marginBottom:12}},[
+          div({key:"t",style:{display:"flex",alignItems:"center",gap:8}},[
+            span({key:"ic",style:{fontSize:"1.1rem"}},"⚠️"),
+            div({key:"l"},[
+              div({key:"h",style:{fontWeight:700,color:"#FF4D6D"}},"Overdue invoices"),
+              div({key:"s",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:1}},overdueInvoices.length+" invoice"+(overdueInvoices.length!==1?"s":"")+" past payment terms"),
             ]),
           ]),
+          btn({key:"view",style:{...S.btnS,fontSize:"0.78rem",padding:"5px 12px",color:"#FF4D6D",borderColor:"rgba(255,77,109,0.3)"},onClick:()=>{setInvTab("history");setHistStatus("Overdue");}},"View all →"),
         ]),
-        claim&&episodes.length>0&&div({key:"ep",style:{marginBottom:16}},[
-          e("label",{key:"l",style:S.label},"Episode / consultation"),
-          e("select",{key:"s",className:"cb-sel",style:S.sel,value:selEpisode,onChange:ev=>{
-              const epId=ev.target.value;
-              setSelEpisode(epId);
-              if(epId){
-                const ep=(claim.episodes||[]).find(e=>e.id===epId);
-                if(ep&&ep.date){
-                  const epDate=new Date(ep.date).toISOString().slice(0,10);
-                  setInvoiceDate(epDate);
-                  setLineItems(p=>p.map(l=>({...l,treatmentDate:epDate})));
-                }
-              }
-            }},[
-            e("option",{key:"",value:""},"Select episode..."),
-            ...episodes.map(ep=>e("option",{key:ep.id,value:ep.id},"#"+(ep.episodeNo||"")+" \u2014 "+new Date(ep.date).toLocaleDateString("en-AU")+(ep.label?" \u2014 "+ep.label:""))),
-          ]),
-        ]),
-        div({key:"dg",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}},[
-          e(Inp,{key:"id",label:"Invoice date",value:invoiceDate,onChange:setInvoiceDate,type:"date",mb:0}),
-          div({key:"gst"},[
-            e("label",{key:"l",style:S.label},"GST"),
-            div({key:"btns",style:{display:"flex",gap:8}},
-              ["no","yes"].map(v=>btn({key:v,onClick:()=>setGst(v),style:{...S.pill,...(gst===v?S.pillT:S.pillM),padding:"9px 16px",fontSize:"0.82rem"}},v==="yes"?"Yes (10%)":"No GST"))
-            ),
-          ]),
-        ]),
-        div({key:"li-hdr",style:{...S.fb,marginBottom:8}},[
-          e("label",{key:"l",style:S.label},"Line items"),
-          btn({key:"add",style:{...S.btnS,fontSize:"0.78rem",padding:"4px 12px"},onClick:addLineItem},"+ Add item"),
-        ]),
-        ...lineItems.map((item,idx)=>div({key:item.id,style:{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,padding:"10px 12px",marginBottom:8}},[
-          div({key:"r1",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},[
-            div({key:"td"},[
-              e("label",{key:"l",style:{...S.label,marginBottom:4}},"Treatment date *"),
-              inp({key:"i",className:"cb-input",style:{...S.inp,fontSize:"0.84rem",padding:"7px 10px"},type:"date",value:item.treatmentDate||invoiceDate,onChange:ev=>updLine(item.id,"treatmentDate",ev.target.value)}),
-            ]),
-            div({key:"ic"},[
-              e("label",{key:"l",style:{...S.label,marginBottom:4}},"Item code"),
-              e("select",{key:"s",className:"cb-sel",style:{...S.sel,fontSize:"0.81rem",padding:"7px 10px"},
-                value:item.itemCode,
-                onChange:ev=>{
-                  const v=ev.target.value;
-                  const fee=WORKSAFE_FEE_MAP[v]||"";
-                  const itm=filteredCodes.find(c=>c.value===v);
-                  updLine(item.id,"itemCode",v);
-                  if(fee)updLine(item.id,"amount",fee);
-                  if(itm)updLine(item.id,"description",itm.label.split(" \u2014 ").slice(1).join(" \u2014 ")||itm.label);
-                }},[
-                e("option",{key:"",value:""},"Select code..."),
-                ...Object.entries(filteredCodes.slice(1).reduce((acc,c)=>{if(c.value){(acc[c.cat||"Other"]=acc[c.cat||"Other"]||[]).push(c);}return acc;},{}))
-                  .map(([cat,items2])=>e("optgroup",{key:cat,label:cat},items2.map(c=>e("option",{key:c.value,value:c.value},c.value+" \u2014 "+(c.label||""))))),
-              ]),
-            ]),
-          ]),
-          div({key:"r2",style:{display:"grid",gridTemplateColumns:"2fr 60px 100px "+(lineItems.length>1?"32px":""),gap:8,alignItems:"end"}},[
-            e(Inp,{key:"desc",label:"Description *",value:item.description,onChange:v=>updLine(item.id,"description",v),placeholder:"Service description",mb:0}),
-            e(Inp,{key:"qty",label:"Qty",value:String(item.qty||1),onChange:v=>updLine(item.id,"qty",parseInt(v)||1),placeholder:"1",mb:0}),
-            e(Inp,{key:"amt",label:"Unit price ($)",value:item.amount,onChange:v=>updLine(item.id,"amount",v),placeholder:"0.00",mb:0}),
-            lineItems.length>1&&btn({key:"rm",style:{background:"transparent",border:"none",color:"#FF4D6D",cursor:"pointer",fontSize:"1rem",alignSelf:"flex-end",paddingBottom:4},onClick:()=>remLine(item.id)},"\u2715"),
-          ]),
-        ])),
-        subTotal>0&&div({key:"prev",style:{...S.ok,marginTop:4,marginBottom:16,justifyContent:"space-between"}},[
-          span({key:"l",style:{color:"#5B7A99"}},gst==="yes"?"Total inc. GST:":"Subtotal (no GST):"),
-          span({key:"v",style:{fontWeight:700,fontSize:"1rem"}},fmtAUD(subTotal*(gst==="yes"?1.1:1))),
-        ]),
-        btn({key:"create",style:{...S.btnP,width:"100%",padding:"13px"},onClick:addInvoice},"+ Create invoice"),
+        ...overdueInvoices.slice(0,3).map(inv=>e(InvCard,{key:inv.id,inv})),
+        overdueInvoices.length>3&&div({key:"more",style:{fontSize:"0.75rem",color:"#5B7A99",textAlign:"center",paddingTop:8}},overdueInvoices.length-3+" more overdue"),
       ]),
-      // Invoice list grouped by month
-      div({key:"list"},[
-        div({key:"h",style:{fontWeight:600,marginBottom:14,fontSize:"0.88rem"}},allInvoices.length+" invoice"+(allInvoices.length!==1?"s":"")+" across all claims"),
-        allInvoices.length===0?div({key:"empty",style:{...S.card,textAlign:"center",padding:"32px",color:"#5B7A99"}},[
-          div({key:"i",style:{fontSize:"2rem",marginBottom:8}},"\U0001F9FE"),
-          div({key:"t"},"No invoices yet"),
-        ]):
-        Object.entries(grouped).map(([month,invs])=>{
-          const monthTotal=invs.reduce((s,i)=>s+getTotal(i),0);
-          const isOpen=expandedMonths[month]!==false;
-          return div({key:month,style:{marginBottom:12}},[
-            btn({key:"mhdr",onClick:()=>setExpandedMonths(p=>({...p,[month]:!isOpen})),
-              style:{width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"9px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",color:"#EFF6FF",marginBottom:isOpen?8:0}},[
-              div({key:"l",style:{display:"flex",alignItems:"center",gap:10}},[
-                span({key:"arr",style:{color:"rgba(255,255,255,0.4)",fontSize:"0.8rem",display:"inline-block",transform:isOpen?"rotate(90deg)":"none",transition:"transform 0.2s"}},"\u203a"),
-                div({key:"m",style:{fontWeight:600,fontSize:"0.85rem"}},month),
-                span({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},invs.length+" invoice"+(invs.length!==1?"s":"")),
+
+      div({key:"cols",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}},[
+        // Create invoice form
+        div({key:"form",style:S.card},[
+          div({key:"h",style:{fontWeight:700,marginBottom:20}},"Create invoice"),
+          saved&&e(OK,{key:"ok"},"Invoice created ✓"),
+          div({key:"pt",style:{marginBottom:16}},[
+            e("label",{key:"l",style:S.label},"Claim / patient *"),
+            div({key:"sw",style:{position:"relative"}},[
+              inp({key:"i",className:"cb-input",style:S.inp,placeholder:"Search patient name or claim number...",
+                value:patientSearch,onChange:ev=>{setPatientSearch(ev.target.value);setShowPatientDd(true);setSelClaim("");},
+                onFocus:()=>setShowPatientDd(true),onBlur:()=>setTimeout(()=>setShowPatientDd(false),200)}),
+              selClaim&&span({key:"ck",style:{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",color:"#00C9A7",fontSize:"0.75rem",pointerEvents:"none"}},"✓"),
+              showPatientDd&&patientSearch.length>0&&div({key:"dd",style:{position:"absolute",top:"100%",left:0,right:0,background:"#112240",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,zIndex:100,marginTop:4,maxHeight:200,overflow:"auto"}},[
+                ...activeClaims.filter(c=>{const q=patientSearch.toLowerCase();return(c.patientName||"").toLowerCase().includes(q)||(c.claimNumber||"").toLowerCase().includes(q);})
+                  .map(c=>div({key:c.id,onClick:()=>{setSelClaim(c.id);setPatientSearch((c.patientName||"")+(c.claimNumber?" — "+c.claimNumber:""));setShowPatientDd(false);},
+                    style:{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
+                    div({key:"n",style:{fontWeight:600,fontSize:"0.87rem"}},c.patientName||"Unnamed"),
+                    div({key:"d",style:{fontSize:"0.74rem",color:"#5B7A99"}},(c.claimNumber||"No claim #")+" · "+(c.scheme||"WorkCover")),
+                  ])),
+                activeClaims.filter(c=>{const q=patientSearch.toLowerCase();return(c.patientName||"").toLowerCase().includes(q)||(c.claimNumber||"").toLowerCase().includes(q);}).length===0&&
+                  div({key:"none",style:{padding:"12px 14px",color:"#5B7A99",fontSize:"0.84rem"}},"No matches"),
               ]),
-              span({key:"t",style:{fontWeight:700,fontSize:"0.9rem",color:"#60A5FA"}},fmtAUD(monthTotal)),
             ]),
-            isOpen&&div({key:"invs"},invs.map(inv=>{
-              const c=claims.find(x=>x.id===inv.claimId)||{};
-              const total=getTotal(inv);
-              const overdue=isOverdue(inv);
-              const effStatus=overdue?"Overdue":inv.status;
-              return div({key:inv.id,className:"card-hover",
-                style:{...S.cardSm,marginBottom:8,cursor:"pointer",borderColor:overdue?"rgba(255,77,109,0.25)":"rgba(255,255,255,0.08)"},
-                onClick:()=>setPreviewInv(inv)},[
-                div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}},[
-                  div({key:"l"},[
-                    div({key:"n",style:{fontWeight:600,fontSize:"0.87rem"}},inv.patientName||"\u2014"),
-                    div({key:"desc",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:1}},(inv.lineItems?inv.lineItems.map(l=>l.description).filter(Boolean).join(", "):inv.description)||"\u2014"),
-                    div({key:"meta",style:{fontSize:"0.7rem",color:"#5B7A99",marginTop:1}},(inv.invoiceNumber||"")+(inv.lineItems&&inv.lineItems[0]&&inv.lineItems[0].itemCode?" \u00b7 "+inv.lineItems[0].itemCode:"")),
-                  ]),
-                  div({key:"r",style:{textAlign:"right",flexShrink:0}},[
-                    div({key:"amt",style:{fontWeight:700,fontSize:"0.95rem"}},fmtAUD(total)),
-                    div({key:"d",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:1}},fmtDate(inv.date||inv.createdAt)),
-                  ]),
+          ]),
+          claim&&episodes.length>0&&div({key:"ep",style:{marginBottom:16}},[
+            e("label",{key:"l",style:S.label},"Episode / consultation"),
+            e("select",{key:"s",className:"cb-sel",style:S.sel,value:selEpisode,onChange:ev=>{
+              const epId=ev.target.value;setSelEpisode(epId);
+              if(epId){const ep=(claim.episodes||[]).find(e=>e.id===epId);if(ep&&ep.date){const epDate=new Date(ep.date).toISOString().slice(0,10);setInvoiceDate(epDate);setLineItems(p=>p.map(l=>({...l,treatmentDate:epDate})));}}
+            }},[
+              e("option",{key:"",value:""},"Select episode..."),
+              ...episodes.map(ep=>e("option",{key:ep.id,value:ep.id},"#"+(ep.episodeNo||"")+" — "+new Date(ep.date).toLocaleDateString("en-AU")+(ep.label?" — "+ep.label:""))),
+            ]),
+          ]),
+          div({key:"dg",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}},[
+            e(Inp,{key:"id",label:"Invoice date",value:invoiceDate,onChange:setInvoiceDate,type:"date",mb:0}),
+            div({key:"gst"},[
+              e("label",{key:"l",style:S.label},"GST"),
+              div({key:"btns",style:{display:"flex",gap:8}},
+                ["no","yes"].map(v=>btn({key:v,onClick:()=>setGst(v),style:{...S.pill,...(gst===v?S.pillT:S.pillM),padding:"9px 16px",fontSize:"0.82rem"}},v==="yes"?"Yes (10%)":"No GST"))
+              ),
+            ]),
+          ]),
+          div({key:"li-hdr",style:{...S.fb,marginBottom:10}},[
+            e("label",{key:"l",style:S.label},"Line items"),
+            btn({key:"add",style:{...S.btnS,fontSize:"0.78rem",padding:"4px 12px"},onClick:addLineItem},"+ Add item"),
+          ]),
+          ...lineItems.map((item)=>div({key:item.id,style:{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,padding:"10px 12px",marginBottom:8}},[
+            div({key:"r1",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},[
+              div({key:"td"},[
+                e("label",{key:"l",style:{...S.label,marginBottom:4}},"Treatment date *"),
+                inp({key:"i",className:"cb-input",style:{...S.inp,fontSize:"0.84rem",padding:"7px 10px"},type:"date",value:item.treatmentDate||invoiceDate,onChange:ev=>updLine(item.id,"treatmentDate",ev.target.value)}),
+              ]),
+              div({key:"ic"},[
+                e("label",{key:"l",style:{...S.label,marginBottom:4}},"Item code"),
+                e("select",{key:"s",className:"cb-sel",style:{...S.sel,fontSize:"0.81rem",padding:"7px 10px"},value:item.itemCode,
+                  onChange:ev=>{const v=ev.target.value;const fee=WORKSAFE_FEE_MAP[v]||"";const itm=filteredCodes.find(c=>c.value===v);updLine(item.id,"itemCode",v);if(fee)updLine(item.id,"amount",fee);if(itm)updLine(item.id,"description",itm.label.split(" — ").slice(1).join(" — ")||itm.label);}},[
+                  e("option",{key:"",value:""},"Select code..."),
+                  ...Object.entries(filteredCodes.slice(1).reduce((acc,c)=>{if(c.value){(acc[c.cat||"Other"]=acc[c.cat||"Other"]||[]).push(c);}return acc;},{}))
+                    .map(([cat,items2])=>e("optgroup",{key:cat,label:cat},items2.map(c=>e("option",{key:c.value,value:c.value},c.value+" — "+(c.label||""))))),
                 ]),
-                div({key:"btns",style:{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}},[
-                  span({key:"s",style:{...S.pill,...(effStatus==="Paid"?S.pillT:effStatus==="Overdue"?S.pillR:S.pillA),fontSize:"0.68rem",padding:"2px 8px",cursor:"default"}},effStatus),
-                  inv.status!=="Paid"&&btn({key:"pay",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 8px"},onClick:ev=>{ev.stopPropagation();updateStatus(inv.claimId,inv.id,"Paid");}},"Mark paid"),
-                  btn({key:"dl",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 8px"},onClick:ev=>{ev.stopPropagation();downloadInvoice(inv);}},"\u2b07 PDF"),
-                  btn({key:"send",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 8px"},onClick:ev=>{ev.stopPropagation();sendInvoice(inv);}},"\U0001F4E8 Send"),
-                  span({key:"hint",style:{fontSize:"0.67rem",color:"rgba(255,255,255,0.2)",marginLeft:4}},"click to preview"),
+              ]),
+            ]),
+            div({key:"r2",style:{display:"grid",gridTemplateColumns:"2fr 60px 100px "+(lineItems.length>1?"32px":""),gap:8,alignItems:"end"}},[
+              e(Inp,{key:"desc",label:"Description *",value:item.description,onChange:v=>updLine(item.id,"description",v),placeholder:"Service description",mb:0}),
+              e(Inp,{key:"qty",label:"Qty",value:String(item.qty||1),onChange:v=>updLine(item.id,"qty",parseInt(v)||1),placeholder:"1",mb:0}),
+              e(Inp,{key:"amt",label:"Unit price ($)",value:item.amount,onChange:v=>updLine(item.id,"amount",v),placeholder:"0.00",mb:0}),
+              lineItems.length>1&&btn({key:"rm",style:{background:"transparent",border:"none",color:"#FF4D6D",cursor:"pointer",fontSize:"1rem",alignSelf:"flex-end",paddingBottom:4},onClick:()=>remLine(item.id)},"✕"),
+            ]),
+          ])),
+          subTotal>0&&div({key:"prev",style:{...S.ok,marginTop:8,marginBottom:16,justifyContent:"space-between"}},[
+            span({key:"l",style:{color:"#5B7A99"}},gst==="yes"?"Total inc. GST:":"Subtotal (no GST):"),
+            span({key:"v",style:{fontWeight:700,fontSize:"1rem"}},fmtAUD(subTotal*(gst==="yes"?1.1:1))),
+          ]),
+          btn({key:"create",style:{...S.btnP,width:"100%",padding:"13px"},onClick:addInvoice},"+ Create invoice"),
+        ]),
+
+        // This month's invoices
+        div({key:"this-month"},[
+          div({key:"h",style:{fontWeight:600,marginBottom:14,fontSize:"0.88rem",display:"flex",justifyContent:"space-between",alignItems:"center"}},[
+            div({key:"l"},thisMonthKey+" — "+thisMonthInvoices.length+" invoice"+(thisMonthInvoices.length!==1?"s":"")),
+            btn({key:"hist",style:{...S.btnS,fontSize:"0.76rem",padding:"4px 12px"},onClick:()=>setInvTab("history")},"View all →"),
+          ]),
+          thisMonthInvoices.length===0?div({key:"empty",style:{...S.cardSm,textAlign:"center",padding:"28px",color:"#5B7A99"}},[
+            div({key:"i",style:{fontSize:"1.8rem",marginBottom:8}},"🧾"),
+            div({key:"t",style:{fontSize:"0.84rem"}},"No invoices this month"),
+          ]):
+          thisMonthInvoices.map(inv=>e(InvCard,{key:inv.id,inv})),
+        ]),
+      ]),
+    ]),
+
+    // ── HISTORY TAB ───────────────────────────────────────────────────────────
+    invTab==="history"&&div({key:"history"},[
+      // Search + filter bar
+      div({key:"filters",style:{...S.card,marginBottom:20,padding:"16px 20px"}},[
+        div({key:"top",style:{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:12,marginBottom:histSearch||histStatus!=="All"||histPrac!=="All"?12:0}},[
+          div({key:"s",style:{position:"relative"}},[
+            inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:36},placeholder:"Search patient, claim number, invoice number...",value:histSearch,onChange:ev=>setHistSearch(ev.target.value)}),
+            span({key:"ic",style:{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#5B7A99"}},"🔍"),
+          ]),
+          div({key:"status"},[
+            e("label",{key:"l",style:{...S.label,marginBottom:4}},"Status"),
+            e("select",{key:"s",className:"cb-sel",style:{...S.sel,padding:"8px 10px"},value:histStatus,onChange:ev=>setHistStatus(ev.target.value)},[
+              ...["All","Invoiced","Paid","Overdue"].map(s=>e("option",{key:s,value:s},s)),
+            ]),
+          ]),
+          div({key:"prac"},[
+            e("label",{key:"l",style:{...S.label,marginBottom:4}},"Practitioner"),
+            e("select",{key:"s",className:"cb-sel",style:{...S.sel,padding:"8px 10px"},value:histPrac,onChange:ev=>setHistPrac(ev.target.value)},[
+              e("option",{key:"all",value:"All"},"All practitioners"),
+              ...practitioners.map(p=>e("option",{key:p.id,value:p.name},p.name)),
+            ]),
+          ]),
+        ]),
+        (histSearch||histStatus!=="All"||histPrac!=="All")&&div({key:"results",style:{fontSize:"0.78rem",color:"#5B7A99"}},
+          histFiltered.length+" result"+(histFiltered.length!==1?"s":"")+" · "+fmtAUD(histFiltered.reduce((s,i)=>s+getTotal(i),0))+" total"
+        ),
+      ]),
+
+      // Month accordion
+      allInvoices.length===0?div({key:"empty",style:{...S.card,textAlign:"center",padding:"48px",color:"#5B7A99"}},[
+        div({key:"i",style:{fontSize:"2.5rem",marginBottom:12}},"🧾"),
+        div({key:"t",style:{fontWeight:600,marginBottom:6}},"No invoices yet"),
+        div({key:"s",style:{fontSize:"0.84rem"}},"Create your first invoice in the Overview tab"),
+        btn({key:"b",style:{...S.btnP,marginTop:16},onClick:()=>setInvTab("overview")},"← Create invoice"),
+      ]):
+      Object.keys(histGrouped).length===0?div({key:"none",style:{...S.card,textAlign:"center",padding:"32px",color:"#5B7A99"}},"No invoices match your filters"):
+      Object.entries(histGrouped).map(([month,invs])=>{
+        const mTotal=invs.reduce((s,i)=>s+getTotal(i),0);
+        const mColl=invs.filter(i=>i.status==="Paid").reduce((s,i)=>s+getTotal(i),0);
+        const mOut=mTotal-mColl;
+        const isOpen=expandedMonths[month]!==false;
+        return div({key:month,style:{marginBottom:12}},[
+          btn({key:"mhdr",onClick:()=>setExpandedMonths(p=>({...p,[month]:!isOpen})),
+            style:{width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"11px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",color:"#EFF6FF",marginBottom:isOpen?8:0}},[
+            div({key:"l",style:{display:"flex",alignItems:"center",gap:12}},[
+              span({key:"arr",style:{color:"rgba(255,255,255,0.4)",fontSize:"0.85rem",display:"inline-block",transform:isOpen?"rotate(90deg)":"none",transition:"transform 0.2s"}},"›"),
+              div({key:"m",style:{fontWeight:600,fontSize:"0.88rem"}},month),
+              span({key:"c",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 8px",cursor:"default"}},invs.length+" invoice"+(invs.length!==1?"s":"")),
+            ]),
+            div({key:"r",style:{display:"flex",gap:16,alignItems:"center"}},[
+              div({key:"t",style:{textAlign:"right"}},[
+                div({key:"inv",style:{fontWeight:700,fontSize:"0.9rem",color:"#60A5FA"}},fmtAUD(mTotal)),
+                div({key:"sub",style:{fontSize:"0.72rem",color:"#5B7A99"}},fmtAUD(mColl)+" collected · "+fmtAUD(mOut)+" outstanding"),
+              ]),
+            ]),
+          ]),
+          isOpen&&div({key:"invs"},invs.map(inv=>e(InvCard,{key:inv.id,inv}))),
+        ]);
+      }),
+    ]),
+
+    // ── REPORTING TAB ─────────────────────────────────────────────────────────
+    invTab==="reporting"&&div({key:"reporting"},[
+      // Per-practitioner summary
+      div({key:"prac-card",style:{...S.card,marginBottom:20}},[
+        div({key:"h",style:{fontWeight:700,marginBottom:20}},"Per-practitioner summary"),
+        pracTotals.length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",textAlign:"center",padding:"20px 0"}},"No invoice data yet"):
+        e("table",{key:"tbl",style:{width:"100%",borderCollapse:"collapse",fontSize:"0.87rem"}},[
+          e("thead",{key:"th"},e("tr",{style:{borderBottom:"2px solid rgba(255,255,255,0.08)"}},
+            ["Practitioner","Profession","Invoices","Total invoiced","Collected","Outstanding"].map(h=>e("th",{key:h,style:{padding:"8px 12px",textAlign:"left",fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#5B7A99"}},h))
+          )),
+          e("tbody",{key:"tb"},pracTotals.map(p=>e("tr",{key:p.name,style:{borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
+            e("td",{key:"n",style:{padding:"10px 12px",fontWeight:600}},p.name),
+            e("td",{key:"pr",style:{padding:"10px 12px",color:"#5B7A99",fontSize:"0.82rem"}},p.profession||"—"),
+            e("td",{key:"c",style:{padding:"10px 12px",textAlign:"center"}},p.count),
+            e("td",{key:"i",style:{padding:"10px 12px",fontWeight:600,color:"#60A5FA"}},fmtAUD(p.invoiced)),
+            e("td",{key:"co",style:{padding:"10px 12px",color:"#00C9A7"}},fmtAUD(p.collected)),
+            e("td",{key:"o",style:{padding:"10px 12px",color:p.invoiced-p.collected>0?"#FFB830":"#5B7A99"}},fmtAUD(p.invoiced-p.collected)),
+          ]))),
+          pracTotals.length>0&&e("tfoot",{key:"tf"},e("tr",{style:{borderTop:"2px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.02)"}},[
+            e("td",{key:"n",style:{padding:"10px 12px",fontWeight:700}},"Total"),
+            e("td",{key:"pr",style:{padding:"10px 12px"}},""),
+            e("td",{key:"c",style:{padding:"10px 12px",textAlign:"center",fontWeight:600}},allInvoices.length),
+            e("td",{key:"i",style:{padding:"10px 12px",fontWeight:700,color:"#60A5FA"}},fmtAUD(totalInv)),
+            e("td",{key:"co",style:{padding:"10px 12px",fontWeight:700,color:"#00C9A7"}},fmtAUD(totalColl)),
+            e("td",{key:"o",style:{padding:"10px 12px",fontWeight:700,color:totalOut>0?"#FFB830":"#5B7A99"}},fmtAUD(totalOut)),
+          ])),
+        ]),
+      ]),
+
+      // Monthly trend table
+      div({key:"monthly-card",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:20}},"Monthly summary"),
+        monthlyTotals.length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",textAlign:"center",padding:"20px 0"}},"No invoice data yet"):
+        e("table",{key:"tbl",style:{width:"100%",borderCollapse:"collapse",fontSize:"0.87rem"}},[
+          e("thead",{key:"th"},e("tr",{style:{borderBottom:"2px solid rgba(255,255,255,0.08)"}},
+            ["Month","Invoices","Total invoiced","Collected","Outstanding","Collection rate"].map(h=>e("th",{key:h,style:{padding:"8px 12px",textAlign:"left",fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#5B7A99"}},h))
+          )),
+          e("tbody",{key:"tb"},monthlyTotals.map(m=>{
+            const rate=m.invoiced>0?Math.round((m.collected/m.invoiced)*100):0;
+            return e("tr",{key:m.month,style:{borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
+              e("td",{key:"m",style:{padding:"10px 12px",fontWeight:600}},m.month),
+              e("td",{key:"c",style:{padding:"10px 12px",textAlign:"center"}},m.count),
+              e("td",{key:"i",style:{padding:"10px 12px",color:"#60A5FA"}},fmtAUD(m.invoiced)),
+              e("td",{key:"co",style:{padding:"10px 12px",color:"#00C9A7"}},fmtAUD(m.collected)),
+              e("td",{key:"o",style:{padding:"10px 12px",color:m.invoiced-m.collected>0?"#FFB830":"#5B7A99"}},fmtAUD(m.invoiced-m.collected)),
+              e("td",{key:"r",style:{padding:"10px 12px"}},[
+                div({key:"bar",style:{display:"flex",alignItems:"center",gap:8}},[
+                  div({key:"bg",style:{flex:1,height:6,background:"rgba(255,255,255,0.08)",borderRadius:3}},[
+                    div({key:"fill",style:{width:rate+"%",height:"100%",background:rate>=80?"#00C9A7":rate>=50?"#FFB830":"#FF4D6D",borderRadius:3}}),
+                  ]),
+                  span({key:"pct",style:{fontSize:"0.78rem",fontWeight:600,color:rate>=80?"#00C9A7":rate>=50?"#FFB830":"#FF4D6D",minWidth:32}},rate+"%"),
                 ]),
-              ]);
-            })),
-          ]);
-        }),
+              ]),
+            ]);
+          })),
+        ]),
       ]),
     ]),
   ]);
