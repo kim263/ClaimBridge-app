@@ -1283,7 +1283,12 @@ function Tab4({claim,up,clinic,practitioners}){
         div({key:"nrd",style:{marginBottom:16}},[div({key:"g",style:S.g2},[e(Inp,{key:"nrd",label:"Next review date",value:claim.nextReviewDate,onChange:v=>up("nextReviewDate",v),type:"date",mb:0}),div({key:"sp"})])]),
         isAlliedHealth?[
           div({key:"note",style:{...S.warn,marginBottom:14}},"\u25b9 Activity/functional limitations and SMART goals (AHRMP format)"),
-          ...[1,2,3].map(n=>div({key:"row"+n,style:{display:"grid",gridTemplateColumns:"1fr 1fr 140px",gap:10,marginBottom:10}},[
+          ...[1,2,3].filter(n=>{
+            // show row if it has data, or if it's the first empty row after filled rows
+            const hasData=!!(claim["ahGoalLim"+n]||claim["ahGoalTarget"+n]||claim["ahGoalDate"+n]);
+            const prevHasData=n===1||!!(claim["ahGoalLim"+(n-1)]||claim["ahGoalTarget"+(n-1)]);
+            return hasData||prevHasData;
+          }).map(n=>div({key:"row"+n,style:{display:"grid",gridTemplateColumns:"1fr 1fr 140px",gap:10,marginBottom:10}},[
             e(Inp,{key:"lim",label:n===1?"Current limitation":"",value:(claim["ahGoalLim"+n]||""),onChange:v=>up("ahGoalLim"+n,v),placeholder:"e.g. Unable to walk 100m",mb:0}),
             e(Inp,{key:"goal",label:n===1?"Related SMART goal":"",value:(claim["ahGoalTarget"+n]||""),onChange:v=>up("ahGoalTarget"+n,v),placeholder:"e.g. Walk 500m by discharge",mb:0}),
             e(Inp,{key:"date",label:n===1?"Est. date":"",value:(claim["ahGoalDate"+n]||""),onChange:v=>up("ahGoalDate"+n,v),type:"date",mb:0}),
