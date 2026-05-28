@@ -765,7 +765,7 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
         curTab===0&&e(TabOverview,{key:"t0",claim:viewClaim,up,clinic,practitioners,activeEpId,setActiveEpId,createEpisode,setEpTab}),
         curTab===1&&e(Tab1,{key:"t1",claim:viewClaim,up,practitioners,readOnly:!!activeEp}),
         curTab===2&&e(Tab2,{key:"t2",claim:viewClaim,up,readOnly:!!activeEp}),
-        curTab===3&&e(Tab4,{key:"t3",claim:viewClaim,up}),
+        curTab===3&&e(Tab4,{key:"t3",claim:viewClaim,up,clinic,practitioners}),
         curTab===4&&e(Tab5,{key:"t4",claim:viewClaim,up,clinic,practitioners}),
         curTab===5&&e(Tab6,{key:"t5",claim:viewClaim,up,clinic,practitioners}),
         curTab===6&&e(Tab8,{key:"t6",claim:viewClaim,up,clinic,practitioners}),
@@ -872,9 +872,6 @@ function Tab2({claim,up}){
   const[diags,setDiags]=useState(claim.diagnoses||[]);
   const[dSubTab,setDSubTab]=useState(0);
   const[hiIdx,setHiIdx]=useState(-1);
-  const[orthoQ,setOrthoQ]=useState("");
-  const[showOrthoDD,setShowOrthoDD]=useState(false);
-  const[orthoHiIdx,setOrthoHiIdx]=useState(-1);
   const DSUB=["Diagnosis & Capacity","Clinical Assessment","Psychosocial Barriers","Imaging"];
   const sugg=useMemo(()=>{if(!q||q.length<2)return[];const ql=q.toLowerCase();return DIAGNOSES_DB.filter(d=>d.label.toLowerCase().includes(ql)||d.icd10.toLowerCase().includes(ql)).slice(0,8);},[q]);
   const addD=d=>{if(diags.find(x=>x.icd10===d.icd10))return;const u=[...diags,d];setDiags(u);up("diagnoses",u);setQ("");setShow(false);};
@@ -988,10 +985,7 @@ function Tab2({claim,up}){
             up("orthoTestList",upd);
             up("orthoTests",upd.map(x=>x.name).join("\n"));
           };
-          const updateResult=(n,v)=>{
-            const upd=testList.map(x=>x.name===n?{...x,result:v}:x);
-            up("orthoTestList",upd);
-          };
+          const updResult=(n,v)=>up("orthoTestList",testList.map(x=>x.name===n?{...x,result:v}:x));
           return div({key:"ortho-wrap",style:{marginBottom:16}},[
             e("label",{key:"l",style:S.label},"Orthopaedic / clinical tests"),
             div({key:"layout",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}},[
@@ -1022,7 +1016,7 @@ function Tab2({claim,up}){
                     },t))
                   ),
                 ]),
-                div({key:"hint",style:{fontSize:"0.72rem",color:"#5B7A99",marginBottom:4}},"\u2191\u2193 navigate · Enter to select"),
+                div({key:"hint",style:{fontSize:"0.72rem",color:"#5B7A99"}},"\u2191\u2193 navigate \u00b7 Enter to add"),
               ]),
               div({key:"right",style:{borderLeft:"1px solid rgba(255,255,255,0.07)",paddingLeft:16}},[
                 testList.length===0
@@ -1030,13 +1024,13 @@ function Tab2({claim,up}){
                   :div({key:"list"},testList.map(t=>div({key:t.name,style:{marginBottom:12}},[
                     div({key:"hdr",style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}},[
                       div({key:"n",style:{fontWeight:600,fontSize:"0.82rem",lineHeight:1.3}},t.name),
-                      btn({key:"x",onClick:()=>remTest(t.name),style:{background:"transparent",border:"none",color:"rgba(255,77,109,0.7)",cursor:"pointer",fontSize:"0.8rem",padding:"0 4px",flexShrink:0}},"\u2715"),
+                      btn({key:"x",onClick:()=>remTest(t.name),style:{background:"transparent",border:"none",color:"rgba(255,77,109,0.7)",cursor:"pointer",fontSize:"0.8rem",padding:"0 4px"}},"\u2715"),
                     ]),
                     inp({key:"r",className:"cb-input",
                       style:{...S.inp,fontSize:"0.82rem",padding:"7px 10px"},
                       placeholder:"Result (e.g. Positive, 45\u00b0, Grade II)...",
                       value:t.result||"",
-                      onChange:ev=>updateResult(t.name,ev.target.value)}),
+                      onChange:ev=>updResult(t.name,ev.target.value)}),
                   ]))
                 ),
               ]),
@@ -1160,68 +1154,57 @@ function OutcomeTrendChart({scores,measure,measureKey}){
 }
 
 // ── TAB 4: TREATMENT PLAN ─────────────────────────────────────────────────────
-// ── QUICK LETTER SENDER (used by multiple tabs) ───────────────────────────────
-function sendQuickLetter({letter, toEmail, toName, ccEmail, subject, claim, up}) {
-  if(!letter) return;
-  const cc = ccEmail || claim.patientEmail || "";
-  const subj = subject || ("Re: " + (claim.scheme||"WorkCover") + " Claim — " + (claim.patientName||"Patient") + " | " + (claim.claimNumber||""));
-  const mailto = "mailto:" + (toEmail||"") + (cc ? "?cc=" + encodeURIComponent(cc) : "?") + "&subject=" + encodeURIComponent(subj) + "&body=" + encodeURIComponent(letter);
+// ── QUICK LETTER SENDER ────────────────────────────────────────────────────
+function sendQuickLetter({letter,toEmail,toName,ccEmail,subject,claim,up}){
+  if(!letter)return;
+  const cc=ccEmail||claim.patientEmail||"";
+  const subj=subject||("Re: "+(claim.scheme||"WorkCover")+" Claim — "+(claim.patientName||"Patient")+" | "+(claim.claimNumber||""));
+  const mailto="mailto:"+(toEmail||"")+(cc?"?cc="+encodeURIComponent(cc)+"&subject=":"?subject=")+encodeURIComponent(subj)+"&body="+encodeURIComponent(letter);
   window.open(mailto);
-  // Log to audit trail
-  if(up) {
-    const entry = {event:"Letter sent", detail:"Sent to " + (toName||toEmail||"recipient") + (cc ? " (CC: " + cc + ")" : ""), timestamp: new Date().toISOString(), by:"—"};
-    up("auditTrail", [...(claim.auditTrail||[]), entry]);
-    // Save to letter history
-    const lEntry = {id:"ltr_"+Date.now(), template:subject||"Quick letter", generatedAt:new Date().toISOString(), content:letter};
-    up("letterHistory", [...(claim.letterHistory||[]), lEntry]);
+  if(up){
+    const ae={event:"Letter sent",detail:"Sent to "+(toName||toEmail||"recipient")+(cc?" (CC: "+cc+")":""),timestamp:new Date().toISOString(),by:"—"};
+    up("auditTrail",[...(claim.auditTrail||[]),ae]);
+    const le={id:"ltr_"+Date.now(),template:subject||"Quick letter",generatedAt:new Date().toISOString(),content:letter};
+    up("letterHistory",[...(claim.letterHistory||[]),le]);
   }
 }
-
-// Build a quick letter given template id and claim data (mini version of Tab8 buildLetter)
-function buildQuickLetter(templateId, claim, practitioners, clinic) {
-  const prac = practitioners.find(p=>p.id===claim.practitionerId)||{};
-  const refs = claim.referrals||[];
-  const firstRef = refs[0]||{};
-  const diags = (claim.diagnoses||[]).map(d=>d.label+(d.icd10?" ("+d.icd10+")":"")).join("\n  - ")||"[Diagnosis not recorded]";
-  const diagShort = (claim.diagnoses||[]).map(d=>d.label).join(", ")||"[Diagnosis not recorded]";
-  const today = new Date().toLocaleDateString("en-AU",{day:"2-digit",month:"long",year:"numeric"});
-  const fmtD = d=>{if(!d)return"[date]";try{return new Date(d).toLocaleDateString("en-AU",{day:"2-digit",month:"long",year:"numeric"});}catch{return d;}};
-  const patientName = claim.patientName||"[Patient]";
-  const doi = fmtD(claim.dateOfInjury);
-  const claimNo = claim.claimNumber||"[Claim number]";
-  const scheme = claim.scheme||"WorkCover";
-  const insurerName = claim.insurerName||claim.insurerNameCustom||"[Insurer]";
-  const caseManager = claim.caseManagerName||"";
-  const pracName = prac.name||"[Practitioner]";
-  const pracProf = prac.profession||"";
-  const pracProv = prac.providerNo||"";
-  const pracPhone = prac.phone||clinic.phone||"";
-  const clinicName = clinic.name||"";
-  const clinicAddr = clinic.address||"";
-  const employer = claim.employerName||"";
-  const treatPlan = claim.treatmentPlan||"As per clinical assessment.";
-  const workRestrictions = claim.workRestrictions||"As per Certificate of Capacity.";
-  const fitnessStatus = claim.fitnessForWork||"";
-  const rtwMod = fmtD(claim.rtwModifiedDate);
-  const rtwNorm = fmtD(claim.rtwNormalDate);
-  const imagingSummary = (claim.imagingReports||[]).filter(r=>r.summary).map(r=>r.name+": "+r.summary.keyFindings).join("\n")||"";
-  const recipient = firstRef.name?(firstRef.name+(firstRef.specialty?" ("+firstRef.specialty+")":"")):(caseManager||insurerName);
-  const salutation = firstRef.name?"Dear "+firstRef.name+",":`Dear ${caseManager?"Case Manager "+caseManager:"Sir / Madam"},`;
-  const sig = `\n\nYours sincerely,\n\n${pracName}\n${pracProf}\nProvider No: ${pracProv}\n${clinicName}\n${clinicAddr}\nPh: ${pracPhone}\nDate: ${today}\n\n---\nGenerated by ClaimBridge`;
-  const hdr = subj => `${today}\n\n${recipient}\n${insurerName}\n\nRe: ${scheme} Claim — ${patientName}\nClaim Number: ${claimNo}\nDate of Injury: ${doi}\n\n${salutation}\n\nRe: ${subj}`;
-
-  if(templateId==="allied_health") return hdr("Request for Approval — Allied Health Referral")+`\n\nI am writing to request approval for an allied health referral for my patient, ${patientName} (DOB: ${fmtD(claim.dob)}), under ${scheme} claim number ${claimNo}.\n\n**Diagnosis:**\n  - ${diags}\n\n**Proposed Referral:**\nI am requesting approval to refer ${patientName} to ${firstRef.name?firstRef.name+", ":""}${firstRef.specialty||"an allied health practitioner"}${firstRef.clinic?" — "+firstRef.clinic:""}.\n\nThe referred practitioner will conduct their own assessment, complete the required AHRMP and submit their treatment request directly.\n\n**Current Treatment:**\n${treatPlan}\n\n**Fitness for Work:**\n${fitnessStatus||"As per Certificate of Capacity."}${workRestrictions?"\nRestrictions: "+workRestrictions:""}${sig}`;
-
-  if(templateId==="radiology") return hdr("Request for Approval — Radiological Imaging")+`\n\nI am writing to request approval for radiological imaging for my patient, ${patientName} (DOB: ${fmtD(claim.dob)}), under ${scheme} claim number ${claimNo}.\n\n**Diagnosis:**\n  - ${diags}\n\n**Imaging Requested:**\n${claim.imagingReferral||"MRI / CT / X-Ray — as clinically indicated"}\n\n**Clinical Indication:**\n${claim.imagingIndication||"To further investigate the clinical presentation and assist with diagnosis and treatment planning."}${claim.otherInvestigations?"\n\n**Other investigations:**\n"+claim.otherInvestigations:""}${sig}`;
-
-  if(templateId==="procedure") return hdr("Request for Approval — Procedure / Surgical Intervention")+`\n\nI am writing to request approval for a procedure / surgical intervention for my patient, ${patientName} (DOB: ${fmtD(claim.dob)}), under ${scheme} claim number ${claimNo}.\n\n**Diagnosis:**\n  - ${diags}\n\n**Proposed Procedure:**\n${claim.proposedProcedure||"[Procedure]"} — to be performed by ${firstRef.name||"[Specialist]"}${firstRef.clinic?" at "+firstRef.clinic:""}.\n\n**Clinical Justification:**\n${patientName} sustained the above compensable injury on ${doi}${employer?" while employed with "+employer:""}. ${treatPlan}${imagingSummary?"\n\n**Supporting Imaging:**\n"+imagingSummary:""}\n\n**Return to Work:**\n${rtwMod!=="[date]"?"Estimated return to modified duties: "+rtwMod+"\n":""}${rtwNorm!=="[date]"?"Estimated return to normal duties: "+rtwNorm:""}${sig}`;
-
+function buildQuickLetter(templateId,claim,practitioners,clinic){
+  const prac=practitioners.find(p=>p.id===claim.practitionerId)||{};
+  const refs=claim.referrals||[];const firstRef=refs[0]||{};
+  const diags=(claim.diagnoses||[]).map(d=>d.label+(d.icd10?" ("+d.icd10+")":"")).join("\n  - ")||"[Diagnosis not recorded]";
+  const today=new Date().toLocaleDateString("en-AU",{day:"2-digit",month:"long",year:"numeric"});
+  const fD=d=>{if(!d)return"[date]";try{return new Date(d).toLocaleDateString("en-AU",{day:"2-digit",month:"long",year:"numeric"});}catch{return d;}};
+  const pat=claim.patientName||"[Patient]";
+  const claimNo=claim.claimNumber||"[Claim number]";
+  const scheme=claim.scheme||"WorkCover";
+  const ins=claim.insurerName||claim.insurerNameCustom||"[Insurer]";
+  const cm=claim.caseManagerName||"";
+  const pracName=prac.name||"[Practitioner]";
+  const pracProf=prac.profession||"";
+  const pracProv=prac.providerNo||"";
+  const pracPhone=prac.phone||clinic.phone||"";
+  const clinicName=clinic.name||"";
+  const clinicAddr=clinic.address||"";
+  const employer=claim.employerName||"";
+  const treatPlan=claim.treatmentPlan||"As per clinical assessment.";
+  const workRes=claim.workRestrictions||"As per Certificate of Capacity.";
+  const fitness=claim.fitnessForWork||"";
+  const rtwMod=fD(claim.rtwModifiedDate);const rtwNorm=fD(claim.rtwNormalDate);
+  const imgSummary=(claim.imagingReports||[]).filter(r=>r.summary).map(r=>r.name+": "+r.summary.keyFindings).join("\n")||"";
+  const recipient=firstRef.name?(firstRef.name+(firstRef.specialty?" ("+firstRef.specialty+")":"")):(cm||ins);
+  const salutation=firstRef.name?"Dear "+firstRef.name+",":`Dear ${cm?"Case Manager "+cm:"Sir / Madam"},`;
+  const sig=`\n\nYours sincerely,\n\n${pracName}\n${pracProf}\nProvider No: ${pracProv}\n${clinicName}\n${clinicAddr}\nPh: ${pracPhone}\nDate: ${today}\n\n---\nGenerated by ClaimBridge`;
+  const hdr=subj=>`${today}\n\n${recipient}\n${ins}\n\nRe: ${scheme} Claim — ${pat}\nClaim Number: ${claimNo}\nDate of Injury: ${fD(claim.dateOfInjury)}\n\n${salutation}\n\nRe: ${subj}`;
+  if(templateId==="allied_health")return hdr("Request for Approval — Allied Health Referral")+`\n\nI am writing to request approval for an allied health referral for my patient, ${pat} (DOB: ${fD(claim.dob)}), under ${scheme} claim number ${claimNo}.\n\n**Diagnosis:**\n  - ${diags}\n\n**Proposed Referral:**\nI am requesting approval to refer ${pat} to ${firstRef.name?firstRef.name+", ":""}${firstRef.specialty||"an allied health practitioner"}${firstRef.clinic?" — "+firstRef.clinic:""}.\n\nThe referred practitioner will conduct their own assessment, complete the required AHRMP and submit their treatment request directly.\n\n**Current Treatment:**\n${treatPlan}\n\n**Fitness for Work:**\n${fitness||"As per Certificate of Capacity."}${workRes?"\nRestrictions: "+workRes:""}${sig}`;
+  if(templateId==="radiology")return hdr("Request for Approval — Radiological Imaging")+`\n\nI am writing to request approval for radiological imaging for my patient, ${pat} (DOB: ${fD(claim.dob)}), under ${scheme} claim number ${claimNo}.\n\n**Diagnosis:**\n  - ${diags}\n\n**Imaging Requested:**\n${claim.imagingReferral||"As clinically indicated"}\n\n**Clinical Indication:**\n${claim.imagingIndication||"To assist with diagnosis and treatment planning."}${claim.otherInvestigations?"\n\n**Other investigations:**\n"+claim.otherInvestigations:""}${sig}`;
+  if(templateId==="procedure")return hdr("Request for Approval — Procedure / Surgical Intervention")+`\n\nI am writing to request approval for a procedure / surgical intervention for my patient, ${pat} (DOB: ${fD(claim.dob)}), under ${scheme} claim number ${claimNo}.\n\n**Diagnosis:**\n  - ${diags}\n\n**Proposed Procedure:**\n${claim.proposedProcedure||"[Procedure]"} — to be performed by ${firstRef.name||"[Specialist]"}${firstRef.clinic?" at "+firstRef.clinic:""}.\n\n**Clinical Justification:**\n${pat} sustained the above compensable injury on ${fD(claim.dateOfInjury)}${employer?" while employed with "+employer:""}. ${treatPlan}${imgSummary?"\n\n**Supporting Imaging:**\n"+imgSummary:""}\n\n**Return to Work:**\n${rtwMod!=="[date]"?"Estimated modified duties: "+rtwMod+"\n":""}${rtwNorm!=="[date]"?"Estimated normal duties: "+rtwNorm:""}${sig}`;
+  if(templateId==="travel")return hdr("Request for Approval — Travel"+(claim.accommodationRequired==="yes"?" and Accommodation":""))+`\n\nI am writing to request approval for funded travel${claim.accommodationRequired==="yes"?" and accommodation":""} for my patient, ${pat} (DOB: ${fD(claim.dob)}), under ${scheme} claim number ${claimNo}.\n\n**Diagnosis:**\n  - ${diags}\n\n**Travel Request:**\n${claim.travelReasoning||"Travel is required to attend approved treatment."}${claim.accommodationRequired==="yes"?`\n\n**Accommodation Request:**\nNights required: ${claim.accommodationNights||"[number]"}\n${claim.accommodationReasoning||"Accommodation required due to distance from treatment facility."}`:""} ${sig}`;
   return "";
 }
 
-function Tab4({claim,up}){
+function Tab4({claim,up,clinic,practitioners}){
   const[subTab,setSubTab]=useState(0);
-  const SUB=["Treatment & Recovery","Proposed Procedure / Surgery","Referrals","Medication & Investigations","Outcome Measures","Travel & Accommodation"];
+  const SUB=["Treatment & Recovery","Proposed Procedure / Surgery","Referrals","Medication & Investigations"];
   const isPrescriber=PRESCRIBING.includes(claim.practitionerProfession);
   const isAlliedHealth=!PRESCRIBING.includes(claim.practitionerProfession)&&claim.practitionerProfession!=="General Practitioner"&&claim.practitionerProfession!=="";
   const[overrides,setOverrides]=useState(claim.rtwOverrides||{});
@@ -1263,29 +1246,23 @@ function Tab4({claim,up}){
                       div({key:"times",style:{display:"flex",gap:8}},[
                         div({key:"mod",style:{flex:1,background:"rgba(255,184,48,0.08)",borderRadius:8,padding:"6px 10px",textAlign:"center"}},[
                           div({key:"l",style:{fontSize:"0.65rem",color:"#FFB830",fontWeight:700,textTransform:"uppercase",marginBottom:2}},"Modified"),
-                          div({key:"v",style:{fontWeight:700,fontSize:"0.88rem",color:"#FFB830"}},
-                            (ov.mod||r.adjModMin)+"–"+(ov.modMax||r.adjModMax)+"w"),
+                          div({key:"v",style:{fontWeight:700,fontSize:"0.88rem",color:"#FFB830"}},(ov.mod||r.adjModMin)+"\u2013"+(ov.modMax||r.adjModMax)+"w"),
                         ]),
                         div({key:"norm",style:{flex:1,background:"rgba(0,201,167,0.08)",borderRadius:8,padding:"6px 10px",textAlign:"center"}},[
                           div({key:"l",style:{fontSize:"0.65rem",color:"#00C9A7",fontWeight:700,textTransform:"uppercase",marginBottom:2}},"Normal"),
-                          div({key:"v",style:{fontWeight:700,fontSize:"0.88rem",color:"#00C9A7"}},
-                            (ov.norm||r.adjNormMin)+"–"+(ov.normMax||r.adjNormMax)+"w"),
+                          div({key:"v",style:{fontWeight:700,fontSize:"0.88rem",color:"#00C9A7"}},(ov.norm||r.adjNormMin)+"\u2013"+(ov.normMax||r.adjNormMax)+"w"),
                         ]),
                       ]),
-                      div({key:"override",style:{display:"flex",gap:6,marginTop:6,alignItems:"center"}},[
-                        div({key:"l",style:{fontSize:"0.68rem",color:"#5B7A99",flexShrink:0}},"Override:"),
-                        inp({key:"om",className:"cb-input",style:{...S.inp,fontSize:"0.75rem",padding:"4px 8px",height:28},
-                          placeholder:"Min",value:ov.mod||"",onChange:ev=>{const v=ev.target.value;setOverride(d.label,"mod",v);if(v&&ov.modMax&&parseInt(v)>parseInt(ov.modMax))setOverride(d.label,"modMax",v);}}),
-                        span({key:"dash1",style:{color:"#5B7A99",fontSize:"0.8rem"}},"–"),
-                        inp({key:"om2",className:"cb-input",style:{...S.inp,fontSize:"0.75rem",padding:"4px 8px",height:28},
-                          placeholder:"Max",value:ov.modMax||"",onChange:ev=>setOverride(d.label,"modMax",ev.target.value)}),
-                        span({key:"sep",style:{color:"#5B7A99",fontSize:"0.7rem",margin:"0 4px"}},"mod /"),
-                        inp({key:"on",className:"cb-input",style:{...S.inp,fontSize:"0.75rem",padding:"4px 8px",height:28},
-                          placeholder:"Min",value:ov.norm||"",onChange:ev=>{const v=ev.target.value;setOverride(d.label,"norm",v);if(v&&ov.normMax&&parseInt(v)>parseInt(ov.normMax))setOverride(d.label,"normMax",v);}}),
-                        span({key:"dash2",style:{color:"#5B7A99",fontSize:"0.8rem"}},"–"),
-                        inp({key:"on2",className:"cb-input",style:{...S.inp,fontSize:"0.75rem",padding:"4px 8px",height:28},
-                          placeholder:"Max",value:ov.normMax||"",onChange:ev=>setOverride(d.label,"normMax",ev.target.value)}),
-                        span({key:"sep2",style:{color:"#5B7A99",fontSize:"0.68rem",marginLeft:2}},"norm"),
+                      div({key:"ov",style:{display:"flex",gap:4,marginTop:6,alignItems:"center"}},[
+                        div({key:"l",style:{fontSize:"0.67rem",color:"#5B7A99",flexShrink:0}},"Override:"),
+                        inp({key:"om",className:"cb-input",style:{...S.inp,fontSize:"0.74rem",padding:"3px 7px",height:26},placeholder:"Min mod",value:ov.mod||"",onChange:ev=>setOverride(d.label,"mod",ev.target.value)}),
+                        span({key:"d1",style:{color:"#5B7A99"}},"–"),
+                        inp({key:"om2",className:"cb-input",style:{...S.inp,fontSize:"0.74rem",padding:"3px 7px",height:26},placeholder:"Max mod",value:ov.modMax||"",onChange:ev=>setOverride(d.label,"modMax",ev.target.value)}),
+                        span({key:"sep",style:{color:"#5B7A99",fontSize:"0.68rem",margin:"0 3px"}},"mod /"),
+                        inp({key:"on",className:"cb-input",style:{...S.inp,fontSize:"0.74rem",padding:"3px 7px",height:26},placeholder:"Min norm",value:ov.norm||"",onChange:ev=>setOverride(d.label,"norm",ev.target.value)}),
+                        span({key:"d2",style:{color:"#5B7A99"}},"–"),
+                        inp({key:"on2",className:"cb-input",style:{...S.inp,fontSize:"0.74rem",padding:"3px 7px",height:26},placeholder:"Max norm",value:ov.normMax||"",onChange:ev=>setOverride(d.label,"normMax",ev.target.value)}),
+                        span({key:"sep2",style:{color:"#5B7A99",fontSize:"0.67rem",marginLeft:2}},"norm"),
                       ]),
                     ]);
                   })
@@ -1313,13 +1290,8 @@ function Tab4({claim,up}){
           e(Ta,{key:"tp",label:"Treatment methods / proposed treatment",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Describe treatment methods to be used...",rows:3}),
           e(Ta,{key:"sm",label:"Self-management strategies",value:claim.selfManagement,onChange:v=>up("selfManagement",v),placeholder:"Strategies the worker will use to manage their condition..."}),
           div({key:"ahrmp-send",style:{marginTop:4,paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
-                        div({key:"h",style:{fontWeight:600,fontSize:"0.85rem",marginBottom:8}},"Send AHRMP / allied health referral letter"),
-                        btn({key:"gs",style:{...S.btnP,fontSize:"0.82rem"},onClick:()=>{
-                          const letter=buildQuickLetter("allied_health",claim,practitioners,clinic);
-                          if(!letter)return;
-                          sendQuickLetter({letter,toEmail:claim.caseManagerEmail||"",toName:claim.caseManagerName||claim.insurerName,ccEmail:claim.patientEmail,claim,up,subject:"AHRMP / Allied Health Referral Request — "+claim.patientName});
-                        }},"📨 Send to case manager"),
-                        div({key:"note",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:6}},"Patient automatically CC'd. Letter saved to claim log."),
+                        btn({key:"gs",style:{...S.btnP,fontSize:"0.82rem"},onClick:()=>{const l=buildQuickLetter("allied_health",claim,practitioners,clinic);if(!l)return;sendQuickLetter({letter:l,toEmail:claim.caseManagerEmail||"",toName:claim.caseManagerName||claim.insurerName,ccEmail:claim.patientEmail,claim,up,subject:"AHRMP / Allied Health Referral — "+claim.patientName});}},"📨 Send AHRMP request to case manager"),
+                        div({key:"note",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:6}},"Patient automatically CC'd. Saved to claim log."),
                       ]),
         ]:[
           e(Ta,{key:"tp",label:"Treatment plan / management approach",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Management approach...",rows:4}),
@@ -1353,6 +1325,26 @@ function Tab4({claim,up}){
         e(Ta,{key:"mod",label:"Modified duties recommendations",value:claim.modifiedDuties,onChange:v=>up("modifiedDuties",v),placeholder:"Specific modified duties available..."}),
       ]),
 
+      diags.length>0&&div({key:"rtw-estimates",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:4}},"Suggested recovery timeframes"),
+        div({key:"s",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:6}},"Research-based estimates adjusted for identified psychosocial barriers. For guidance only \u2014 clinical judgement applies."),
+        adjustments.length>0&&div({key:"adj-note",style:{...S.warn,marginBottom:12,fontSize:"0.78rem"}},"\u26a0 "+adjustments.length+" psychosocial barrier"+(adjustments.length>1?"s":"")+" identified \u2014 timeframes extended accordingly."),
+        ...diags.map(d=>{
+          const r=calcRTW(d.label);
+          if(!r)return div({key:d.icd10,style:{padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.05)",fontSize:"0.82rem",color:"#5B7A99"}},d.label+" \u2014 no estimate available");
+          const ov=overrides[d.label]||{};
+          return div({key:d.icd10,style:{borderBottom:"1px solid rgba(255,255,255,0.06)",paddingBottom:12,marginBottom:12}},[
+            div({key:"name",style:{fontWeight:600,fontSize:"0.88rem",marginBottom:8}},d.label),
+            div({key:"grid",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:6}},[
+              div({key:"mod",style:{...S.cardSm,background:"rgba(255,184,48,0.06)",borderColor:"rgba(255,184,48,0.2)"}},[div({key:"l",style:{fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#FFB830",marginBottom:4}},"Modified duties"),div({key:"v",style:{fontWeight:700,fontSize:"1.1rem",color:"#FFB830"}},(ov.mod||r.adjModMin)+"\u2013"+(ov.modMax||r.adjModMax)+" weeks"),r.adjModMin!==r.baseModMin&&div({key:"base",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:2}},"Base: "+r.baseModMin+"\u2013"+r.baseModMax+"w")]),
+              div({key:"norm",style:{...S.cardSm,background:"rgba(0,201,167,0.06)",borderColor:"rgba(0,201,167,0.2)"}},[div({key:"l",style:{fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#00C9A7",marginBottom:4}},"Normal duties"),div({key:"v",style:{fontWeight:700,fontSize:"1.1rem",color:"#00C9A7"}},(ov.norm||r.adjNormMin)+"\u2013"+(ov.normMax||r.adjNormMax)+" weeks"),r.adjNormMin!==r.baseNormMin&&div({key:"base",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:2}},"Base: "+r.baseNormMin+"\u2013"+r.baseNormMax+"w")]),
+            ]),
+            r.notes&&div({key:"note",style:{fontSize:"0.76rem",color:"#5B7A99",fontStyle:"italic",marginBottom:6}},r.notes),
+            div({key:"override",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[div({key:"ol",style:{fontSize:"0.74rem",color:"#5B7A99"}},"Override:"),e(Inp,{key:"omod",label:"",value:ov.mod||"",onChange:v=>setOverride(d.label,"mod",v),placeholder:"Mod wks",mb:0}),e(Inp,{key:"onorm",label:"",value:ov.norm||"",onChange:v=>setOverride(d.label,"norm",v),placeholder:"Normal wks",mb:0})]),
+          ]);
+        }),
+      ]),
+      subTab===SUB.indexOf("Treatment & Recovery")&&e(OutcomeMeasuresTab,{key:"om-inline",claim,up}),
     ]),
 
     subTab===SUB.indexOf("Proposed Procedure / Surgery")&&div({key:"proc-tab"},[
@@ -1367,14 +1359,17 @@ function Tab4({claim,up}){
           e(Inp,{key:"pd",label:"Proposed date (if known)",value:claim.procedureDate||"",onChange:v=>up("procedureDate",v),type:"date",mb:0}),
         ]),
         e(Ta,{key:"pn",label:"Clinical notes / justification",value:claim.procedureNotes||"",onChange:v=>up("procedureNotes",v),placeholder:"Additional clinical notes supporting the proposed procedure...",rows:4}),
+        div({key:"acc-section",style:{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
+                    div({key:"h",style:{fontWeight:600,fontSize:"0.88rem",marginBottom:10}},"Accommodation"),
+                    div({key:"g",style:S.g2},[
+                      e(Sel,{key:"acc",label:"Accommodation required",value:claim.accommodationRequired||"",onChange:v=>up("accommodationRequired",v),options:["yes","no"],mb:0}),
+                      e(Inp,{key:"an",label:"Number of nights",value:claim.accommodationNights||"",onChange:v=>up("accommodationNights",v),placeholder:"e.g. 2",mb:0}),
+                    ]),
+                    claim.accommodationRequired==="yes"&&e(Ta,{key:"t",label:"Accommodation justification",value:claim.accommodationReasoning||"",onChange:v=>up("accommodationReasoning",v),placeholder:"Justification for accommodation..."}),
+                  ]),
         claim.proposedProcedure&&div({key:"proc-send",style:{marginTop:14,paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
-                    div({key:"h",style:{fontWeight:600,fontSize:"0.85rem",marginBottom:8}},"Generate & send procedure request letter"),
-                    btn({key:"gs",style:{...S.btnP,fontSize:"0.82rem"},onClick:()=>{
-                      const letter=buildQuickLetter("procedure",claim,practitioners,clinic);
-                      if(!letter)return;
-                      sendQuickLetter({letter,toEmail:claim.caseManagerEmail||"",toName:claim.caseManagerName||claim.insurerName,ccEmail:claim.patientEmail,claim,up,subject:"Request for Approval — Procedure/Surgery — "+claim.patientName});
-                    }},"📨 Send procedure request to case manager"),
-                    div({key:"note",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:6}},"Patient automatically CC'd. Letter saved to claim log."),
+                    btn({key:"gs",style:{...S.btnP,fontSize:"0.82rem"},onClick:()=>{const l=buildQuickLetter("procedure",claim,practitioners,clinic);if(!l)return;sendQuickLetter({letter:l,toEmail:claim.caseManagerEmail||"",toName:claim.caseManagerName||claim.insurerName,ccEmail:claim.patientEmail,claim,up,subject:"Request for Approval — Procedure/Surgery — "+claim.patientName});}},"📨 Send procedure request to case manager"),
+                    div({key:"note",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:6}},"Patient automatically CC'd. Saved to claim log."),
                   ]),
       ]),
     ]),
@@ -1402,19 +1397,10 @@ function Tab4({claim,up}){
         (claim.referrals||[]).length>0&&div({key:"ref-send",style:{marginTop:14,paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
                     div({key:"h",style:{fontWeight:600,fontSize:"0.85rem",marginBottom:8}},"Generate & send referral letter"),
                     div({key:"btns",style:{display:"flex",gap:10,flexWrap:"wrap"}},[
-                      btn({key:"gs",style:{...S.btnP,fontSize:"0.82rem"},onClick:()=>{
-                        const letter=buildQuickLetter("allied_health",claim,practitioners,clinic);
-                        if(!letter)return;
-                        sendQuickLetter({letter,toEmail:claim.caseManagerEmail||"",toName:claim.caseManagerName||claim.insurerName,ccEmail:claim.patientEmail,claim,up,subject:"Request for Allied Health Referral Approval — "+claim.patientName});
-                      }},"📨 Send to case manager"),
-                      btn({key:"gp",style:{...S.btnS,fontSize:"0.82rem"},onClick:()=>{
-                        const letter=buildQuickLetter("allied_health",claim,practitioners,clinic);
-                        const ref=(claim.referrals||[])[0]||{};
-                        if(!letter)return;
-                        sendQuickLetter({letter,toEmail:ref.email||"",toName:ref.name||ref.specialty,ccEmail:claim.patientEmail,claim,up,subject:"Referral — "+claim.patientName+" | "+(claim.scheme||"WorkCover")});
-                      }},"📨 Send to practitioner"),
+                      btn({key:"gs",style:{...S.btnP,fontSize:"0.82rem"},onClick:()=>{const l=buildQuickLetter("allied_health",claim,practitioners,clinic);if(!l)return;sendQuickLetter({letter:l,toEmail:claim.caseManagerEmail||"",toName:claim.caseManagerName||claim.insurerName,ccEmail:claim.patientEmail,claim,up,subject:"Request for Allied Health Referral — "+claim.patientName});}},"📨 Send to case manager"),
+                      btn({key:"gp",style:{...S.btnS,fontSize:"0.82rem"},onClick:()=>{const l=buildQuickLetter("allied_health",claim,practitioners,clinic);const r=(claim.referrals||[])[0]||{};if(!l)return;sendQuickLetter({letter:l,toEmail:r.email||"",toName:r.name||r.specialty,ccEmail:claim.patientEmail,claim,up,subject:"Referral — "+claim.patientName});}},"📨 Send to practitioner"),
                     ]),
-                    div({key:"note",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:6}},"Patient automatically CC'd. Letter saved to claim log."),
+                    div({key:"note",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:6}},"Patient automatically CC'd. Saved to claim log."),
                   ]),
         (claim.referrals||[]).length>0&&div({key:"list",style:{marginTop:16}},[
           ...(claim.referrals||[]).map(r=>div({key:r.id,style:{...S.cardSm,marginBottom:8}},[
@@ -1446,6 +1432,20 @@ function Tab4({claim,up}){
           ])),
         ]),
       ]),
+      subTab===SUB.indexOf("Referrals")&&div({key:"travel-card",style:{...S.card,marginTop:16}},[
+        div({key:"h",style:{fontWeight:700,marginBottom:6}},"Travel"),
+        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:12}},"Required for treatment or procedure attendance. Approval requested with the relevant referral letter."),
+        e(Sel,{key:"tr",label:"Travel required",value:claim.travelRequired||"",onChange:v=>up("travelRequired",v),options:["Yes — public transport","Yes — private vehicle","Yes — taxi / rideshare","Yes — air travel required","No travel required"]}),
+        e(Ta,{key:"trr",label:"Travel justification",value:claim.travelReasoning||"",onChange:v=>up("travelReasoning",v),placeholder:"Why travel is required and why the worker cannot use their own vehicle or public transport..."}),
+        claim.travelRequired&&claim.travelRequired!=="No travel required"&&div({key:"travel-send",style:{marginTop:8,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
+                    btn({key:"ts",style:{...S.btnP,fontSize:"0.82rem"},onClick:()=>{
+            const letter=buildQuickLetter("travel",claim,practitioners,clinic);
+            if(!letter)return;
+            sendQuickLetter({letter,toEmail:claim.caseManagerEmail||"",toName:claim.caseManagerName||claim.insurerName,ccEmail:claim.patientEmail,claim,up,subject:"Request for Travel Approval — "+claim.patientName});
+          }},"📨 Send travel request to case manager"),
+          div({key:"note",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:6}},"Patient automatically CC'd."),
+        ]),
+      ]),
     ]),
 
     subTab===SUB.indexOf("Medication & Investigations")&&div({key:"medinv"},[
@@ -1455,30 +1455,14 @@ function Tab4({claim,up}){
         e(Ta,{key:"ind",label:"Imaging clinical indication",value:claim.imagingIndication,onChange:v=>up("imagingIndication",v),placeholder:"Clinical reason..."}),
         e(Ta,{key:"oth",label:"Other investigations",value:claim.otherInvestigations,onChange:v=>up("otherInvestigations",v),placeholder:"Blood tests, nerve conduction studies..."}),
           claim.imagingReferral&&div({key:"img-send",style:{marginTop:8,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
-                        div({key:"h",style:{fontWeight:600,fontSize:"0.85rem",marginBottom:8}},"Send imaging request letter"),
-                        btn({key:"gs",style:{...S.btnP,fontSize:"0.82rem"},onClick:()=>{
-                          const letter=buildQuickLetter("radiology",claim,practitioners,clinic);
-                          if(!letter)return;
-                          sendQuickLetter({letter,toEmail:claim.caseManagerEmail||"",toName:claim.caseManagerName||claim.insurerName,ccEmail:claim.patientEmail,claim,up,subject:"Request for Imaging Approval — "+claim.patientName+" — "+(claim.imagingReferral||"")});
-                        }},"📨 Send imaging request to case manager"),
-                        div({key:"note",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:6}},"Patient automatically CC'd. Letter saved to claim log."),
+                        btn({key:"gs",style:{...S.btnP,fontSize:"0.82rem"},onClick:()=>{const l=buildQuickLetter("radiology",claim,practitioners,clinic);if(!l)return;sendQuickLetter({letter:l,toEmail:claim.caseManagerEmail||"",toName:claim.caseManagerName||claim.insurerName,ccEmail:claim.patientEmail,claim,up,subject:"Request for Imaging Approval — "+claim.patientName+" — "+(claim.imagingReferral||"")});}},"📨 Send imaging request to case manager"),
+                        div({key:"note",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:6}},"Patient automatically CC'd. Saved to claim log."),
                       ]),
       ])),
     ]),
 
     subTab===SUB.indexOf("Outcome Measures")&&e(OutcomeMeasuresTab,{key:"om",claim,up}),
-    subTab===SUB.indexOf("Travel & Accommodation")&&div({key:"travel-tab"},[      div({key:"card",style:S.card},[
-            div({key:"h",style:{fontWeight:700,marginBottom:6}},"Travel & Accommodation"),
-            div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Complete if travel or accommodation approval is required for this claim."),
-            e(Sel,{key:"tr",label:"Travel required",value:claim.travelRequired||"",onChange:v=>up("travelRequired",v),options:["Yes — public transport","Yes — private vehicle","Yes — taxi / rideshare","Yes — air travel required","No travel required"]}),
-            e(Ta,{key:"trr",label:"Travel justification",value:claim.travelReasoning||"",onChange:v=>up("travelReasoning",v),placeholder:"Why travel is required and why the worker cannot use their own vehicle or public transport..."}),
-            div({key:"g",style:S.g2},[
-              e(Sel,{key:"acc",label:"Accommodation required",value:claim.accommodationRequired||"",onChange:v=>up("accommodationRequired",v),options:["yes","no"],mb:0}),
-              e(Inp,{key:"an",label:"Number of nights",value:claim.accommodationNights||"",onChange:v=>up("accommodationNights",v),placeholder:"e.g. 2",mb:0}),
-            ]),
-            claim.accommodationRequired==="yes"&&e(Ta,{key:"acr",label:"Accommodation justification",value:claim.accommodationReasoning||"",onChange:v=>up("accommodationReasoning",v),placeholder:"Justification for accommodation..."}),
-          ]),
-        ]),
+    
   ]);
 }
 function OutcomeMeasuresTab({claim,up}){
@@ -3264,6 +3248,277 @@ I am satisfied that this procedure is reasonable, necessary, and causally relate
   ]);
 }
 
+function generateHandoverPdf(claim, practitioners, clinic) {
+  const prac = practitioners.find(p=>p.id===claim.practitionerId)||{};
+  const allPracs = (claim.episodes||[]).map(ep=>ep.practitionerName).filter(Boolean);
+  const uniquePracs = [...new Set(allPracs)];
+  const fmtD = d=>{if(!d)return'—';try{return new Date(d).toLocaleDateString('en-AU');}catch{return d;}};
+  const diags = (claim.diagnoses||[]).map(d=>d.label+' ('+d.icd10+')').join('; ')||'—';
+  const flags = claim.psychosocial||{};
+  const allFlags = [...(flags.yellow||[]),...(flags.blue||[]),...(flags.black||[]),...(flags.orange||[])];
+  const allScores = claim.outcomeScores||{};
+  const refs = claim.referrals||[];
+  const episodes = claim.episodes||[];
+  const meds = claim.medications||[];
+  
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Warm Handover Package — ${claim.patientName||'Patient'}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1a1a; background: white; padding: 20px; }
+  .header { border-bottom: 3px solid #006B5E; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .logo { font-size: 18px; font-weight: 800; color: #006B5E; }
+  .title { font-size: 14px; font-weight: 700; margin-top: 4px; }
+  .meta { font-size: 9px; color: #666; text-align: right; }
+  .confidential { background: #FEF3C7; border: 1px solid #F59E0B; padding: 6px 10px; margin-bottom: 14px; font-size: 9px; font-weight: 600; color: #92400E; }
+  .section { margin-bottom: 14px; }
+  .sec-hdr { background: #006B5E; color: white; padding: 5px 10px; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0; }
+  .sec-body { border: 1px solid #ccc; border-top: none; padding: 8px 10px; }
+  .row { display: grid; gap: 8px; margin-bottom: 5px; }
+  .row-2 { grid-template-columns: 1fr 1fr; }
+  .row-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .lbl { font-size: 9px; color: #555; margin-bottom: 2px; }
+  .val { font-weight: 600; border-bottom: 1px solid #eee; padding-bottom: 2px; min-height: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 6px; }
+  th { border: 1px solid #ccc; padding: 4px 6px; background: #f0f0f0; font-weight: 700; font-size: 9px; text-align: left; }
+  td { border: 1px solid #ccc; padding: 4px 6px; vertical-align: top; }
+  .flag { display: inline-block; padding: 2px 6px; border-radius: 10px; font-size: 9px; margin: 2px; }
+  .flag-y { background: #FEF3C7; color: #92400E; }
+  .flag-b { background: #DBEAFE; color: #1E40AF; }
+  .flag-bk { background: #F3F4F6; color: #374151; }
+  .flag-o { background: #FEE2E2; color: #991B1B; }
+  .note { font-size: 9px; color: #666; font-style: italic; margin-top: 8px; }
+  .footer { margin-top: 16px; padding-top: 8px; border-top: 1px solid #ddd; font-size: 8px; color: #999; text-align: center; }
+  @media print { @page { margin: 12mm; size: A4; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <div class="logo">ClaimBridge</div>
+    <div class="title">Warm Handover Package</div>
+    <div style="font-size:9px;color:#666;margin-top:3px;">Prepared for incoming treating practitioner</div>
+  </div>
+  <div class="meta">
+    <div><strong>Date prepared:</strong> ${new Date().toLocaleDateString('en-AU')}</div>
+    <div><strong>Prepared by:</strong> ${prac.name||clinic.name||'—'}</div>
+    <div><strong>Clinic:</strong> ${clinic.name||'—'}</div>
+  </div>
+</div>
+
+<div class="confidential">⚠️ CONFIDENTIAL — This document contains private health information. For clinical handover use only. Patient consent obtained.</div>
+
+<div class="section">
+  <div class="sec-hdr">1. Patient & Claim Details</div>
+  <div class="sec-body">
+    <div class="row row-3">
+      <div><div class="lbl">Full name</div><div class="val">${claim.patientName||'—'}</div></div>
+      <div><div class="lbl">Date of birth</div><div class="val">${fmtD(claim.dob)}</div></div>
+      <div><div class="lbl">Claim number</div><div class="val">${claim.claimNumber||'—'}</div></div>
+    </div>
+    <div class="row row-3" style="margin-top:6px">
+      <div><div class="lbl">Scheme</div><div class="val">${claim.scheme||'WorkCover'}</div></div>
+      <div><div class="lbl">Insurer / Agent</div><div class="val">${claim.insurerName||claim.insurerNameCustom||'—'}</div></div>
+      <div><div class="lbl">Date of injury</div><div class="val">${fmtD(claim.dateOfInjury)}</div></div>
+    </div>
+    <div class="row row-2" style="margin-top:6px">
+      <div><div class="lbl">Address</div><div class="val">${claim.patientAddress||'—'}</div></div>
+      <div><div class="lbl">Employer</div><div class="val">${claim.employerName||'—'}</div></div>
+    </div>
+    <div class="row row-3" style="margin-top:6px">
+      <div><div class="lbl">Phone</div><div class="val">${claim.patientPhone||'—'}</div></div>
+      <div><div class="lbl">Email</div><div class="val">${claim.patientEmail||'—'}</div></div>
+      <div><div class="lbl">Claim status</div><div class="val">${claim.status||'Active'}</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">2. Diagnosis</div>
+  <div class="sec-body">
+    <div class="lbl">Clinical diagnoses (ICD-10)</div>
+    <div class="val" style="margin-bottom:8px">${diags}</div>
+    ${claim.preExisting ? `<div class="lbl">Pre-existing conditions</div><div class="val">${claim.preExisting}</div>` : ''}
+    ${claim.injuryMechanism ? `<div class="lbl" style="margin-top:6px">Mechanism of injury</div><div class="val">${claim.injuryMechanism}${claim.injuryDescription?' — '+claim.injuryDescription:''}</div>` : ''}
+    ${claim.injuryCausation ? `<div class="lbl" style="margin-top:6px">Causation / pathophysiology</div><div class="val">${claim.injuryCausation}</div>` : ''}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">3. Current Capacity Assessment</div>
+  <div class="sec-body">
+    <table>
+      <thead><tr><th>Physical function</th><th>Can</th><th>With modifications</th><th>Cannot</th></tr></thead>
+      <tbody>
+        ${['sit','stand','walk','bend','kneel','stairs','lift_light','lift_mod','lift_heavy','push_pull','overhead','fine_motor','drive','heights'].map(id=>{
+          const labels={sit:'Sit',stand:'Stand',walk:'Walk',bend:'Bend/Stoop',kneel:'Kneel/Squat',stairs:'Climb stairs',lift_light:'Lift <5kg',lift_mod:'Lift 5-15kg',lift_heavy:'Lift >15kg',push_pull:'Push/Pull',overhead:'Reach overhead',fine_motor:'Fine motor',drive:'Drive',heights:'Work at heights'};
+          const c=(claim.capacity||{})[id];
+          if(!c) return '';
+          return `<tr><td>${labels[id]||id}</td><td style="text-align:center">${c==='Can'?'☑':'☐'}</td><td style="text-align:center">${c==='Modified'?'☑':'☐'}</td><td style="text-align:center">${c==='Cannot'?'☑':'☐'}</td></tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    ${claim.physicalNotes ? `<div class="lbl">Physical notes</div><div style="font-size:10px;padding:3px 0">${claim.physicalNotes}</div>` : ''}
+    <div class="lbl" style="margin-top:6px">Mental function</div>
+    <div style="font-size:10px;padding:3px 0">${claim.mentalStatus||'Not assessed'}${claim.mentalNotes?' — '+claim.mentalNotes:''}</div>
+    ${claim.workRestrictions ? `<div class="lbl" style="margin-top:6px">Work restrictions</div><div style="font-size:10px;padding:3px 0">${claim.workRestrictions}</div>` : ''}
+    ${claim.activityRestrictions ? `<div class="lbl" style="margin-top:6px">Activity restrictions</div><div style="font-size:10px;padding:3px 0">${claim.activityRestrictions}</div>` : ''}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">4. Current Certificate of Capacity</div>
+  <div class="sec-body">
+    <div class="row row-3">
+      <div><div class="lbl">Fitness for work</div><div class="val">${claim.fitnessForWork||'Not issued'}</div></div>
+      <div><div class="lbl">Valid from</div><div class="val">${fmtD(claim.cocFrom||claim.fitNormalFrom||claim.fitRestrictFrom||claim.unfitFrom)}</div></div>
+      <div><div class="lbl">Valid to</div><div class="val">${fmtD(claim.cocTo||claim.fitRestrictTo||claim.unfitTo)}</div></div>
+    </div>
+    <div class="row row-2" style="margin-top:6px">
+      <div><div class="lbl">Next review date</div><div class="val">${fmtD(claim.nextReviewDate)}</div></div>
+      <div><div class="lbl">Certificate number</div><div class="val">${claim.cocCount||1}</div></div>
+    </div>
+    ${claim.fitnessRestrictions ? `<div class="lbl" style="margin-top:6px">Restrictions detail</div><div style="font-size:10px;padding:3px 0">${claim.fitnessRestrictions}</div>` : ''}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">5. Outcome Measures</div>
+  <div class="sec-body">
+    ${Object.keys(allScores).length===0 ? '<div style="color:#999;font-style:italic;font-size:10px">No outcome measures recorded</div>' : `
+    <table>
+      <thead><tr><th>Measure</th><th>Initial date</th><th>Initial score</th><th>Latest date</th><th>Latest score</th><th>Trend</th></tr></thead>
+      <tbody>
+        ${Object.keys(allScores).map(key=>{
+          const scores=[...(allScores[key]||[])].sort((a,b)=>new Date(a.date)-new Date(b.date));
+          const m=OUTCOME_MEASURES[key]||{unit:''};
+          const first=scores[0]||{};const last=scores[scores.length-1]||{};
+          const trend=scores.length>1?(m.higherBetter?(parseFloat(last.score)>parseFloat(first.score)?'↑ Improving':'↓ Declining'):(parseFloat(last.score)<parseFloat(first.score)?'↑ Improving':'↓ Declining')):'—';
+          return `<tr><td><strong>${key}</strong></td><td>${first.date?new Date(first.date).toLocaleDateString('en-AU'):''}</td><td>${first.score?(first.score+m.unit):''}</td><td>${last.date&&last.date!==first.date?new Date(last.date).toLocaleDateString('en-AU'):''}</td><td>${last.score&&last.score!==first.score?(last.score+m.unit):''}</td><td>${trend}</td></tr>`;
+        }).join('')}
+      </tbody>
+    </table>`}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">6. Treatment History</div>
+  <div class="sec-body">
+    ${claim.treatmentPlan ? `<div class="lbl">Treatment plan / management approach</div><div style="font-size:10px;padding:3px 0 6px">${claim.treatmentPlan}</div>` : ''}
+    ${claim.goalsShort ? `<div class="lbl">Short-term goals</div><div style="font-size:10px;padding:3px 0 6px">${claim.goalsShort}</div>` : ''}
+    ${claim.goalsLong ? `<div class="lbl">Long-term goals</div><div style="font-size:10px;padding:3px 0 6px">${claim.goalsLong}</div>` : ''}
+    ${episodes.length>0 ? `
+    <div class="lbl" style="margin-top:4px">Consultation episodes</div>
+    <table style="margin-top:4px">
+      <thead><tr><th>#</th><th>Date</th><th>Practitioner</th><th>Label</th><th>Referrals</th></tr></thead>
+      <tbody>
+        ${episodes.map(ep=>`<tr><td>${ep.episodeNo||'—'}</td><td>${new Date(ep.date).toLocaleDateString('en-AU')}</td><td>${ep.practitionerName||'—'}${ep.practitionerProfession?' ('+ep.practitionerProfession+')':''}</td><td>${ep.label||'—'}</td><td>${(ep.referrals||[]).length}</td></tr>`).join('')}
+      </tbody>
+    </table>` : ''}
+    ${uniquePracs.length>0 ? `<div class="note">All treating practitioners: ${uniquePracs.join(', ')}</div>` : ''}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">7. Referrals & Approvals</div>
+  <div class="sec-body">
+    ${refs.length===0 ? '<div style="color:#999;font-style:italic;font-size:10px">No referrals recorded</div>' : `
+    <table>
+      <thead><tr><th>Specialty</th><th>Practitioner</th><th>Priority</th><th>Status</th><th>Updated</th></tr></thead>
+      <tbody>
+        ${refs.map(r=>`<tr><td>${r.specialty||'—'}</td><td>${r.name||'—'}${r.clinic?' ('+r.clinic+')':''}</td><td>${r.priority||'—'}</td><td><strong>${r.status||'Pending'}</strong></td><td>${r.statusDate?new Date(r.statusDate).toLocaleDateString('en-AU'):'—'}</td></tr>`).join('')}
+      </tbody>
+    </table>`}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">8. Psychosocial Flags</div>
+  <div class="sec-body">
+    ${allFlags.length===0 ? '<div style="color:#999;font-style:italic;font-size:10px">No flags recorded</div>' : `
+    <div style="margin-bottom:6px">
+      ${(flags.yellow||[]).map(f=>`<span class="flag flag-y">⚑ ${f}</span>`).join('')}
+      ${(flags.blue||[]).map(f=>`<span class="flag flag-b">⚑ ${f}</span>`).join('')}
+      ${(flags.black||[]).map(f=>`<span class="flag flag-bk">⚑ ${f}</span>`).join('')}
+      ${(flags.orange||[]).map(f=>`<span class="flag flag-o">⚑ ${f}</span>`).join('')}
+    </div>
+    ${claim.psychosocialNotes ? `<div class="lbl">Psychosocial notes</div><div style="font-size:10px">${claim.psychosocialNotes}</div>` : ''}`}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">9. RTW Plan</div>
+  <div class="sec-body">
+    <div class="row row-2">
+      <div><div class="lbl">Estimated RTW — modified duties</div><div class="val">${fmtD(claim.rtwModifiedDate)}</div></div>
+      <div><div class="lbl">Estimated RTW — normal duties</div><div class="val">${fmtD(claim.rtwNormalDate)}</div></div>
+    </div>
+    ${claim.rtwPlan ? `<div class="lbl" style="margin-top:6px">RTW plan</div><div style="font-size:10px;padding:3px 0">${claim.rtwPlan}</div>` : ''}
+    ${claim.modifiedDuties ? `<div class="lbl" style="margin-top:6px">Modified duties available</div><div style="font-size:10px;padding:3px 0">${claim.modifiedDuties}</div>` : ''}
+    ${claim.barriers ? `<div class="lbl" style="margin-top:6px">Barriers to recovery</div><div style="font-size:10px;padding:3px 0">${claim.barriers}</div>` : ''}
+  </div>
+</div>
+
+${meds.length>0 ? `
+<div class="section">
+  <div class="sec-hdr">10. Current Medications</div>
+  <div class="sec-body">
+    <table>
+      <thead><tr><th>Medication</th><th>Dosage</th><th>Frequency</th><th>Duration</th></tr></thead>
+      <tbody>
+        ${meds.map(m=>`<tr><td><strong>${m.name||'—'}</strong></td><td>${m.dosage||'—'}</td><td>${m.frequency||'—'}</td><td>${m.duration||'—'}</td></tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+</div>` : ''}
+
+<div class="section">
+  <div class="sec-hdr">11. Imaging & Investigations</div>
+  <div class="sec-body">
+    ${(claim.imagingReports||[]).length===0 && !claim.otherInvestigations ? '<div style="color:#999;font-style:italic;font-size:10px">No imaging or investigations recorded</div>' : ''}
+    ${(claim.imagingReports||[]).map(r=>`<div style="font-size:10px;margin-bottom:4px"><strong>${r.name}</strong> — uploaded ${new Date(r.uploadedAt).toLocaleDateString('en-AU')}${r.summary?' — '+r.summary.clinicalSummary:''}</div>`).join('')}
+    ${claim.otherInvestigations ? `<div class="lbl" style="margin-top:4px">Other investigations</div><div style="font-size:10px">${claim.otherInvestigations}</div>` : ''}
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">12. Referring Practitioner Details</div>
+  <div class="sec-body">
+    <div class="row row-3">
+      <div><div class="lbl">Name</div><div class="val">${prac.name||'—'}</div></div>
+      <div><div class="lbl">Profession</div><div class="val">${prac.profession||'—'}</div></div>
+      <div><div class="lbl">Provider number</div><div class="val">${prac.providerNo||'—'}</div></div>
+    </div>
+    <div class="row row-2" style="margin-top:6px">
+      <div><div class="lbl">Phone</div><div class="val">${prac.phone||clinic.phone||'—'}</div></div>
+      <div><div class="lbl">Email</div><div class="val">${prac.email||'—'}</div></div>
+    </div>
+    <div class="lbl" style="margin-top:6px">Clinic</div>
+    <div class="val">${clinic.name||'—'} — ${prac.address||clinic.address||'—'}</div>
+  </div>
+</div>
+
+<div class="footer">
+  Warm Handover Package — Generated by ClaimBridge on ${new Date().toLocaleDateString('en-AU')} — CONFIDENTIAL — For clinical use only<br>
+  Patient: ${claim.patientName||'—'} | Claim: ${claim.claimNumber||'—'} | ${claim.scheme||'WorkCover'}
+</div>
+
+</body>
+</html>`;
+
+  // Blob URL avoids popup blockers
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
 // ── TAB: OVERVIEW ─────────────────────────────────────────────────────────────
 function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,createEpisode,setEpTab}){
   const prac=practitioners.find(p=>p.id===claim.practitionerId);
@@ -3364,12 +3619,8 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
           return uniqueMeds.length>0&&div({key:"meds-tally",style:{...S.card,marginTop:16,marginBottom:0}},[
                       div({key:"h",style:{fontWeight:700,marginBottom:10}},"Current medications"),
                       ...uniqueMeds.map(m=>div({key:m.id||m.name,style:{padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",fontSize:"0.84rem"}},[
-                        div({key:"n",style:{fontWeight:600}},m.name+(m.dosage?" — "+m.dosage:"")),
-                        (m.frequency||m.duration)&&div({key:"d",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:1}},[
-                          m.frequency&&span({key:"f"},m.frequency),
-                          m.frequency&&m.duration&&span({key:"sep"}," · "),
-                          m.duration&&span({key:"dur"},m.duration),
-                        ]),
+                        div({key:"n",style:{fontWeight:600}},m.name+(m.dosage?" \u2014 "+m.dosage:"")),
+                        (m.frequency||m.duration)&&div({key:"d",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:1}},(m.frequency||"")+(m.frequency&&m.duration?" · ":""+(m.duration||""))),
                       ])),
                     ]);
                   })(),
