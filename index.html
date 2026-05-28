@@ -37,6 +37,7 @@ button{font-family:inherit;cursor:pointer;}
 .trend-dot { cursor: pointer; }
 .trend-dot:hover { r: 6; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div id="root"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#07101E;flex-direction:column;gap:12px;"><div style="font-weight:800;font-size:1.5rem;color:#EFF6FF;">Claim<span style="color:#00C9A7">Bridge</span></div><div style="color:#5B7A99;font-size:0.85rem;">Loading...</div></div></div>
@@ -3796,78 +3797,417 @@ function ApiKeySettings(){
 }
 
 // ── INVOICING PAGE ────────────────────────────────────────────────────────────
+// ── INVOICE PDF GENERATOR ─────────────────────────────────────────────────────
+function generateInvoicePdf(inv,claim,clinic,practitioners,paymentTerms){
+  if(!window.jspdf){alert("PDF library not loaded — please refresh.");return null;}
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:"mm",format:"a4"});
+  const W=210,PL=18,PR=192,teal=[0,201,167],navy=[7,16,30],grey=[91,122,153],lgrey=[248,251,253];
+  const fmtAUD=n=>"$"+parseFloat(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,",");
+  const fmtD=d=>{try{return new Date(d).toLocaleDateString("en-AU",{day:"2-digit",month:"2-digit",year:"numeric"});}catch{return d||"\u2014";}};
+  const prac=practitioners.find(p=>p.id===claim.practitionerId)||{};
+  const items=inv.lineItems||[{itemCode:inv.itemCode||"",description:inv.description||"",amount:inv.amount||"0",qty:1,treatmentDate:inv.treatmentDate||inv.date}];
+  const sub=items.reduce((s,l)=>(parseFloat(l.amount)||0)*(l.qty||1)+s,0);
+  const gstAmt=inv.gst==="yes"?sub*0.1:0;
+  const total=sub+gstAmt;
+  const invNo=inv.invoiceNumber||"INV";
+  const dueDate=(()=>{const d=new Date(inv.date||inv.createdAt||Date.now());d.setDate(d.getDate()+(paymentTerms||30));return fmtD(d.toISOString());})();
+  // Teal header
+  doc.setFillColor(...teal);doc.rect(0,0,W,18,"F");
+  doc.setFont("helvetica","bold");doc.setFontSize(15);
+  doc.setTextColor(7,16,30);doc.text("Claim",PL,12);
+  doc.setTextColor(255,255,255);doc.text("Bridge",PL+19,12);
+  doc.setFontSize(10);doc.setFont("helvetica","normal");doc.text("TAX INVOICE",PR,12,{align:"right"});
+  // Clinic block
+  doc.setTextColor(...navy);doc.setFontSize(11);doc.setFont("helvetica","bold");doc.text(clinic.name||"",PL,27);
+  doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(...grey);
+  let cy=33;
+  if(clinic.address){doc.text(clinic.address,PL,cy);cy+=4.5;}
+  if(clinic.phone){doc.text("Ph: "+clinic.phone,PL,cy);cy+=4.5;}
+  if(clinic.abn){doc.text("ABN: "+clinic.abn,PL,cy);cy+=4.5;}
+  if(clinic.email){doc.text(clinic.email,PL,cy);cy+=4.5;}
+  // Invoice details
+  const dets=[["Invoice No:",invNo],["Invoice date:",fmtD(inv.date)],["Due date:",dueDate],["Payment terms:",(paymentTerms||30)+" days"]];
+  let dy=27;
+  dets.forEach(([l,v])=>{
+    doc.setFontSize(8);doc.setFont("helvetica","normal");doc.setTextColor(...grey);doc.text(l,PR-52,dy,{align:"right"});
+    doc.setTextColor(...navy);doc.setFont("helvetica","bold");doc.text(v,PR,dy,{align:"right"});
+    dy+=5.5;
+  });
+  // Divider
+  doc.setDrawColor(...teal);doc.setLineWidth(0.5);
+  const divY=Math.max(cy,dy)+3;doc.line(PL,divY,PR,divY);
+  // Bill to box
+  const boxY=divY+4;
+  doc.setFillColor(...lgrey);doc.roundedRect(PL,boxY,PR-PL,26,2,2,"F");
+  doc.setFontSize(7);doc.setFont("helvetica","bold");doc.setTextColor(...teal);
+  doc.text("BILL TO",PL+4,boxY+5);doc.text("PATIENT / CLAIM",(PL+PR)/2+2,boxY+5);
+  doc.setTextColor(...navy);doc.setFont("helvetica","normal");doc.setFontSize(8.5);
+  doc.text(claim.insurerName||claim.insurerNameCustom||"Insurer",PL+4,boxY+11);
+  if(claim.caseManagerName){doc.setFontSize(8);doc.setTextColor(...grey);doc.text("Attn: "+claim.caseManagerName,PL+4,boxY+16);}
+  doc.setFontSize(8.5);doc.setTextColor(...navy);
+  doc.text(claim.patientName||"",(PL+PR)/2+2,boxY+11);
+  doc.setFontSize(8);doc.setTextColor(...grey);
+  doc.text("Claim: "+(claim.claimNumber||"\u2014"),(PL+PR)/2+2,boxY+17);
+  doc.text("DOI: "+fmtD(claim.dateOfInjury),(PL+PR)/2+2,boxY+22);
+  let tableY=boxY+32;
+  if(prac.name){doc.setFontSize(8);doc.setTextColor(...grey);doc.text("Treating: "+prac.name+(prac.profession?" \u2014 "+prac.profession:"")+(prac.providerNo?" | Provider: "+prac.providerNo:""),PL,tableY);tableY+=6;}
+  // Table header
+  doc.setFillColor(...navy);doc.rect(PL,tableY,PR-PL,7,"F");
+  doc.setFontSize(7.5);doc.setFont("helvetica","bold");doc.setTextColor(255,255,255);
+  doc.text("TX DATE",PL+2,tableY+5);doc.text("CODE",PL+30,tableY+5);doc.text("DESCRIPTION",PL+48,tableY+5);
+  doc.text("QTY",PR-42,tableY+5,{align:"right"});doc.text("UNIT",PR-26,tableY+5,{align:"right"});doc.text("AMOUNT",PR,tableY+5,{align:"right"});
+  tableY+=7;
+  // Rows
+  items.forEach((item,i)=>{
+    doc.setFillColor(i%2===0?255:248,i%2===0?255:251,i%2===0?255:253);doc.rect(PL,tableY,PR-PL,8,"F");
+    doc.setFontSize(8.5);doc.setFont("helvetica","normal");doc.setTextColor(...navy);
+    doc.text(fmtD(item.treatmentDate||inv.date),PL+2,tableY+5.5);
+    doc.text(String(item.itemCode||"\u2014"),PL+30,tableY+5.5);
+    const desc=String(item.description||"");
+    doc.text(desc.length>34?desc.substring(0,32)+"\u2026":desc,PL+48,tableY+5.5);
+    const qty=item.qty||1,unit=parseFloat(item.amount||0);
+    doc.text(String(qty),PR-42,tableY+5.5,{align:"right"});doc.text(fmtAUD(unit),PR-26,tableY+5.5,{align:"right"});doc.text(fmtAUD(unit*qty),PR,tableY+5.5,{align:"right"});
+    tableY+=8;
+  });
+  doc.setDrawColor(220,220,220);doc.setLineWidth(0.3);doc.line(PL,tableY,PR,tableY);tableY+=4;
+  [["Subtotal",fmtAUD(sub)],["GST",inv.gst==="yes"?fmtAUD(gstAmt):"Nil (GST Free)"],["TOTAL DUE",fmtAUD(total)]].forEach(([l,v],i)=>{
+    const last=i===2;
+    if(last){doc.setFillColor(...teal);doc.rect(PR-68,tableY,68,8,"F");doc.setTextColor(255,255,255);}
+    else doc.setTextColor(...navy);
+    doc.setFontSize(last?9:8);doc.setFont("helvetica",last?"bold":"normal");
+    doc.text(l,PR-38,tableY+5.5,{align:"right"});doc.text(v,PR-1,tableY+5.5,{align:"right"});
+    tableY+=8;
+  });
+  tableY+=4;doc.setDrawColor(...teal);doc.setLineWidth(0.4);doc.line(PL,tableY,PR,tableY);tableY+=5;
+  doc.setFont("helvetica","bold");doc.setFontSize(9);doc.setTextColor(...navy);doc.text("Payment Details",PL,tableY);tableY+=5;
+  doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(...grey);
+  const bank=inv.bankSettings||{};
+  if(bank.accountName){doc.text("Account name: "+bank.accountName,PL,tableY);tableY+=4.5;}
+  if(bank.bsb&&bank.accountNo){doc.text("BSB: "+bank.bsb+"   Account: "+bank.accountNo,PL,tableY);tableY+=4.5;}
+  doc.text("Please quote invoice number "+invNo+" on payment.",PL,tableY);
+  doc.setFillColor(...teal);doc.rect(0,283,W,14,"F");
+  doc.setFontSize(7.5);doc.setTextColor(255,255,255);doc.setFont("helvetica","normal");
+  doc.text("Generated by ClaimBridge \u2014 WorkCover & TAC Documentation Platform",W/2,289,{align:"center"});
+  doc.text(clinic.name||"",W/2,294,{align:"center"});
+  return doc;
+}
 function InvoicingPage({clinic,claims,onSaveClaim}){
   const[selClaim,setSelClaim]=useState("");
-  const[form,setForm]=useState({description:"",itemCode:"",amount:"",date:new Date().toISOString().slice(0,10),gst:"yes"});
+  const[selEpisode,setSelEpisode]=useState("");
+  const[lineItems,setLineItems]=useState([{id:"li_1",itemCode:"",description:"",amount:"",qty:1,treatmentDate:new Date().toISOString().slice(0,10)}]);
+  const[invoiceDate,setInvoiceDate]=useState(new Date().toISOString().slice(0,10));
+  const[gst,setGst]=useState("no");
   const[saved,setSaved]=useState(false);
   const[patientSearch,setPatientSearch]=useState("");
   const[showPatientDd,setShowPatientDd]=useState(false);
   const[practitioners,setPractitioners]=useState([]);
-  useEffect(()=>{sget("practitioners:"+clinic.id).then(p=>setPractitioners(p||[]));},
-  [clinic.id]);
+  const[previewInv,setPreviewInv]=useState(null);
+  const[bankSettings,setBankSettings]=useState({});
+  const[paymentTerms,setPaymentTerms]=useState(30);
+  const[expandedMonths,setExpandedMonths]=useState({});
+  useEffect(()=>{
+    sget("practitioners:"+clinic.id).then(p=>setPractitioners(p||[]));
+    sget("banksettings:"+clinic.id).then(b=>{if(b)setBankSettings(b);});
+    sget("paymentterms:"+clinic.id).then(t=>{if(t)setPaymentTerms(parseInt(t)||30);});
+  },[clinic.id]);
   const activeClaims=claims.filter(c=>c.status!=="Closed");
   const claim=claims.find(c=>c.id===selClaim);
-  const claimPrac=claim&&practitioners&&practitioners.find(p=>p.id===claim.practitionerId);
-  const claimProf=claimPrac&&claimPrac.profession||"";
+  const claimPrac=claim&&practitioners.find(p=>p.id===claim.practitionerId);
+  const claimProf=(claimPrac&&claimPrac.profession)||"";
   const allowedCats=claimProf&&PROF_INVOICE_CATS[claimProf]||null;
-  const filteredCodes=allowedCats
-    ?WORKSAFE_CODES.filter(c=>!c.cat||allowedCats.includes(c.cat))
-    :WORKSAFE_CODES;
-  const allInvoices=claims.flatMap(c=>(c.invoices||[]).map(inv=>({...inv,claimId:c.id,patientName:c.patientName})));
-  const totalInvoiced=allInvoices.reduce((s,i)=>s+(parseFloat(i.amount)||0),0);
-  const totalCollected=allInvoices.filter(i=>i.status==="Paid").reduce((s,i)=>s+(parseFloat(i.amount)||0),0);
-  const totalOutstanding=totalInvoiced-totalCollected;
-  const addInvoice=()=>{if(!selClaim||!form.description||!form.amount)return;const inv={id:"inv_"+Date.now(),...form,status:"Invoiced",createdAt:new Date().toISOString()};const updated={...claim,invoices:[...(claim.invoices||[]),inv]};onSaveClaim(updated);setSaved(true);setTimeout(()=>setSaved(false),2000);setForm({description:"",itemCode:"",amount:"",date:new Date().toISOString().slice(0,10),gst:"yes"});};
-  const updateStatus=(claimId,invId,status)=>{const c=claims.find(x=>x.id===claimId);if(!c)return;const updated={...c,invoices:(c.invoices||[]).map(i=>i.id===invId?{...i,status,paidAt:status==="Paid"?new Date().toISOString():i.paidAt}:i)};onSaveClaim(updated);};
+  const filteredCodes=allowedCats?WORKSAFE_CODES.filter(c=>!c.cat||allowedCats.includes(c.cat)):WORKSAFE_CODES;
+  const episodes=claim?(claim.episodes||[]):[];
+  const now=new Date();
+  const allInvoices=claims.flatMap(c=>(c.invoices||[]).map(inv=>({...inv,claimId:c.id,patientName:c.patientName,claimNumber:c.claimNumber})));
+  const getTotal=inv=>{
+    const sub=inv.lineItems?inv.lineItems.reduce((s,l)=>(parseFloat(l.amount)||0)*(l.qty||1)+s,0):(parseFloat(inv.amount)||0);
+    return sub*(inv.gst==="yes"?1.1:1);
+  };
+  const isOverdue=inv=>inv.status!=="Paid"&&(()=>{const d=new Date(inv.date||inv.createdAt);d.setDate(d.getDate()+(paymentTerms||30));return d<now;})();
+  const totalInv=allInvoices.reduce((s,i)=>s+getTotal(i),0);
+  const totalColl=allInvoices.filter(i=>i.status==="Paid").reduce((s,i)=>s+getTotal(i),0);
+  const totalOut=totalInv-totalColl;
   const fmtAUD=n=>"$"+parseFloat(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,",");
   const fmtDate=d=>{try{return new Date(d).toLocaleDateString("en-AU");}catch{return d||"\u2014";}};
+  const grouped={};
+  [...allInvoices].sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).forEach(inv=>{
+    const d=new Date(inv.date||inv.createdAt);
+    const key=d.toLocaleDateString("en-AU",{month:"long",year:"numeric"});
+    if(!grouped[key])grouped[key]=[];
+    grouped[key].push(inv);
+  });
+  const nextInvNumber=()=>{
+    const year=new Date().getFullYear();
+    const seq=allInvoices.filter(i=>i.invoiceNumber&&i.invoiceNumber.startsWith("INV-"+year)).length+1;
+    return "INV-"+year+"-"+String(seq).padStart(4,"0");
+  };
+  const addInvoice=()=>{
+    if(!selClaim||!lineItems.some(l=>l.description&&l.amount))return;
+    const inv={id:"inv_"+Date.now(),invoiceNumber:nextInvNumber(),episodeId:selEpisode,lineItems,
+      amount:String(lineItems.reduce((s,l)=>(parseFloat(l.amount)||0)*(l.qty||1)+s,0).toFixed(2)),
+      date:invoiceDate,gst,status:"Invoiced",createdAt:new Date().toISOString(),bankSettings};
+    const logEntry={event:"Invoice created",detail:inv.invoiceNumber+" \u2014 "+fmtAUD(getTotal(inv)),timestamp:new Date().toISOString(),by:claimPrac?claimPrac.name:clinic.name};
+    const updated={...claim,invoices:[...(claim.invoices||[]),inv],auditTrail:[...(claim.auditTrail||[]),logEntry]};
+    onSaveClaim(updated);setSaved(true);setTimeout(()=>setSaved(false),2500);
+    setLineItems([{id:"li_1",itemCode:"",description:"",amount:"",qty:1,treatmentDate:invoiceDate}]);
+    setSelEpisode("");setGst("no");setPatientSearch("");setSelClaim("");
+  };
+  const updateStatus=(claimId,invId,status)=>{
+    const c=claims.find(x=>x.id===claimId);if(!c)return;
+    const inv=(c.invoices||[]).find(i=>i.id===invId);
+    const logEntry=status==="Paid"?{event:"Invoice paid",detail:(inv&&inv.invoiceNumber||invId)+" marked as paid",timestamp:new Date().toISOString(),by:clinic.name}:null;
+    const updated={...c,
+      invoices:(c.invoices||[]).map(i=>i.id===invId?{...i,status,paidAt:status==="Paid"?new Date().toISOString():i.paidAt}:i),
+      auditTrail:logEntry?[...(c.auditTrail||[]),logEntry]:(c.auditTrail||[])};
+    onSaveClaim(updated);
+  };
+  const downloadInvoice=inv=>{
+    const c=claims.find(x=>x.id===inv.claimId);if(!c)return;
+    const doc=generateInvoicePdf(inv,c,clinic,practitioners,paymentTerms);
+    if(doc)doc.save((inv.invoiceNumber||"invoice")+".pdf");
+  };
+  const sendInvoice=inv=>{
+    const c=claims.find(x=>x.id===inv.claimId);if(!c)return;
+    const doc=generateInvoicePdf(inv,c,clinic,practitioners,paymentTerms);
+    if(!doc)return;
+    doc.save((inv.invoiceNumber||"invoice")+".pdf");
+    const toEmail=c.insurerApEmail||inv.insurerApEmail||"";
+    const ccEmail=c.patientEmail||"";
+    const subj="Tax Invoice "+(inv.invoiceNumber||"")+" \u2014 "+(c.patientName||"")+" | Claim "+(c.claimNumber||"");
+    const body="Please find attached tax invoice "+(inv.invoiceNumber||"")+" for services rendered.\n\nPatient: "+(c.patientName||"")+"\nClaim: "+(c.claimNumber||"")+"\nAmount due: "+fmtAUD(getTotal(inv))+"\n\nPlease quote the invoice number on payment.\n\n"+(clinic.name||"");
+    window.open("mailto:"+toEmail+(ccEmail?"?cc="+encodeURIComponent(ccEmail)+"&subject=":"?subject=")+encodeURIComponent(subj)+"&body="+encodeURIComponent(body));
+  };
+  const addLineItem=()=>setLineItems(p=>[...p,{id:"li_"+Date.now(),itemCode:"",description:"",amount:"",qty:1,treatmentDate:invoiceDate}]);
+  const updLine=(id,f,v)=>setLineItems(p=>p.map(l=>l.id===id?{...l,[f]:v}:l));
+  const remLine=id=>setLineItems(p=>p.filter(l=>l.id!==id));
   const statusPill=s=>s==="Paid"?S.pillT:s==="Overdue"?S.pillR:S.pillA;
-  
-
-  return div({},[
-    div({key:"h",style:{fontWeight:800,fontSize:"1.2rem",marginBottom:4}},"Invoicing"),
-    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Track invoices per claim and monitor collection status."),
-    div({key:"totals",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}},[{label:"Total invoiced",val:totalInvoiced,col:"#60A5FA"},{label:"Total collected",val:totalCollected,col:"#00C9A7"},{label:"Outstanding",val:totalOutstanding,col:totalOutstanding>0?"#FFB830":"#5B7A99"}].map(m=>div({key:m.label,style:{...S.card,textAlign:"center",padding:"20px",marginBottom:0}},[div({key:"v",style:{fontWeight:800,fontSize:"1.6rem",color:m.col,lineHeight:1,marginBottom:6}},fmtAUD(m.val)),div({key:"l",style:{fontSize:"0.76rem",color:"#5B7A99"}},m.label)]))),
-    div({key:"cols",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}},[
-      div({key:"form",style:S.card},[
-        div({key:"h",style:{fontWeight:700,marginBottom:16}},"Add invoice"),
-        saved&&e(OK,{key:"ok"},"Invoice added"),
-        div({key:"cl",style:{marginBottom:16}},[e("label",{key:"l",style:S.label},"Claim / patient *"),div({key:"sw",style:{position:"relative"}},[  inp({key:"i",className:"cb-input",style:S.inp,placeholder:"Search patient name or claim number...",    value:patientSearch,onChange:ev=>{setPatientSearch(ev.target.value);setSelClaim("");},    onFocus:()=>setShowPatientDd(true),onBlur:()=>setTimeout(()=>setShowPatientDd(false),200)}),  selClaim&&div({key:"sel",style:{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",    fontSize:"0.75rem",color:"#00C9A7",pointerEvents:"none"}},"✓ Selected"),  showPatientDd&&patientSearch.length>0&&div({key:"dd",style:{position:"absolute",top:"100%",left:0,right:0,    background:"#112240",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,zIndex:100,    marginTop:4,maxHeight:200,overflow:"auto",boxShadow:"0 8px 30px rgba(0,0,0,0.3)"}},[    ...activeClaims.filter(c=>{      const q=patientSearch.toLowerCase();      return (c.patientName||"").toLowerCase().includes(q)||(c.claimNumber||"").toLowerCase().includes(q);    }).map(c=>div({key:c.id,onClick:()=>{setSelClaim(c.id);setPatientSearch((c.patientName||"Unnamed")+(c.claimNumber?" — "+c.claimNumber:""));setShowPatientDd(false);},      style:{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.05)",        fontSize:"0.87rem"}},[      div({key:"n",style:{fontWeight:600}},c.patientName||"Unnamed"),      div({key:"d",style:{fontSize:"0.74rem",color:"#5B7A99"}},c.claimNumber||"No claim #"),    ])),    activeClaims.filter(c=>{const q=patientSearch.toLowerCase();return (c.patientName||"").toLowerCase().includes(q)||(c.claimNumber||"").toLowerCase().includes(q);}).length===0&&    div({key:"empty",style:{padding:"12px 14px",color:"#5B7A99",fontSize:"0.84rem"}},"No matching claims"),  ]),]),]),
-        div({key:"ic",style:{marginBottom:16}},[e("label",{key:"l",style:S.label},"Item code"),e("select",{key:"s",className:"cb-sel",style:S.sel,value:form.itemCode,onChange:ev=>{  const v=ev.target.value;  const fee=WORKSAFE_FEE_MAP[v]||"";  const item=WORKSAFE_CODES.find(c=>c.value===v);  setForm({...form,itemCode:v,amount:fee,description:item&&item.value?item.label.replace(item.value+" — ",""):""})}},[e("option",{key:"",value:""},"Select item code..."),...Object.entries(filteredCodes.slice(1).reduce((acc,c)=>{(acc[c.cat]=acc[c.cat]||[]).push(c);return acc;},{})).map(([cat,items])=>e("optgroup",{key:cat,label:cat},  items.map(c=>e("option",{key:c.value,value:c.value},c.label))))]),]),
-        e(Inp,{key:"desc",label:"Description",value:form.description,onChange:v=>setForm({...form,description:v}),placeholder:"e.g. Certificate of Capacity \u2014 May 2026",required:true}),
-        div({key:"g",style:S.g2},[claimProf&&div({key:"prof-note",style:{fontSize:"0.76rem",color:"rgba(0,201,167,0.7)",marginTop:-10,marginBottom:12}},"Showing codes for "+claimProf+(allowedCats?" ("+allowedCats.join(", ")+")":"")),
-        e(Inp,{key:"amt",label:"Amount (excl. GST)",value:form.amount,onChange:v=>setForm({...form,amount:v}),placeholder:"0.00",mb:0}),e(Inp,{key:"date",label:"Invoice date",value:form.date,onChange:v=>setForm({...form,date:v}),type:"date",mb:0})]),
-        div({key:"gst",style:{marginTop:16,marginBottom:16}},[e("label",{key:"l",style:S.label},"GST applicable"),div({key:"btns",style:{display:"flex",gap:8}},["yes","no"].map(v=>btn({key:v,onClick:()=>setForm({...form,gst:v}),style:{...S.pill,...(form.gst===v?S.pillT:S.pillM),padding:"8px 18px"}},v==="yes"?"Yes (add 10%)":"No GST")))]),
-        form.amount&&div({key:"total",style:{...S.ok,marginBottom:14}},[span({key:"l",style:{color:"#5B7A99"}},"Total inc. GST: "),span({key:"v",style:{fontWeight:700}},fmtAUD(form.gst==="yes"?parseFloat(form.amount||0)*1.1:parseFloat(form.amount||0)))]),
-        btn({key:"add",style:{...S.btnP,width:"100%"},onClick:addInvoice},"+ Add invoice"),
-      ]),
-      div({key:"list"},[
-        div({key:"h",style:{fontWeight:700,marginBottom:12,fontSize:"0.88rem"}},allInvoices.length+" invoice"+(allInvoices.length!==1?"s":"")+" across all claims"),
-        allInvoices.length===0?div({key:"empty",style:{...S.card,textAlign:"center",padding:"28px",color:"#5B7A99"}},"No invoices yet"):
-        [...allInvoices].reverse().map(inv=>div({key:inv.id,style:{...S.cardSm,marginBottom:10}},[
-          div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}},[
-            div({key:"l"},[div({key:"p",style:{fontWeight:600,fontSize:"0.87rem"}},inv.patientName||"\u2014"),div({key:"d",style:{fontSize:"0.76rem",color:"#5B7A99",marginTop:1}},inv.description),inv.itemCode&&div({key:"ic",style:{fontSize:"0.72rem",color:"#5B7A99"}},inv.itemCode)]),
-            div({key:"r",style:{textAlign:"right"}},[div({key:"amt",style:{fontWeight:700,fontSize:"0.95rem",color:"#EFF6FF"}},fmtAUD(inv.gst==="yes"?parseFloat(inv.amount||0)*1.1:parseFloat(inv.amount||0))),div({key:"d",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:1}},fmtDate(inv.date))]),
+  const subTotal=lineItems.reduce((s,l)=>(parseFloat(l.amount)||0)*(l.qty||1)+s,0);
+  return div({style:{padding:"28px",maxWidth:1100,margin:"0 auto"}},[
+    // Preview modal
+    previewInv&&(()=>{
+      const c=claims.find(x=>x.id===previewInv.claimId)||{};
+      const items=previewInv.lineItems||[{itemCode:previewInv.itemCode,description:previewInv.description,amount:previewInv.amount,qty:1,treatmentDate:previewInv.date}];
+      const sub=items.reduce((s,l)=>(parseFloat(l.amount)||0)*(l.qty||1)+s,0);
+      const gstAmt=previewInv.gst==="yes"?sub*0.1:0;
+      const dueDate=(()=>{const d=new Date(previewInv.date||previewInv.createdAt);d.setDate(d.getDate()+(paymentTerms||30));return fmtDate(d.toISOString());})();
+      return div({key:"modal",style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
+        div({style:{background:"#0C1A2E",borderRadius:16,width:"100%",maxWidth:660,maxHeight:"90vh",overflow:"auto",border:"1px solid rgba(255,255,255,0.1)"}},[
+          div({key:"mhdr",style:{...S.fb,padding:"14px 20px",borderBottom:"1px solid rgba(255,255,255,0.08)"}},[
+            div({key:"t",style:{fontWeight:700,fontSize:"0.95rem"}},(previewInv.invoiceNumber||"Invoice")+" \u2014 "+(c.patientName||"")),
+            div({key:"btns",style:{display:"flex",gap:8}},[
+              btn({key:"dl",style:{...S.btnP,fontSize:"0.82rem",padding:"7px 14px"},onClick:()=>downloadInvoice(previewInv)},"\u2b07 Download PDF"),
+              btn({key:"send",style:{...S.btnS,fontSize:"0.82rem",padding:"7px 14px"},onClick:()=>sendInvoice(previewInv)},"\u{1F4E8} Send to insurer"),
+              btn({key:"x",style:{...S.btnS,padding:"7px 12px"},onClick:()=>setPreviewInv(null)},"\u2715"),
+            ]),
           ]),
-          div({key:"status",style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},[
-            div({key:"btns",style:{display:"flex",gap:6}},["Invoiced","Paid","Overdue"].map(s=>btn({key:s,onClick:()=>updateStatus(inv.claimId,inv.id,s),style:{...S.pill,...(inv.status===s?statusPill(s):S.pillM),fontSize:"0.7rem",padding:"3px 10px"}},s))),
-            inv.status==="Paid"&&inv.paidAt&&div({key:"paid",style:{fontSize:"0.72rem",color:"#00C9A7"}},"Paid "+fmtDate(inv.paidAt)),
+          div({key:"preview",style:{background:"white",color:"#1a1a2e",margin:16,borderRadius:10,overflow:"hidden",fontFamily:"Arial,sans-serif",fontSize:10}},[
+            div({key:"hdr",style:{background:"#00C9A7",padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}},[
+              div({key:"logo",style:{fontWeight:800,fontSize:14,letterSpacing:"-0.02em"}},[span({key:"c",style:{color:"#07101E"}},"Claim"),span({key:"b",style:{color:"white"}},"Bridge")]),
+              div({key:"lbl",style:{color:"white",fontWeight:700,fontSize:10}},"TAX INVOICE"),
+            ]),
+            div({key:"body",style:{padding:"14px 16px"}},[
+              div({key:"top",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}},[
+                div({key:"cl"},[
+                  div({key:"n",style:{fontWeight:700,fontSize:11,marginBottom:2}},clinic.name||""),
+                  div({key:"a",style:{color:"#5B7A99",lineHeight:1.5,fontSize:9}},clinic.address||""),
+                  clinic.abn&&div({key:"abn",style:{color:"#5B7A99",fontSize:9}},"ABN: "+clinic.abn),
+                ]),
+                div({key:"inv",style:{textAlign:"right"}},[
+                  div({key:"no",style:{fontWeight:700,fontSize:11,marginBottom:2}},previewInv.invoiceNumber||""),
+                  div({key:"d",style:{color:"#5B7A99",fontSize:9}},"Date: "+fmtDate(previewInv.date)),
+                  div({key:"due",style:{color:"#5B7A99",fontSize:9}},"Due: "+dueDate),
+                  div({key:"terms",style:{color:"#5B7A99",fontSize:9}},"Terms: "+(paymentTerms||30)+" days"),
+                ]),
+              ]),
+              div({key:"boxes",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}},[
+                div({key:"bill",style:{background:"#f0f7f5",borderRadius:5,padding:"7px 9px"}},[
+                  div({key:"h",style:{fontWeight:700,color:"#00C9A7",fontSize:7.5,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:3}},"Bill To"),
+                  div({key:"i",style:{fontSize:9}},c.insurerName||c.insurerNameCustom||""),
+                  c.caseManagerName&&div({key:"cm",style:{color:"#5B7A99",fontSize:9}},"Attn: "+c.caseManagerName),
+                ]),
+                div({key:"claim",style:{background:"#f0f7f5",borderRadius:5,padding:"7px 9px"}},[
+                  div({key:"h",style:{fontWeight:700,color:"#00C9A7",fontSize:7.5,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:3}},"Patient / Claim"),
+                  div({key:"p",style:{fontSize:9}},c.patientName||""),
+                  div({key:"cn",style:{color:"#5B7A99",fontSize:9}},"Claim: "+(c.claimNumber||"\u2014")),
+                  div({key:"doi",style:{color:"#5B7A99",fontSize:9}},"DOI: "+fmtDate(c.dateOfInjury)),
+                ]),
+              ]),
+              e("table",{key:"tbl",style:{width:"100%",borderCollapse:"collapse",marginBottom:10,fontSize:9}},[
+                e("thead",{key:"th"},e("tr",{style:{background:"#07101E",color:"white"}},
+                  ["Tx Date","Code","Description","Qty","Unit Price","Amount"].map(h=>e("th",{key:h,style:{padding:"4px 7px",fontWeight:600,textAlign:["Qty","Unit Price","Amount"].includes(h)?"right":"left",fontSize:7.5}},h))
+                )),
+                e("tbody",{key:"tb"},items.map((item,i)=>
+                  e("tr",{key:item.id||i,style:{background:i%2===0?"white":"#f8fbfd"}},
+                    [fmtDate(item.treatmentDate||previewInv.date),item.itemCode||"\u2014",item.description||"",(item.qty||1),fmtAUD(parseFloat(item.amount||0)),fmtAUD((parseFloat(item.amount)||0)*(item.qty||1))]
+                    .map((v,j)=>e("td",{key:j,style:{padding:"4px 7px",borderBottom:"1px solid #f0f0f0",textAlign:j>=3?"right":"left"}},v))
+                  )
+                )),
+              ]),
+              div({key:"tots",style:{display:"flex",justifyContent:"flex-end",marginBottom:12}},[
+                div({key:"t",style:{minWidth:170,fontSize:9}},[
+                  div({key:"sub",style:{display:"flex",justifyContent:"space-between",padding:"2px 0",color:"#5B7A99"}},[span({key:"l"},"Subtotal"),span({key:"v"},fmtAUD(sub))]),
+                  div({key:"gst",style:{display:"flex",justifyContent:"space-between",padding:"2px 0",borderBottom:"1px solid #eee",color:"#5B7A99"}},[span({key:"l"},"GST"),span({key:"v"},previewInv.gst==="yes"?fmtAUD(gstAmt):"Nil")]),
+                  div({key:"tot",style:{display:"flex",justifyContent:"space-between",padding:"5px 7px",background:"#00C9A7",borderRadius:4,marginTop:3,fontWeight:700,color:"#07101E"}},[span({key:"l"},"TOTAL DUE"),span({key:"v"},fmtAUD(sub+gstAmt))]),
+                ]),
+              ]),
+              bankSettings&&(bankSettings.bsb||bankSettings.accountName)&&div({key:"pay",style:{background:"#f8fbfd",borderRadius:5,padding:"7px 9px",fontSize:9}},[
+                div({key:"h",style:{fontWeight:700,marginBottom:3,color:"#07101E",fontSize:9}},"Payment Details"),
+                bankSettings.accountName&&div({key:"an",style:{color:"#5B7A99"}},"Account name: "+bankSettings.accountName),
+                bankSettings.bsb&&div({key:"bsb",style:{color:"#5B7A99"}},"BSB: "+bankSettings.bsb+"   Account: "+(bankSettings.accountNo||"")),
+                div({key:"ref",style:{color:"#5B7A99"}},"Reference: "+(previewInv.invoiceNumber||"")),
+              ]),
+            ]),
+            div({key:"ftr",style:{background:"#00C9A7",padding:"5px 16px",textAlign:"center",fontSize:7.5,color:"#07101E"}},"Generated by ClaimBridge \u2014 WorkCover & TAC Documentation Platform"),
+          ]),
+        ])
+      );
+    })(),
+    div({key:"h",style:{fontWeight:800,fontSize:"1.2rem",marginBottom:4}},"Invoicing"),
+    div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Generate tax invoices per episode and track collection."),
+    div({key:"totals",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}},[
+      {label:"Total invoiced (inc. GST)",val:totalInv,col:"#60A5FA"},
+      {label:"Total collected",val:totalColl,col:"#00C9A7"},
+      {label:"Outstanding",val:totalOut,col:totalOut>0?"#FFB830":"#5B7A99"},
+    ].map(m=>div({key:m.label,style:{...S.card,textAlign:"center",padding:"20px",marginBottom:0}},[
+      div({key:"v",style:{fontWeight:800,fontSize:"1.5rem",color:m.col,lineHeight:1,marginBottom:6}},fmtAUD(m.val)),
+      div({key:"l",style:{fontSize:"0.76rem",color:"#5B7A99"}},m.label),
+    ]))),
+    div({key:"cols",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}},[
+      // Create invoice form
+      div({key:"form",style:S.card},[
+        div({key:"h",style:{fontWeight:700,marginBottom:16}},"Create invoice"),
+        saved&&e(OK,{key:"ok"},"Invoice created \u2713"),
+        div({key:"pt",style:{marginBottom:16}},[
+          e("label",{key:"l",style:S.label},"Claim / patient *"),
+          div({key:"sw",style:{position:"relative"}},[
+            inp({key:"i",className:"cb-input",style:S.inp,placeholder:"Search patient name or claim number...",
+              value:patientSearch,onChange:ev=>{setPatientSearch(ev.target.value);setShowPatientDd(true);setSelClaim("");},
+              onFocus:()=>setShowPatientDd(true),onBlur:()=>setTimeout(()=>setShowPatientDd(false),200)}),
+            selClaim&&span({key:"ck",style:{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",color:"#00C9A7",fontSize:"0.75rem",pointerEvents:"none"}},"\u2713"),
+            showPatientDd&&patientSearch.length>0&&div({key:"dd",style:{position:"absolute",top:"100%",left:0,right:0,background:"#112240",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,zIndex:100,marginTop:4,maxHeight:200,overflow:"auto"}},[
+              ...activeClaims.filter(c=>{const q=patientSearch.toLowerCase();return(c.patientName||"").toLowerCase().includes(q)||(c.claimNumber||"").toLowerCase().includes(q);})
+                .map(c=>div({key:c.id,onClick:()=>{setSelClaim(c.id);setPatientSearch((c.patientName||"")+(c.claimNumber?" \u2014 "+c.claimNumber:""));setShowPatientDd(false);},
+                  style:{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
+                  div({key:"n",style:{fontWeight:600,fontSize:"0.87rem"}},c.patientName||"Unnamed"),
+                  div({key:"d",style:{fontSize:"0.74rem",color:"#5B7A99"}},(c.claimNumber||"No claim #")+" \u00b7 "+(c.scheme||"WorkCover")),
+                ])),
+              activeClaims.filter(c=>{const q=patientSearch.toLowerCase();return(c.patientName||"").toLowerCase().includes(q)||(c.claimNumber||"").toLowerCase().includes(q);}).length===0&&
+                div({key:"none",style:{padding:"12px 14px",color:"#5B7A99",fontSize:"0.84rem"}},"No matches"),
+            ]),
+          ]),
+        ]),
+        claim&&episodes.length>0&&div({key:"ep",style:{marginBottom:16}},[
+          e("label",{key:"l",style:S.label},"Episode / consultation"),
+          e("select",{key:"s",className:"cb-sel",style:S.sel,value:selEpisode,onChange:ev=>setSelEpisode(ev.target.value)},[
+            e("option",{key:"",value:""},"Select episode..."),
+            ...episodes.map(ep=>e("option",{key:ep.id,value:ep.id},"#"+(ep.episodeNo||"")+" \u2014 "+new Date(ep.date).toLocaleDateString("en-AU")+(ep.label?" \u2014 "+ep.label:""))),
+          ]),
+        ]),
+        div({key:"dg",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}},[
+          e(Inp,{key:"id",label:"Invoice date",value:invoiceDate,onChange:setInvoiceDate,type:"date",mb:0}),
+          div({key:"gst"},[
+            e("label",{key:"l",style:S.label},"GST"),
+            div({key:"btns",style:{display:"flex",gap:8}},
+              ["no","yes"].map(v=>btn({key:v,onClick:()=>setGst(v),style:{...S.pill,...(gst===v?S.pillT:S.pillM),padding:"9px 16px",fontSize:"0.82rem"}},v==="yes"?"Yes (10%)":"No GST"))
+            ),
+          ]),
+        ]),
+        div({key:"li-hdr",style:{...S.fb,marginBottom:8}},[
+          e("label",{key:"l",style:S.label},"Line items"),
+          btn({key:"add",style:{...S.btnS,fontSize:"0.78rem",padding:"4px 12px"},onClick:addLineItem},"+ Add item"),
+        ]),
+        ...lineItems.map((item,idx)=>div({key:item.id,style:{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,padding:"10px 12px",marginBottom:8}},[
+          div({key:"r1",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},[
+            div({key:"td"},[
+              e("label",{key:"l",style:{...S.label,marginBottom:4}},"Treatment date *"),
+              inp({key:"i",className:"cb-input",style:{...S.inp,fontSize:"0.84rem",padding:"7px 10px"},type:"date",value:item.treatmentDate||invoiceDate,onChange:ev=>updLine(item.id,"treatmentDate",ev.target.value)}),
+            ]),
+            div({key:"ic"},[
+              e("label",{key:"l",style:{...S.label,marginBottom:4}},"Item code"),
+              e("select",{key:"s",className:"cb-sel",style:{...S.sel,fontSize:"0.81rem",padding:"7px 10px"},
+                value:item.itemCode,
+                onChange:ev=>{
+                  const v=ev.target.value;
+                  const fee=WORKSAFE_FEE_MAP[v]||"";
+                  const itm=filteredCodes.find(c=>c.value===v);
+                  updLine(item.id,"itemCode",v);
+                  if(fee)updLine(item.id,"amount",fee);
+                  if(itm)updLine(item.id,"description",itm.label.split(" \u2014 ").slice(1).join(" \u2014 ")||itm.label);
+                }},[
+                e("option",{key:"",value:""},"Select code..."),
+                ...Object.entries(filteredCodes.slice(1).reduce((acc,c)=>{if(c.value){(acc[c.cat||"Other"]=acc[c.cat||"Other"]||[]).push(c);}return acc;},{}))
+                  .map(([cat,items2])=>e("optgroup",{key:cat,label:cat},items2.map(c=>e("option",{key:c.value,value:c.value},c.value+" \u2014 "+(c.label||""))))),
+              ]),
+            ]),
+          ]),
+          div({key:"r2",style:{display:"grid",gridTemplateColumns:"2fr 60px 100px "+(lineItems.length>1?"32px":""),gap:8,alignItems:"end"}},[
+            e(Inp,{key:"desc",label:"Description *",value:item.description,onChange:v=>updLine(item.id,"description",v),placeholder:"Service description",mb:0}),
+            e(Inp,{key:"qty",label:"Qty",value:String(item.qty||1),onChange:v=>updLine(item.id,"qty",parseInt(v)||1),placeholder:"1",mb:0}),
+            e(Inp,{key:"amt",label:"Unit price ($)",value:item.amount,onChange:v=>updLine(item.id,"amount",v),placeholder:"0.00",mb:0}),
+            lineItems.length>1&&btn({key:"rm",style:{background:"transparent",border:"none",color:"#FF4D6D",cursor:"pointer",fontSize:"1rem",alignSelf:"flex-end",paddingBottom:4},onClick:()=>remLine(item.id)},"\u2715"),
           ]),
         ])),
+        subTotal>0&&div({key:"prev",style:{...S.ok,marginTop:4,marginBottom:16,justifyContent:"space-between"}},[
+          span({key:"l",style:{color:"#5B7A99"}},gst==="yes"?"Total inc. GST:":"Subtotal (no GST):"),
+          span({key:"v",style:{fontWeight:700,fontSize:"1rem"}},fmtAUD(subTotal*(gst==="yes"?1.1:1))),
+        ]),
+        btn({key:"create",style:{...S.btnP,width:"100%",padding:"13px"},onClick:addInvoice},"+ Create invoice"),
+      ]),
+      // Invoice list grouped by month
+      div({key:"list"},[
+        div({key:"h",style:{fontWeight:600,marginBottom:14,fontSize:"0.88rem"}},allInvoices.length+" invoice"+(allInvoices.length!==1?"s":"")+" across all claims"),
+        allInvoices.length===0?div({key:"empty",style:{...S.card,textAlign:"center",padding:"32px",color:"#5B7A99"}},[
+          div({key:"i",style:{fontSize:"2rem",marginBottom:8}},"\U0001F9FE"),
+          div({key:"t"},"No invoices yet"),
+        ]):
+        Object.entries(grouped).map(([month,invs])=>{
+          const monthTotal=invs.reduce((s,i)=>s+getTotal(i),0);
+          const isOpen=expandedMonths[month]!==false;
+          return div({key:month,style:{marginBottom:12}},[
+            btn({key:"mhdr",onClick:()=>setExpandedMonths(p=>({...p,[month]:!isOpen})),
+              style:{width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"9px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",color:"#EFF6FF",marginBottom:isOpen?8:0}},[
+              div({key:"l",style:{display:"flex",alignItems:"center",gap:10}},[
+                span({key:"arr",style:{color:"rgba(255,255,255,0.4)",fontSize:"0.8rem",display:"inline-block",transform:isOpen?"rotate(90deg)":"none",transition:"transform 0.2s"}},"\u203a"),
+                div({key:"m",style:{fontWeight:600,fontSize:"0.85rem"}},month),
+                span({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},invs.length+" invoice"+(invs.length!==1?"s":"")),
+              ]),
+              span({key:"t",style:{fontWeight:700,fontSize:"0.9rem",color:"#60A5FA"}},fmtAUD(monthTotal)),
+            ]),
+            isOpen&&div({key:"invs"},invs.map(inv=>{
+              const c=claims.find(x=>x.id===inv.claimId)||{};
+              const total=getTotal(inv);
+              const overdue=isOverdue(inv);
+              const effStatus=overdue?"Overdue":inv.status;
+              return div({key:inv.id,className:"card-hover",
+                style:{...S.cardSm,marginBottom:8,cursor:"pointer",borderColor:overdue?"rgba(255,77,109,0.25)":"rgba(255,255,255,0.08)"},
+                onClick:()=>setPreviewInv(inv)},[
+                div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}},[
+                  div({key:"l"},[
+                    div({key:"n",style:{fontWeight:600,fontSize:"0.87rem"}},inv.patientName||"\u2014"),
+                    div({key:"desc",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:1}},(inv.lineItems?inv.lineItems.map(l=>l.description).filter(Boolean).join(", "):inv.description)||"\u2014"),
+                    div({key:"meta",style:{fontSize:"0.7rem",color:"#5B7A99",marginTop:1}},(inv.invoiceNumber||"")+(inv.lineItems&&inv.lineItems[0]&&inv.lineItems[0].itemCode?" \u00b7 "+inv.lineItems[0].itemCode:"")),
+                  ]),
+                  div({key:"r",style:{textAlign:"right",flexShrink:0}},[
+                    div({key:"amt",style:{fontWeight:700,fontSize:"0.95rem"}},fmtAUD(total)),
+                    div({key:"d",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:1}},fmtDate(inv.date||inv.createdAt)),
+                  ]),
+                ]),
+                div({key:"btns",style:{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}},[
+                  span({key:"s",style:{...S.pill,...(effStatus==="Paid"?S.pillT:effStatus==="Overdue"?S.pillR:S.pillA),fontSize:"0.68rem",padding:"2px 8px",cursor:"default"}},effStatus),
+                  inv.status!=="Paid"&&btn({key:"pay",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 8px"},onClick:ev=>{ev.stopPropagation();updateStatus(inv.claimId,inv.id,"Paid");}},"Mark paid"),
+                  btn({key:"dl",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 8px"},onClick:ev=>{ev.stopPropagation();downloadInvoice(inv);}},"\u2b07 PDF"),
+                  btn({key:"send",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 8px"},onClick:ev=>{ev.stopPropagation();sendInvoice(inv);}},"\U0001F4E8 Send"),
+                  span({key:"hint",style:{fontSize:"0.67rem",color:"rgba(255,255,255,0.2)",marginLeft:4}},"click to preview"),
+                ]),
+              ]);
+            })),
+          ]);
+        }),
       ]),
     ]),
   ]);
 }
-
-
-// ── SETTINGS PAGE ─────────────────────────────────────────────────────────────
-const INSURER_AP_DEFAULTS={
-  allianz:"workerscomp.ap@allianz.com.au",
-  eml:"accounts@eml.com.au",
-  gallagher:"ap.vic@gallagherbasset.com.au",
-  dxc:"ap@dxcclaims.com.au",
-  tac:"accounts.payable@tac.vic.gov.au",
-};
 function SettingsPage({clinic,bankSettings,onSaveBank,insurerEmails,onSaveInsurerEmails}){
   const[bank,setBank]=useState(bankSettings||{bsb:"",accountNo:"",accountName:""});
   const[emails,setEmails]=useState(insurerEmails||{});
