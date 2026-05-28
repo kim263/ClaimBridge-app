@@ -4099,7 +4099,18 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
         ]),
         claim&&episodes.length>0&&div({key:"ep",style:{marginBottom:16}},[
           e("label",{key:"l",style:S.label},"Episode / consultation"),
-          e("select",{key:"s",className:"cb-sel",style:S.sel,value:selEpisode,onChange:ev=>setSelEpisode(ev.target.value)},[
+          e("select",{key:"s",className:"cb-sel",style:S.sel,value:selEpisode,onChange:ev=>{
+              const epId=ev.target.value;
+              setSelEpisode(epId);
+              if(epId){
+                const ep=(claim.episodes||[]).find(e=>e.id===epId);
+                if(ep&&ep.date){
+                  const epDate=new Date(ep.date).toISOString().slice(0,10);
+                  setInvoiceDate(epDate);
+                  setLineItems(p=>p.map(l=>({...l,treatmentDate:epDate})));
+                }
+              }
+            }},[
             e("option",{key:"",value:""},"Select episode..."),
             ...episodes.map(ep=>e("option",{key:ep.id,value:ep.id},"#"+(ep.episodeNo||"")+" \u2014 "+new Date(ep.date).toLocaleDateString("en-AU")+(ep.label?" \u2014 "+ep.label:""))),
           ]),
@@ -4257,7 +4268,7 @@ function SettingsPage({clinic,bankSettings,onSaveBank,insurerEmails,onSaveInsure
       savedEmail&&e(OK,{key:"ok"},"AP emails saved"),
       ...ALL_INSURERS.map(ins=>
         div({key:ins.id,style:{marginBottom:14}},[
-          e(Inp,{key:"e",label:ins.name+" — Accounts Payable email",value:emails[ins.id]!==undefined?emails[ins.id]:(INSURER_AP_DEFAULTS[ins.id]||""),onChange:v=>setEmails({...emails,[ins.id]:v}),placeholder:"ap@insurer.com.au",mb:0}),
+          e(Inp,{key:"e",label:ins.name+" — Accounts Payable email",value:emails[ins.id]||"",onChange:v=>setEmails({...emails,[ins.id]:v}),placeholder:"ap@insurer.com.au",mb:0}),
         ])
       ),
       div({key:"sp",style:{height:8}}),
