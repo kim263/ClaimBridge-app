@@ -872,6 +872,9 @@ function Tab2({claim,up}){
   const[diags,setDiags]=useState(claim.diagnoses||[]);
   const[dSubTab,setDSubTab]=useState(0);
   const[hiIdx,setHiIdx]=useState(-1);
+  const[orthoQ,setOrthoQ]=useState("");
+  const[showOrthoDD,setShowOrthoDD]=useState(false);
+  const[orthoHiIdx,setOrthoHiIdx]=useState(-1);
   const DSUB=["Diagnosis & Capacity","Clinical Assessment","Psychosocial Barriers","Imaging"];
   const sugg=useMemo(()=>{if(!q||q.length<2)return[];const ql=q.toLowerCase();return DIAGNOSES_DB.filter(d=>d.label.toLowerCase().includes(ql)||d.icd10.toLowerCase().includes(ql)).slice(0,8);},[q]);
   const addD=d=>{if(diags.find(x=>x.icd10===d.icd10))return;const u=[...diags,d];setDiags(u);up("diagnoses",u);setQ("");setShow(false);};
@@ -1433,24 +1436,31 @@ function Tab4({claim,up,clinic,practitioners}){
                 const rule=r.ediType==="further_info"?"10 working days (further info)":"28 days (new treatment)";
                 return div({key:"edi",style:{display:"flex",flexDirection:"column",gap:3,marginTop:5}},[span({key:"s",style:{...S.pill,...(overdue?S.pillR:urgent?S.pillA:S.pillM),fontSize:"0.68rem",padding:"2px 8px",cursor:"default",display:"inline-flex"}},overdue?"\u26a0 EDI overdue by "+Math.abs(daysLeft)+" days":urgent?"\u23f0 EDI due in "+daysLeft+" days":"\uD83D\uDCC5 EDI due "+due.toLocaleDateString("en-AU")),span({key:"r",style:{fontSize:"0.66rem",color:"#5B7A99"}},rule)]);
               })(),
+              div({key:"travel-inline",style:{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,0.05)"}},[
+                                div({key:"th",style:{fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#5B7A99",marginBottom:6}},"Travel"),
+                                div({key:"trow",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[
+                                  e("select",{key:"tr",className:"cb-sel",style:{...S.sel,flex:1,fontSize:"0.82rem",padding:"6px 10px"},
+                                    value:r.travelRequired||"",
+                                    onChange:ev=>up("referrals",(claim.referrals||[]).map(x=>x.id===r.id?{...x,travelRequired:ev.target.value}:x))},[
+                                    e("option",{key:"",value:""},"Travel required?"),
+                                    e("option",{key:"pt",value:"Yes — public transport"},"Public transport"),
+                                    e("option",{key:"pv",value:"Yes — private vehicle"},"Private vehicle"),
+                                    e("option",{key:"tx",value:"Yes — taxi / rideshare"},"Taxi / rideshare"),
+                                    e("option",{key:"air",value:"Yes — air travel required"},"Air travel"),
+                                    e("option",{key:"no",value:"No travel required"},"No travel required"),
+                                  ]),
+                                ]),
+                                r.travelRequired&&r.travelRequired!=="No travel required"&&
+                                  inp({key:"trr",className:"cb-input",style:{...S.inp,fontSize:"0.82rem",padding:"7px 10px",marginTop:6},
+                                    placeholder:"Travel justification...",
+                                    value:r.travelReasoning||"",
+                                    onChange:ev=>up("referrals",(claim.referrals||[]).map(x=>x.id===r.id?{...x,travelReasoning:ev.target.value}:x))}),
+                              ]),
             ]),
           ])),
         ]),
       ]),
-      subTab===SUB.indexOf("Referrals")&&div({key:"travel-card",style:{...S.card,marginTop:16}},[
-        div({key:"h",style:{fontWeight:700,marginBottom:6}},"Travel"),
-        div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:12}},"Required for treatment or procedure attendance. Approval requested with the relevant referral letter."),
-        e(Sel,{key:"tr",label:"Travel required",value:claim.travelRequired||"",onChange:v=>up("travelRequired",v),options:["Yes — public transport","Yes — private vehicle","Yes — taxi / rideshare","Yes — air travel required","No travel required"]}),
-        e(Ta,{key:"trr",label:"Travel justification",value:claim.travelReasoning||"",onChange:v=>up("travelReasoning",v),placeholder:"Why travel is required and why the worker cannot use their own vehicle or public transport..."}),
-        claim.travelRequired&&claim.travelRequired!=="No travel required"&&div({key:"travel-send",style:{marginTop:8,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
-                    btn({key:"ts",style:{...S.btnP,fontSize:"0.82rem"},onClick:()=>{
-            const letter=buildQuickLetter("travel",claim,practitioners,clinic);
-            if(!letter)return;
-            sendQuickLetter({letter,toEmail:claim.caseManagerEmail||"",toName:claim.caseManagerName||claim.insurerName,ccEmail:claim.patientEmail,claim,up,subject:"Request for Travel Approval — "+claim.patientName});
-          }},"📨 Send travel request to case manager"),
-          div({key:"note",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:6}},"Patient automatically CC'd."),
-        ]),
-      ]),
+      
     ]),
 
     subTab===SUB.indexOf("Medication & Investigations")&&div({key:"medinv"},[
