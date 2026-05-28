@@ -1504,7 +1504,7 @@ function OutcomeMeasuresCompact({claim,up}){
     if(isNaN(val)||val<m.min||val>m.max){alert("Score must be between "+m.min+" and "+m.max);return;}
     const existing=allScores[selMeasure]||[];
     up("outcomeScores",{...allScores,[selMeasure]:[...existing,{score:scoreVal,date:scoreDate,id:"sc_"+Date.now()}]});
-    setScoreVal("");
+    setScoreVal("");setSelMeasure("");
   };
   const remScore=(key,id)=>{
     const updated={...allScores,[key]:(allScores[key]||[]).filter(s=>s.id!==id)};
@@ -1521,48 +1521,45 @@ function OutcomeMeasuresCompact({claim,up}){
     return m.higherBetter?(last>first?"up":last<first?"down":"stable"):(last<first?"up":last>first?"down":"stable");
   };
   return div({},[
-    // Active scores summary
-    activeMeasures.length>0&&div({key:"scores",style:{marginBottom:14}},
+    // Existing scores — compact rows
+    activeMeasures.length>0&&div({key:"scores",style:{marginBottom:10}},
       activeMeasures.map(key=>{
-        const latest=getLatest(key);
-        const trend=getTrend(key);
+        const latest=getLatest(key);const trend=getTrend(key);
         const m=OUTCOME_MEASURES[key];
         const tCol=trend==="up"?"#00C9A7":trend==="down"?"#FF4D6D":"#FFB830";
-        return div({key,style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
-          div({key:"l"},[
-            div({key:"n",style:{fontSize:"0.78rem",fontWeight:600}},key),
-            div({key:"d",style:{fontSize:"0.68rem",color:"#5B7A99"}},new Date(latest.date).toLocaleDateString("en-AU")),
-          ]),
-          div({key:"r",style:{display:"flex",alignItems:"center",gap:6}},[
-            div({key:"s",style:{fontWeight:700,fontSize:"0.9rem",color:"#EFF6FF"}},latest.score+(m?m.unit:"")),
-            trend&&span({key:"t",style:{fontSize:"0.72rem",color:tCol}},trend==="up"?"↑":trend==="down"?"↓":"→"),
-            btn({key:"x",onClick:()=>remScore(key,latest.id),style:{background:"transparent",border:"none",color:"rgba(255,77,109,0.5)",cursor:"pointer",fontSize:"0.75rem",padding:"0 2px"}},"✕"),
+        return div({key,style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
+          div({key:"l",style:{fontSize:"0.77rem",fontWeight:600,color:"rgba(239,246,255,0.7)"}},key),
+          div({key:"r",style:{display:"flex",alignItems:"center",gap:5}},[
+            span({key:"s",style:{fontWeight:700,fontSize:"0.85rem"}},latest.score+(m?m.unit:"")),
+            trend&&span({key:"t",style:{fontSize:"0.7rem",color:tCol}},trend==="up"?"↑":trend==="down"?"↓":"→"),
+            span({key:"d",style:{fontSize:"0.68rem",color:"#5B7A99"}}," "+new Date(latest.date).toLocaleDateString("en-AU",{day:"2-digit",month:"2-digit"})),
+            btn({key:"x",onClick:()=>remScore(key,latest.id),style:{background:"transparent",border:"none",color:"rgba(255,77,109,0.4)",cursor:"pointer",fontSize:"0.72rem",padding:"0 2px"}},"✕"),
           ]),
         ]);
       })
     ),
-    // Add score row
-    div({key:"add",style:{paddingTop:activeMeasures.length>0?10:0,borderTop:activeMeasures.length>0?"1px solid rgba(255,255,255,0.07)":"none"}},[
-      div({key:"g1",style:{marginBottom:8}},[
-        e("label",{key:"l",style:{...S.label,marginBottom:6}},"Add score"),
-        e("select",{key:"s",className:"cb-sel",style:{...S.sel,fontSize:"0.82rem",padding:"8px 10px"},value:selMeasure,onChange:ev=>setSelMeasure(ev.target.value)},[
-          e("option",{key:"",value:""},"Select measure..."),
+    // Add row — single line, expands on measure selection
+    div({key:"add",style:{paddingTop:activeMeasures.length>0?8:0,borderTop:activeMeasures.length>0?"1px solid rgba(255,255,255,0.07)":"none"}},[
+      div({key:"row",style:{display:"flex",gap:6,alignItems:"center",marginBottom:selMeasure?8:0}},[
+        e("select",{key:"s",className:"cb-sel",style:{...S.sel,flex:2,fontSize:"0.78rem",padding:"6px 8px"},
+          value:selMeasure,onChange:ev=>setSelMeasure(ev.target.value)},[
+          e("option",{key:"",value:""},"+ Add outcome measure..."),
           ...Object.keys(OUTCOME_MEASURES).map(k=>e("option",{key:k,value:k},k)),
         ]),
       ]),
-      div({key:"g2",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},[
-        div({key:"sc"},[
-          e("label",{key:"l",style:{...S.label,marginBottom:4}},"Score"+(selMeasure?" ("+OUTCOME_MEASURES[selMeasure].min+"-"+OUTCOME_MEASURES[selMeasure].max+")":"")),
-          inp({key:"i",className:"cb-input",style:{...S.inp,fontSize:"0.82rem",padding:"7px 10px"},type:"number",value:scoreVal,onChange:ev=>setScoreVal(ev.target.value),placeholder:"Score"}),
-        ]),
-        div({key:"dt"},[
-          e("label",{key:"l",style:{...S.label,marginBottom:4}},"Date"),
-          inp({key:"i",className:"cb-input",style:{...S.inp,fontSize:"0.82rem",padding:"7px 10px"},type:"date",value:scoreDate,onChange:ev=>setScoreDate(ev.target.value)}),
-        ]),
+      selMeasure&&div({key:"entry",style:{display:"flex",gap:6,alignItems:"center"}},[
+        inp({key:"sc",className:"cb-input",
+          style:{...S.inp,fontSize:"0.78rem",padding:"6px 8px",flex:1},
+          type:"number",placeholder:(OUTCOME_MEASURES[selMeasure].min+"-"+OUTCOME_MEASURES[selMeasure].max),
+          value:scoreVal,onChange:ev=>setScoreVal(ev.target.value),
+          onKeyDown:ev=>{if(ev.key==="Enter")addScore();}}),
+        inp({key:"dt",className:"cb-input",
+          style:{...S.inp,fontSize:"0.78rem",padding:"6px 8px",flex:1},
+          type:"date",value:scoreDate,onChange:ev=>setScoreDate(ev.target.value)}),
+        btn({key:"add",style:{...S.btnP,fontSize:"0.78rem",padding:"6px 14px",flexShrink:0},
+          onClick:addScore},"Add"),
       ]),
-      btn({key:"add",style:{...S.btnP,width:"100%",fontSize:"0.82rem",padding:"8px"},onClick:addScore},"+ Add score"),
     ]),
-    activeMeasures.length===0&&div({key:"empty",style:{fontSize:"0.78rem",color:"#5B7A99",textAlign:"center",paddingBottom:12}},"No scores yet"),
   ]);
 }
 
