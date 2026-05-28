@@ -1268,6 +1268,7 @@ function Tab4({claim,up,clinic,practitioners}){
                   })
                 ),
               ]),
+      div({key:"goals-om-layout",style:{display:"grid",gridTemplateColumns:"1fr 340px",gap:16,alignItems:"start"}},[
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:14}},"Goals & management"),
         div({key:"nrd",style:{marginBottom:16}},[div({key:"g",style:S.g2},[e(Inp,{key:"nrd",label:"Next review date",value:claim.nextReviewDate,onChange:v=>up("nextReviewDate",v),type:"date",mb:0}),div({key:"sp"})])]),
@@ -1304,7 +1305,12 @@ function Tab4({claim,up,clinic,practitioners}){
           e("textarea",{key:"t",className:"cb-ta",style:{...S.ta,minHeight:72},value:claim.barriers||"",onChange:ev=>up("barriers",ev.target.value),placeholder:"Additional barriers not listed above..."}),
         ]),
         claim.practitionerProfession==="Podiatrist"&&e(Collapsible,{key:"pod",title:"Orthotics & Aids",icon:"\uD83D\uDC5F",defaultOpen:true},div({},[e(Ta,{key:"ort",label:"Recommended orthotics / aids",value:claim.orthotics,onChange:v=>up("orthotics",v),placeholder:"e.g. Custom foot orthotics, ankle brace..."}),e(Ta,{key:"cli",label:"Clinical justification for orthotics",value:claim.orthJustification,onChange:v=>up("orthJustification",v),placeholder:"Clinical reasoning..."})])),
+      ]),,
+      div({key:"om-sidebar",style:{...S.card,padding:"16px"}},[
+        div({key:"h",style:{fontWeight:700,fontSize:"0.88rem",marginBottom:12}},"Outcome measures"),
+        e(OutcomeMeasuresCompact,{key:"omc",claim,up}),
       ]),
+    ])
 
       div({key:"work-inline",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:6}},"Work & activity restrictions"),
