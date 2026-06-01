@@ -67,6 +67,7 @@ const S={
   pillA:{background:"rgba(255,184,48,0.1)",borderColor:"rgba(255,184,48,0.25)",color:"#FFB830"},
   pillR:{background:"rgba(255,77,109,0.1)",borderColor:"rgba(255,77,109,0.25)",color:"#FF4D6D"},
   pillP:{background:"rgba(96,165,250,0.12)",borderColor:"rgba(96,165,250,0.4)",color:"#60A5FA"},
+  pillD:{background:"rgba(234,88,12,0.12)",borderColor:"rgba(234,88,12,0.35)",color:"#EA580C"},
   ok:{background:"rgba(0,201,167,0.1)",border:"1px solid rgba(0,201,167,0.25)",borderRadius:12,padding:"12px 16px",color:"#00C9A7",fontSize:"0.84rem",marginBottom:16,display:"flex",alignItems:"center",gap:8},
   warn:{background:"rgba(255,184,48,0.08)",border:"1px solid rgba(255,184,48,0.2)",borderRadius:12,padding:"12px 16px",color:"#FFB830",fontSize:"0.84rem",marginBottom:16,display:"flex",alignItems:"center",gap:8},
   g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16},
@@ -1124,7 +1125,7 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
     const cocCount=Math.max(...(claim.episodes||[]).map(e=>e.cocCount||0),0)+1;
     const newEp={id:"ep_"+claim.id+"_"+Date.now(),episodeNo:epNo,date:new Date().toISOString(),practitionerId:claim.practitionerId,practitionerName:claim.practitionerName,practitionerProfession:claim.practitionerProfession,label:"Request "+epNo,createdAt:new Date().toISOString(),cocCount,cocType:"Subsequent",referrals:[],letterHistory:[],medications:[]};
     setClaim(prev=>({...prev,episodes:[...(prev.episodes||[]),newEp]}));
-    setActiveEpId(newEp.id);setEpTab(3);
+    setActiveEpId(newEp.id);setEpTab(2);
   };
   const save=async()=>{const now=new Date().toISOString();const prac=practitioners.find(p=>p.id===claim.practitionerId);const updated={...claim,lastEditedAt:now,lastEditedBy:prac?prac.name:clinic.name,createdAt:claim.createdAt||now,createdBy:claim.createdBy||(prac?prac.name:clinic.name)};setClaim(updated);await onSave(updated);setSavedModal(true);};
   const saveDraft=async()=>{const now=new Date().toISOString();const prac=practitioners.find(p=>p.id===claim.practitionerId);const updated={...claim,status:"Draft",lastEditedAt:now,lastEditedBy:prac?prac.name:clinic.name,createdAt:claim.createdAt||now,createdBy:claim.createdBy||(prac?prac.name:clinic.name)};setClaim(updated);await onSave(updated);setDraftModal(true);};
@@ -1181,7 +1182,7 @@ function Tab1({claim,up,practitioners}){
     div({key:"scheme-card",style:S.card},[
       div({key:"tog-row",style:{display:"flex",gap:8,marginBottom:16}},[
         e("button",{key:"wc",onClick:()=>{up("scheme","WorkCover");up("insurerId","");},style:{flex:1,padding:"12px",borderRadius:10,border:"none",fontWeight:700,fontSize:"1rem",cursor:"pointer",background:claim.scheme==="WorkCover"?"#0057A8":"rgba(255,255,255,0.05)",color:claim.scheme==="WorkCover"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"WorkCover"),
-        e("button",{key:"tac",onClick:()=>{up("scheme","TAC");up("insurerId","");},style:{flex:1,padding:"12px",borderRadius:10,border:"none",fontWeight:700,fontSize:"1rem",cursor:"pointer",background:claim.scheme==="TAC"?"#C0392B":"rgba(255,255,255,0.05)",color:claim.scheme==="TAC"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"TAC"),
+        e("button",{key:"tac",onClick:()=>{up("scheme","TAC");up("insurerId","");},style:{flex:1,padding:"12px",borderRadius:10,border:"none",fontWeight:700,fontSize:"1rem",cursor:"pointer",background:claim.scheme==="TAC"?"#C0392B":"rgba(255,255,255,0.05)",color:claim.scheme==="TAC"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"Transport Accident (TAC)"),
       ]),
       div({key:"jur-row",style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}},
         JURS.map(j=>{const active=claim.jurisdiction===j.id||(j.id==="vic"&&!claim.jurisdiction);return e("button",{key:j.id,onClick:()=>j.on?up("jurisdiction",j.id):alert(j.label+" coming soon"),style:{...S.pill,...(active?S.pillT:S.pillM),fontSize:"0.8rem",padding:"7px 16px",...(!j.on?{opacity:0.4}:{})}},j.label+(j.on?"":" (soon)"));})
@@ -1230,7 +1231,7 @@ function Tab1({claim,up,practitioners}){
       div({key:"g",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}},[
         e(Inp,{key:"cn",label:"Claim number",value:claim.claimNumber,onChange:v=>up("claimNumber",v),placeholder:"WC-2025-XXXXX",mb:0}),
         e(Inp,{key:"doi",label:"Date of injury",value:claim.dateOfInjury,onChange:v=>up("dateOfInjury",v),type:"date",required:true,mb:0}),
-        e(Sel,{key:"st",label:"Claim status",value:claim.status,onChange:v=>up("status",v),options:["Active","Pending Approval","Approved","Closed","Disputed"],mb:0}),
+        e(Sel,{key:"st",label:"Claim status",value:claim.status,onChange:v=>up("status",v),options:["Active","Closed","Disputed"],mb:0}),
       ]),
       claim.scheme==="WorkCover"&&div({key:"emp",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginTop:16}},[
         e(Inp,{key:"en",label:"Employer name",value:claim.employerName,onChange:v=>up("employerName",v),placeholder:"ABC Company Pty Ltd",mb:0}),
@@ -1794,7 +1795,7 @@ function Tab4({claim,up,clinic,practitioners}){
               div({key:"btns",style:{display:"flex",gap:6,flexWrap:"wrap"}},
                 ["Pending","Approved","Further info required","Declined","Disputed"].map(s=>{
                   const active=(r.status||"Pending")===s;
-                  const col=s==="Approved"?S.pillT:s==="Declined"?S.pillR:s==="Further info required"?S.pillA:s==="Pending"?S.pillP:S.pillM;
+                  const col=s==="Approved"?S.pillT:s==="Declined"?S.pillR:s==="Further info required"?S.pillA:s==="Pending"?S.pillP:s==="Disputed"?S.pillD:S.pillM;
                   return btn({key:s,onClick:()=>{
                     let newEdiDue=r.ediDueDate;
                     if(s==="Further info required"){const d=new Date();let wdays=0;while(wdays<10){d.setDate(d.getDate()+1);const dow=d.getDay();if(dow!==0&&dow!==6)wdays++;}newEdiDue=d.toISOString();}
@@ -3714,9 +3715,12 @@ I am satisfied that this procedure is reasonable, necessary, and causally relate
                   const subj="Re: "+claim.scheme+" Claim — "+(claim.patientName||"Patient")+" | Claim No: "+(claim.claimNumber||"");
                   const ccEmail=claim.patientEmail||"";
                   window.open("mailto:"+claim.caseManagerEmail+(ccEmail?"?cc="+encodeURIComponent(ccEmail)+"&subject=":"?subject=")+encodeURIComponent(subj)+"&body="+encodeURIComponent(letter));
-                  // Auto-log send to audit trail
+                  // Auto-log send to audit trail + letter history
                   const entry={event:"Letter sent",detail:"Sent to case manager / insurer: "+claim.caseManagerEmail,timestamp:new Date().toISOString(),by:"—"};
                   up("auditTrail",[...(claim.auditTrail||[]),entry]);
+                  const t2=TMPLS.find(x=>x.id===tmpl);
+                  const ltrEntry={id:"ltr_"+Date.now(),template:t2?t2.label:tmpl,generatedAt:new Date().toISOString(),sentTo:"Case manager: "+claim.caseManagerEmail,content:letter};
+                  up("letterHistory",[...(claim.letterHistory||[]),ltrEntry]);
                   // Auto-set matching referral to Pending if not already set
                   const t=TMPLS.find(x=>x.id===tmpl);
                   if(t&&(claim.referrals||[]).length>0){
@@ -4105,7 +4109,7 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
             return div({key:ep.id,className:"card-hover",style:{...S.cardSm,marginBottom:10,cursor:"pointer",border:"1px solid "+(activeEpId===ep.id?"rgba(0,201,167,0.35)":"rgba(255,255,255,0.08)"),background:activeEpId===ep.id?"rgba(0,201,167,0.06)":"rgba(255,255,255,0.03)"},onClick:()=>{if(setActiveEpId&&setEpTab){setActiveEpId(ep.id);setEpTab(3);}}},[
               div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}},[
                 div({key:"l"},[div({key:"n",style:{fontWeight:600,fontSize:"0.88rem"}},ep.label||"Episode "+ep.episodeNo),div({key:"d",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:2}},[new Date(ep.date).toLocaleDateString("en-AU"),ep.practitionerName&&" \u00b7 "+ep.practitionerName,ep.practitionerProfession&&" ("+ep.practitionerProfession+")"])]),
-                div({key:"r",style:{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}},[epLetters.length>0&&span({key:"l",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},epLetters.length+" letter"+(epLetters.length!==1?"s":"")),epApproved>0&&span({key:"a",style:{...S.pill,...S.pillT,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},epApproved+" approved"),epPending>0&&span({key:"p",style:{...S.pill,...S.pillA,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},epPending+" pending")]),
+                div({key:"r",style:{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}},[epLetters.length>0&&span({key:"l",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},epLetters.length+" letter"+(epLetters.length!==1?"s":"")),epApproved>0&&span({key:"a",style:{...S.pill,...S.pillT,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},epApproved+" approved"),epPending>0&&span({key:"p",style:{...S.pill,...S.pillP,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},epPending+" pending")]),
               ]),
             ]);
           }),
@@ -4164,13 +4168,24 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
 // ── TAB: CLAIM LOG ─────────────────────────────────────────────────────────────
 function TabClaimLog({claim,up,clinic,practitioners,setActiveEpId,setEpTab}){
   const[expanded,setExpanded]=useState(null);
+  const[logTab,setLogTab]=useState("history");
   const fmtD=d=>{if(!d)return"\u2014";try{return new Date(d).toLocaleString("en-AU",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});}catch{return d;}};
   const fmtDate=d=>{if(!d)return"\u2014";try{return new Date(d).toLocaleDateString("en-AU");}catch{return d;}};
   const statusStyle=s=>s==="Approved"?S.pillT:s==="Declined"||s==="Disputed"?S.pillR:s==="Further info required"?S.pillA:S.pillM;
   const letters=claim.letterHistory||[];const refs=claim.referrals||[];const audit=claim.auditTrail||[];
   const deleteLetter=(id)=>{const ltr=letters.find(l=>l.id===id);if(!ltr)return;const updated=letters.filter(l=>l.id!==id);const entry={event:"Letter deleted",detail:"'"+ltr.template+"' generated "+fmtDate(ltr.generatedAt)+" \u2014 removed from history",timestamp:new Date().toISOString(),by:"\u2014"};up("letterHistory",updated);up("auditTrail",[...audit,entry]);};
   return div({style:{padding:"0"}},[
-    div({key:"ep-timeline",style:{...S.card,marginBottom:16}},[
+    // Tab switcher
+    div({key:"log-tabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:20}},
+      [["history","📋 History"],["coc","📄 COC"],["letters","✉️ Letters"],["referrals","🔗 Referrals"],["audit","🔍 Audit"]].map(([id,label])=>
+        btn({key:id,onClick:()=>setLogTab(id),style:{padding:"9px 16px",borderRadius:"8px 8px 0 0",border:"none",
+          background:logTab===id?"rgba(0,201,167,0.1)":"transparent",
+          color:logTab===id?"#00C9A7":"rgba(255,255,255,0.45)",
+          fontSize:"0.82rem",fontWeight:500,cursor:"pointer",
+          borderBottom:logTab===id?"2px solid #00C9A7":"none"}},label)
+      )
+    ),
+    logTab==="history"&&div({key:"ep-timeline",style:{...S.card,marginBottom:16}},[
       div({key:"h",style:{...S.fb,marginBottom:4}},[div({key:"t",style:{fontWeight:700}},"Claim history"),span({key:"c",style:{fontSize:"0.76rem",color:"#5B7A99"}},(claim.episodes||[]).length+" episode"+(((claim.episodes||[]).length)!==1?"s":""))]),
       div({key:"s",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:14}},"Chronological record of all consultation episodes. Click to open and review."),
       (claim.episodes||[]).length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",padding:"12px 0",textAlign:"center"}},"No episodes recorded yet"):
@@ -4191,7 +4206,7 @@ function TabClaimLog({claim,up,clinic,practitioners,setActiveEpId,setEpTab}){
       }),
     ]),
     // COC history
-    (claim.cocHistory||[]).length>0&&div({key:"coc-hist-log",style:{...S.card,marginBottom:16}},[
+    logTab==="coc"&&(claim.cocHistory||[]).length>0&&div({key:"coc-hist-log",style:{...S.card,marginBottom:16}},[
             div({key:"h",style:{...S.fb,marginBottom:12}},[
               div({key:"t",style:{fontWeight:700}},"Certificate of Capacity — Saved snapshots"),
               span({key:"c",style:{fontSize:"0.76rem",color:"#5B7A99"}},(claim.cocHistory||[]).length+" saved"),
@@ -4213,7 +4228,7 @@ function TabClaimLog({claim,up,clinic,practitioners,setActiveEpId,setEpTab}){
               ]))
             ),
           ]),
-    div({key:"letters",style:{...S.card,marginBottom:16}},[
+    logTab==="letters"&&div({key:"letters",style:{...S.card,marginBottom:16}},[
       div({key:"h",style:{...S.fb,marginBottom:4}},[div({key:"t",style:{fontWeight:700}},"Letter history"),span({key:"c",style:{fontSize:"0.76rem",color:"#5B7A99"}},letters.length+" letter"+(letters.length!==1?"s":""))]),
       letters.length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",padding:"16px 0",textAlign:"center"}},"No letters generated yet"):
       [...letters].reverse().map(ltr=>div({key:ltr.id,style:{...S.cardSm,marginBottom:10}},[
@@ -4228,7 +4243,7 @@ function TabClaimLog({claim,up,clinic,practitioners,setActiveEpId,setEpTab}){
         expanded===ltr.id&&div({key:"body",style:{marginTop:12,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"16px",fontFamily:"Georgia,serif",fontSize:"0.85rem",lineHeight:1.8,whiteSpace:"pre-wrap",maxHeight:400,overflow:"auto",color:"rgba(239,246,255,0.88)"}},ltr.content),
       ])),
     ]),
-    div({key:"refs",style:{...S.card,marginBottom:16}},[
+    logTab==="referrals"&&div({key:"refs",style:{...S.card,marginBottom:16}},[
       div({key:"h",style:{...S.fb,marginBottom:4}},[div({key:"t",style:{fontWeight:700}},"Referral & request status"),span({key:"c",style:{fontSize:"0.76rem",color:"#5B7A99"}},refs.length+" request"+(refs.length!==1?"s":""))]),
       refs.length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",padding:"16px 0",textAlign:"center"}},"No referrals added yet"):
       refs.map(r=>div({key:r.id,style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
@@ -4236,7 +4251,7 @@ function TabClaimLog({claim,up,clinic,practitioners,setActiveEpId,setEpTab}){
         div({key:"r",style:{display:"flex",alignItems:"center",gap:10}},[span({key:"p",style:{...S.pill,...S.pillM,fontSize:"0.68rem",padding:"2px 7px",cursor:"default"}},r.priority||"Routine"),span({key:"s",style:{...S.pill,...statusStyle(r.status||"Pending"),fontSize:"0.72rem",padding:"3px 10px",cursor:"default"}},r.status||"Pending")]),
       ])),
     ]),
-    div({key:"audit",style:S.card},[
+    logTab==="audit"&&div({key:"audit",style:S.card},[
       div({key:"h",style:{...S.fb,marginBottom:4}},[div({key:"t",style:{fontWeight:700}},"Audit trail"),span({key:"c",style:{fontSize:"0.76rem",color:"#5B7A99"}},(claim.auditTrail||[]).length+" events")]),
       (claim.auditTrail||[]).length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",padding:"10px 0"}},"Claim created "+fmtDate(claim.createdAt)):
       [...(claim.auditTrail||[])].reverse().map((entry,i)=>div({key:i,style:{display:"flex",gap:12,padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",fontSize:"0.82rem"}},[
@@ -4288,7 +4303,7 @@ function generateInvoicePdf(inv,claim,clinic,practitioners,paymentTerms,bankSett
   doc.setFillColor(...teal);doc.rect(0,0,W,18,"F");
   doc.setFont("helvetica","bold");doc.setFontSize(15);
   doc.setTextColor(7,16,30);doc.text("Claim",PL,12);
-  doc.setTextColor(255,255,255);doc.text("Bridge",PL+19,12);
+  doc.setTextColor(255,255,255);doc.text("Bridge",PL+13,12);
   doc.setFontSize(10);doc.setFont("helvetica","normal");doc.text("TAX INVOICE",PR,12,{align:"right"});
   // Clinic block
   doc.setTextColor(...navy);doc.setFontSize(11);doc.setFont("helvetica","bold");doc.text(clinic.name||"",PL,27);
