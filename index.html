@@ -913,6 +913,15 @@ function Sidebar({nav,onNav,clinic,onLogout,collapsed,onToggle}){
     ),
     div({key:"ftr",style:{padding:"14px",borderTop:"1px solid rgba(255,255,255,0.07)",marginTop:"auto"}},[
       !collapsed&&div({key:"name",style:{fontSize:"0.72rem",color:"#5B7A99",marginBottom:8,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},clinic.name),
+      btn({key:"feedback",onClick:()=>window.open("https://forms.gle/REPLACE_WITH_YOUR_FORM_ID","_blank"),title:collapsed?"Leave feedback":"",
+        style:{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",cursor:"pointer",
+          borderRadius:8,border:"1px solid rgba(0,201,167,0.25)",
+          background:"rgba(0,201,167,0.08)",color:"#00C9A7",
+          fontSize:"0.82rem",width:"100%",textAlign:"left",marginBottom:8}}
+      ,[
+        span({key:"i",style:{fontSize:"1rem",width:20,textAlign:"center",flexShrink:0}},"📝"),
+        !collapsed&&span({key:"l"},"Leave feedback"),
+      ]),
       btn({key:"out",onClick:onLogout,title:collapsed?"Sign out":"",style:{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",cursor:"pointer",borderRadius:8,border:"none",background:"transparent",color:"#FF4D6D",fontSize:"0.85rem",width:"100%",textAlign:"left"}},[
         span({key:"i",style:{fontSize:"1rem",width:20,textAlign:"center",flexShrink:0}},"🚪"),
         !collapsed&&"Sign out",
