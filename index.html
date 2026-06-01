@@ -3477,30 +3477,54 @@ Fitness for work: ${fitnessStatus||"As per Certificate of Capacity."}
 Work restrictions: ${workRestrictions}
 ${reviewDate!=="[date not set]"?"Next review: "+reviewDate:""}${sig}`;
 
-    if(id==="allied_health")return hdr("Request for Approval — Allied Health Referral")+`
+    if(id==="allied_health"){const ahMeds=(claim.medications||[]);return hdr("Request for Approval — Allied Health Referral")+`
 
 I am writing to request approval for an allied health referral for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+
+**Injury Details:**
+Date of injury: ${doi}
+Body part: ${claim.injuryBodyPart||"[Not recorded]"}
+Injury type: ${claim.injuryType||"[Not recorded]"}
+Onset: ${claim.injuryOnset||"[Not recorded]"}
+${employer?"Employer at time of injury: "+employer:""}
+
+**Mechanism of Injury:**
+${claim.injuryDescription||"As per claim records."}
 
 **Diagnosis:**
   - ${diagList}
 
+**Causation / Pathophysiology:**
+${claim.injuryCausation||"Injury is consistent with the reported mechanism and is accepted as compensable."}
+
+**Investigations Conducted:**
+${imagingSummary?imagingSummary:""}${claim.imagingReferral?(imagingSummary?"\nImaging referral pending: ":"Imaging referral: ")+claim.imagingReferral+(claim.imagingIndication?" — "+claim.imagingIndication:""):""}${claim.otherInvestigations?"\n"+claim.otherInvestigations:""}${!imagingSummary&&!claim.imagingReferral&&!claim.otherInvestigations?"No formal investigations conducted to date.":""}
+
+**GP Treatment to Date:**
+${ahMeds.length>0?"Medications prescribed: "+ahMeds.map(m=>m.name+(m.dosage?" "+m.dosage:"")+(m.frequency?", "+m.frequency:"")).join("; ")+".\n":""}${treatPlan||"Conservative management in progress."}
+
+**Clinical Assessment:**
+${claim.clinicalPresentation?claim.clinicalPresentation+"\n":""}${claim.arom?"Active ROM: "+claim.arom+"\n":""}${claim.prom?"Passive ROM: "+claim.prom+"\n":""}${(claim.orthoTestList&&claim.orthoTestList.length>0)?"Orthopaedic / Clinical Tests:\n"+claim.orthoTestList.map(t=>"  - "+t.name+(t.result?": "+t.result:"")).join("\n")+"\n":""}${!claim.clinicalPresentation&&!claim.arom&&!claim.prom&&!(claim.orthoTestList&&claim.orthoTestList.length>0)?"Clinical findings as per consultation notes.":""}
+
+**Clinical Rationale for Referral:**
+Based on the above clinical findings, ${patientName} presents with objective impairments consistent with the compensable diagnosis. Allied health management is indicated to address these deficits, restore functional capacity, and support a safe and sustainable return to work.
+${ahrmJust&&ahrmJust!==treatPlan?"\n"+ahrmJust:""}
+
 **Proposed Referral:**
-I am requesting approval to refer ${patientName} to the following allied health practitioner:
-${firstRef.name?firstRef.name+", ":""} ${ahrmTreatment||firstRef.specialty||"Allied health practitioner"}${firstRef.clinic?" — "+firstRef.clinic:""}
-
-The referred practitioner will conduct their own clinical assessment, complete the required Allied Health Recovery Management Plan (AHRMP) and submit their own treatment request to you directly.
-
-**Current Proposed Treatment Strategy:**
-${ahrmJust}
+${firstRef.name?firstRef.name+" — ":""}${firstRef.specialty||"Allied health practitioner"}${firstRef.clinic?" | "+firstRef.clinic:""}
 
 **Treatment Goals:**
-${ahrmGoals||goalsText||"To restore functional capacity and support return to work."}
+${ahrmGoals||goalsText||"Restore functional capacity, reduce pain and disability, and support a safe and sustainable return to work."}
 
-**Fitness for Work:**
-${fitnessStatus||"As per Certificate of Capacity."}
-${workRestrictions?"Work restrictions: "+workRestrictions:""}
+**Certificate of Capacity:**
+${claim.cocType||"Subsequent"} Certificate — No. ${claim.cocCount||""}
+Valid: ${cocFrom} to ${cocTo}
+Status: ${fitnessStatus||"As per Certificate of Capacity."}
+${workRestrictions&&workRestrictions!=="As per Certificate of Capacity."?"Restrictions: "+workRestrictions:""}${claim.cocNotes?"\nAdditional notes: "+claim.cocNotes:""}
 
-I am satisfied that this referral is reasonable, necessary and related to the compensable condition. I request your approval at your earliest convenience given the legislative timeframes that apply.${sig}`;
+Please note that under WorkSafe Victoria guidelines, the referred practitioner may commence up to 5 treatments prior to submitting an Allied Health Recovery Management Plan (AHRMP) with clinical justification directly to you. Further treatment requests beyond the initial 5 sessions will be managed by the treating allied health practitioner in accordance with the Clinical Framework for the Delivery of Health Services.
+
+I am satisfied that this referral is reasonable, necessary, and causally related to the compensable condition. I request your approval at your earliest convenience given the statutory timeframes that apply.${sig}`;}
 
     if(id==="psychology")return hdr("Request for Approval — Psychological Assessment and Treatment")+`
 
