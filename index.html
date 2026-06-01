@@ -416,6 +416,383 @@ const DIAGNOSES_DB=[
   {icd10:"F07.81",label:"Post-concussion syndrome",cat:"Head"},{icd10:"S06.0",label:"Concussion",cat:"Head"},
   {icd10:"G44.3",label:"Post-traumatic headache",cat:"Head"},{icd10:"H83.3",label:"Noise-induced hearing loss",cat:"Head"},
 ];
+// ── DEMO DATA SEEDER ──────────────────────────────────────────────────────────
+const DEMO_CLAIMS_DATA = [
+  // ── CLAIM 1: WorkCover GP — Lumbar disc with radiculopathy ──────────────────
+  {
+    id:"demo_claim_001",
+    scheme:"WorkCover",
+    status:"Active",
+    patientFirstName:"Bob",
+    patientLastName:"Mitchell",
+    patientName:"Bob Mitchell",
+    dob:"1982-03-15",
+    patientAddress:"14 Beachside Ave, Mordialloc VIC 3195",
+    patientPostcode:"3195",
+    patientEmail:"bob.mitchell@email.com",
+    patientPhone:"0412 345 678",
+    claimNumber:"WC-2025-084521",
+    dateOfInjury:"2025-09-12",
+    employerName:"Bayside Construction Pty Ltd",
+    employerContact:"HR Manager — 03 9580 2200",
+    injuryMechanism:"Lifting / manual handling",
+    injuryBodyPart:"Lumbar spine / lower back",
+    injuryType:"Disc injury",
+    injuryOnset:"Sudden / acute - single incident",
+    injuryDescription:"Worker was lifting a 25kg concrete bag from ground level. Felt immediate sharp pain in lower back with radiation into left leg. Unable to continue work.",
+    injuryCausation:"Mechanism consistent with lumbar disc herniation at L4/5. Axial loading with flexion resulted in posterior disc herniation compressing the L5 nerve root.",
+    insurerId:"allianz",
+    insurerName:"Allianz Workers Compensation",
+    insurerPhone:"1300 130 664",
+    insurerAddress:"2 Market St, Sydney NSW 2000",
+    caseManagerName:"Jessica Hartley",
+    caseManagerEmail:"j.hartley@allianz.com.au",
+    caseManagerPhone:"03 8620 5412",
+    practitionerId:"p1",
+    practitionerName:"Dr. Sarah Chen",
+    practitionerProfession:"General Practitioner",
+    practitionerProviderNo:"123456A",
+    consent:true,
+    jurisdiction:"vic",
+    diagnoses:[
+      {icd10:"M51.1",label:"Lumbar disc herniation with radiculopathy",cat:"Spine"},
+      {icd10:"M54.4",label:"Lumbago with sciatica",cat:"Spine"}
+    ],
+    capacity:{
+      sit:"Modified",stand:"Cannot",walk:"Modified",bend:"Cannot",
+      kneel:"Cannot",stairs:"Modified",lift_light:"Modified",lift_mod:"Cannot",
+      lift_heavy:"Cannot",push_pull:"Cannot",overhead:"Can",fine_motor:"Can",
+      drive:"Modified",heights:"Cannot"
+    },
+    mentalStatus:"Not affected",
+    preExisting:"Nil relevant pre-existing conditions.",
+    fitnessForWork:"Fit with restrictions",
+    fitRestrictFrom:"2025-09-15",
+    fitRestrictTo:"2025-10-15",
+    fitnessRestrictions:"No lifting >5kg. No prolonged standing >15 min. Alternating sit/stand. No driving >30 min.",
+    cocType:"Subsequent",
+    cocCount:3,
+    cocFrom:"2025-09-15",
+    cocTo:"2025-10-15",
+    nextReviewDate:"2025-10-15",
+    rtwModifiedDate:"2025-10-01",
+    rtwNormalDate:"2026-01-15",
+    treatmentPlan:"Analgesia, NSAIDs, physiotherapy referral. Monitoring neurological symptoms. Review imaging.",
+    workRestrictions:"No lifting >5kg. No prolonged standing. Alternating sit/stand every 30 min.",
+    activityRestrictions:"No driving >30 minutes. Avoid stairs where possible.",
+    goalsShort:"Pain reduction to <4/10 VAS. Restore walking tolerance to 500m.",
+    goalsLong:"Return to modified duties within 3 weeks. Full RTW by 4 months.",
+    rtwPlan:"Graded return starting with office-based administrative duties. Progressive increase in physical load over 8 weeks.",
+    psychosocial:{yellow:["Fear-avoidance beliefs","Pain catastrophising"],blue:[],black:[],orange:[]},
+    barriers:"Fear of re-injury. Employer relationship strained.",
+    imagingReferral:"MRI",
+    imagingIndication:"Suspected L4/5 disc herniation with L5 nerve root compression. Neurological symptoms present.",
+    medications:[
+      {id:"med_001",name:"Ibuprofen",dosage:"400mg",frequency:"Three times daily (TDS)",duration:"2 weeks",review:"Review at 2 weeks — cease if GI symptoms"},
+      {id:"med_002",name:"Paracetamol",dosage:"1g",frequency:"Four times daily (QID)",duration:"4 weeks",review:"Regular analgesia baseline"},
+    ],
+    referrals:[
+      {id:"ref_001",specialty:"Physiotherapist",name:"Marcus Webb",clinic:"Bayside Medical Centre",email:"marcus@bayside.com.au",priority:"Routine (within 4 weeks)",reasoning:"Physiotherapy for lumbar spine rehabilitation, core stabilisation and safe return to work program.",status:"Approved",statusDate:"2025-09-18",travelRequired:"Yes — private vehicle",travelReasoning:"Patient unable to use public transport due to pain with prolonged sitting."},
+      {id:"ref_002",specialty:"Orthopaedic Surgeon",name:"",clinic:"",email:"",priority:"Soon (within 2 weeks)",reasoning:"Orthopaedic review if no improvement with conservative management by 6 weeks. Surgical consultation may be required.",status:"Pending",statusDate:"2025-09-20",ediDueDate:new Date(Date.now()+8*24*60*60*1000).toISOString(),ediType:"new_treatment"},
+    ],
+    outcomeScores:{
+      "Pain VAS/NRS":[
+        {id:"sc_001",score:"8",date:"2025-09-12",notes:"Initial assessment"},
+        {id:"sc_002",score:"6",date:"2025-09-26",notes:"After 2 weeks physio"},
+        {id:"sc_003",score:"4",date:"2025-10-10",notes:"Improving with treatment"},
+      ],
+      "Oswestry":[
+        {id:"sc_004",score:"52",date:"2025-09-12",notes:"Initial — severe disability"},
+        {id:"sc_005",score:"38",date:"2025-10-10",notes:"Review — moderate disability"},
+      ]
+    },
+    letterHistory:[
+      {id:"ltr_001",template:"Allied health referral",generatedAt:"2025-09-18",content:"Letter to Allianz requesting approval for physiotherapy referral for Bob Mitchell..."},
+    ],
+    auditTrail:[
+      {event:"Claim created",detail:"",timestamp:"2025-09-13T09:00:00.000Z",by:"Dr. Sarah Chen"},
+      {event:"Letter sent",detail:"Sent to case manager j.hartley@allianz.com.au (CC: bob.mitchell@email.com)",timestamp:"2025-09-18T10:30:00.000Z",by:"Dr. Sarah Chen"},
+      {event:"Referral approved",detail:"Physiotherapy referral approved by Allianz",timestamp:"2025-09-19T14:00:00.000Z",by:"Dr. Sarah Chen"},
+    ],
+    createdAt:"2025-09-13T09:00:00.000Z",
+    lastEditedAt:"2025-10-10T11:00:00.000Z",
+    lastEditedBy:"Dr. Sarah Chen",
+    episodes:[
+      {
+        id:"ep_demo_001_1",episodeNo:1,date:"2025-09-13T09:00:00.000Z",
+        practitionerId:"p1",practitionerName:"Dr. Sarah Chen",practitionerProfession:"General Practitioner",
+        label:"Initial consultation",createdAt:"2025-09-13T09:00:00.000Z",
+        cocType:"First",cocCount:1,cocFrom:"2025-09-13",cocTo:"2025-09-27",
+      },
+      {
+        id:"ep_demo_001_2",episodeNo:2,date:"2025-09-27T09:00:00.000Z",
+        practitionerId:"p1",practitionerName:"Dr. Sarah Chen",practitionerProfession:"General Practitioner",
+        label:"Review — 2 weeks",createdAt:"2025-09-27T09:00:00.000Z",
+        cocType:"Subsequent",cocCount:2,cocFrom:"2025-09-27",cocTo:"2025-10-15",
+      },
+    ],
+    invoices:[
+      {id:"inv_demo_001",invoiceNumber:"INV-2025-0001",episodeId:"ep_demo_001_1",
+        lineItems:[{id:"li_1",itemCode:"GP-Initial",description:"Initial consultation — WorkCover",amount:"89.10",qty:1,treatmentDate:"2025-09-13"}],
+        amount:"89.10",date:"2025-09-13",gst:"no",status:"Paid",paidAt:"2025-10-05",
+        createdAt:"2025-09-13T09:00:00.000Z",bankSettings:{}},
+      {id:"inv_demo_002",invoiceNumber:"INV-2025-0002",episodeId:"ep_demo_001_2",
+        lineItems:[
+          {id:"li_1",itemCode:"GP-Review",description:"Review consultation — WorkCover",amount:"71.20",qty:1,treatmentDate:"2025-09-27"},
+          {id:"li_2",itemCode:"COC",description:"Certificate of Capacity",amount:"71.20",qty:1,treatmentDate:"2025-09-27"},
+        ],
+        amount:"142.40",date:"2025-09-27",gst:"no",status:"Invoiced",
+        createdAt:"2025-09-27T09:00:00.000Z",bankSettings:{}},
+    ],
+  },
+  // ── CLAIM 2: WorkCover Physio — Rotator cuff ────────────────────────────────
+  {
+    id:"demo_claim_002",
+    scheme:"WorkCover",
+    status:"Active",
+    patientFirstName:"Sandra",
+    patientLastName:"Okafor",
+    patientName:"Sandra Okafor",
+    dob:"1975-07-22",
+    patientAddress:"8 Collins Parade, Hampton VIC 3188",
+    patientPostcode:"3188",
+    patientEmail:"sandra.okafor@gmail.com",
+    patientPhone:"0423 567 890",
+    claimNumber:"WC-2025-091340",
+    dateOfInjury:"2025-10-03",
+    employerName:"Coles Supermarkets — Hampton",
+    employerContact:"Store Manager — 03 9598 4400",
+    injuryMechanism:"Repetitive strain / overuse",
+    injuryBodyPart:"Shoulder - right",
+    injuryType:"Soft tissue tear",
+    injuryOnset:"Gradual onset - over months",
+    injuryDescription:"Gradual onset right shoulder pain over 4 months of repetitive overhead shelf-stacking. Progressive worsening with inability to lift arm above shoulder height.",
+    injuryCausation:"Occupational overuse injury consistent with rotator cuff pathology. Repetitive overhead loading causing impingement and partial thickness supraspinatus tear.",
+    insurerId:"eml",
+    insurerName:"EML VIC Pty Ltd",
+    insurerPhone:"1300 365 435",
+    insurerAddress:"Level 3, 60 City Rd, Southbank VIC 3006",
+    caseManagerName:"David Park",
+    caseManagerEmail:"d.park@eml.com.au",
+    caseManagerPhone:"1300 365 435",
+    practitionerId:"p2",
+    practitionerName:"Dr. Marcus Webb",
+    practitionerProfession:"Physiotherapist",
+    practitionerProviderNo:"234567B",
+    consent:true,
+    jurisdiction:"vic",
+    diagnoses:[
+      {icd10:"M75.1",label:"Rotator cuff syndrome / tear",cat:"Shoulder"},
+      {icd10:"M75.5",label:"Subacromial bursitis",cat:"Shoulder"},
+    ],
+    capacity:{
+      sit:"Can",stand:"Can",walk:"Can",bend:"Can",
+      kneel:"Can",stairs:"Can",lift_light:"Modified",lift_mod:"Cannot",
+      lift_heavy:"Cannot",push_pull:"Modified",overhead:"Cannot",fine_motor:"Can",
+      drive:"Modified",heights:"Cannot"
+    },
+    mentalStatus:"Affected",
+    mentalSeverity:{stress:"Mildly affected",motivation:"Mildly affected"},
+    fitnessForWork:"Fit with restrictions",
+    fitRestrictFrom:"2025-10-05",
+    fitRestrictTo:"2025-11-05",
+    fitnessRestrictions:"No overhead work. No lifting >2kg with right arm. No pushing/pulling >5kg.",
+    cocType:"Subsequent",
+    cocCount:2,
+    cocFrom:"2025-10-05",
+    cocTo:"2025-11-05",
+    nextReviewDate:"2025-11-05",
+    rtwModifiedDate:"2025-10-20",
+    rtwNormalDate:"2026-04-01",
+    ahGoalLim1:"Unable to lift right arm above 90 degrees",ahGoalTarget1:"Achieve full overhead reach by discharge",ahGoalDate1:"2026-01-15",
+    ahGoalLim2:"Pain with reaching across body",ahGoalTarget2:"Pain-free horizontal adduction",ahGoalDate2:"2025-12-01",
+    txNum:"16",txWeeks:"8",txFrom:"2025-10-10",txTo:"2025-12-05",
+    treatmentPlan:"Physiotherapy — rotator cuff rehabilitation. Progressive strengthening, scapular stabilisation, postural correction. Manual therapy for subacromial impingement.",
+    selfManagement:"Home exercise program provided. Ice/heat as required. Activity modification.",
+    workRestrictions:"No overhead work. No lifting >2kg with right arm.",
+    barriers:"Motivated patient. Some fear of re-injury with overhead tasks.",
+    psychosocial:{yellow:["Fear-avoidance beliefs"],blue:[],black:[],orange:[]},
+    referrals:[
+      {id:"ref_003",specialty:"Orthopaedic Surgeon",name:"",clinic:"",email:"",priority:"Routine (within 4 weeks)",reasoning:"Orthopaedic review if insufficient progress at 8 weeks. MRI correlation.",status:"Pending",statusDate:"2025-10-10",ediDueDate:new Date(Date.now()+15*24*60*60*1000).toISOString(),ediType:"new_treatment"},
+    ],
+    imagingReferral:"Ultrasound",
+    imagingIndication:"Partial thickness rotator cuff tear — confirm extent and guide rehabilitation approach.",
+    outcomeScores:{
+      "DASH":[
+        {id:"sc_010",score:"58",date:"2025-10-03",notes:"Initial assessment — significant disability"},
+        {id:"sc_011",score:"44",date:"2025-10-24",notes:"3 weeks post treatment"},
+      ],
+      "Pain VAS/NRS":[
+        {id:"sc_012",score:"7",date:"2025-10-03",notes:"Initial"},
+        {id:"sc_013",score:"5",date:"2025-10-24",notes:"After 3 weeks physio"},
+      ],
+    },
+    auditTrail:[
+      {event:"Claim created",detail:"",timestamp:"2025-10-05T10:00:00.000Z",by:"Dr. Marcus Webb"},
+    ],
+    createdAt:"2025-10-05T10:00:00.000Z",
+    lastEditedAt:"2025-10-24T14:00:00.000Z",
+    lastEditedBy:"Dr. Marcus Webb",
+    episodes:[
+      {id:"ep_demo_002_1",episodeNo:1,date:"2025-10-05T10:00:00.000Z",
+        practitionerId:"p2",practitionerName:"Dr. Marcus Webb",practitionerProfession:"Physiotherapist",
+        label:"Initial assessment",createdAt:"2025-10-05T10:00:00.000Z",cocCount:1},
+    ],
+    invoices:[
+      {id:"inv_demo_003",invoiceNumber:"INV-2025-0003",episodeId:"ep_demo_002_1",
+        lineItems:[
+          {id:"li_1",itemCode:"PY100",description:"Physiotherapy Initial Consultation (inc. AHRMP)",amount:"126.66",qty:1,treatmentDate:"2025-10-05"},
+        ],
+        amount:"126.66",date:"2025-10-05",gst:"no",status:"Invoiced",
+        createdAt:"2025-10-05T10:00:00.000Z",bankSettings:{}},
+    ],
+  },
+  // ── CLAIM 3: TAC — Psych + Physical post MVA ────────────────────────────────
+  {
+    id:"demo_claim_003",
+    scheme:"TAC",
+    status:"Active",
+    patientFirstName:"James",
+    patientLastName:"Nguyen",
+    patientName:"James Nguyen",
+    dob:"1990-11-08",
+    patientAddress:"22 Station St, Cheltenham VIC 3192",
+    patientPostcode:"3192",
+    patientEmail:"james.nguyen@outlook.com",
+    patientPhone:"0435 678 901",
+    claimNumber:"TAC-2025-447821",
+    dateOfInjury:"2025-08-14",
+    injuryMechanism:"Motor vehicle accident",
+    injuryBodyPart:"Cervical spine",
+    injuryType:"Sprain / strain",
+    injuryOnset:"Sudden / acute - single incident",
+    injuryDescription:"Rear-end collision at traffic lights. Significant whiplash mechanism. Patient wearing seatbelt. Airbags deployed. Reported immediate neck pain and headache.",
+    injuryCausation:"WAD Grade II consistent with rear-end MVA mechanism. Cervical hyperextension/flexion injury with associated soft tissue and neurological sensitisation.",
+    insurerId:"tac",
+    insurerName:"Transport Accident Commission (TAC)",
+    insurerPhone:"1300 654 329",
+    insurerAddress:"60 Brougham St, Geelong VIC 3220",
+    caseManagerName:"Michelle Torres",
+    caseManagerEmail:"m.torres@tac.vic.gov.au",
+    caseManagerPhone:"1300 654 329",
+    practitionerId:"p1",
+    practitionerName:"Dr. Sarah Chen",
+    practitionerProfession:"General Practitioner",
+    practitionerProviderNo:"123456A",
+    consent:true,
+    jurisdiction:"vic",
+    diagnoses:[
+      {icd10:"S13.4",label:"Whiplash associated disorder (WAD)",cat:"Spine"},
+      {icd10:"F43.20",label:"Adjustment Disorder with Depressed Mood",cat:"Psychological"},
+      {icd10:"F07.81",label:"Post-concussion syndrome",cat:"Head"},
+    ],
+    capacity:{
+      sit:"Modified",stand:"Can",walk:"Can",bend:"Modified",
+      kneel:"Can",stairs:"Can",lift_light:"Modified",lift_mod:"Modified",
+      lift_heavy:"Cannot",push_pull:"Modified",overhead:"Modified",fine_motor:"Can",
+      drive:"Modified",heights:"Cannot",
+      concentration:"Mildly affected",memory:"Mildly affected"
+    },
+    mentalStatus:"Affected",
+    mentalSeverity:{concentration:"Mildly affected",memory:"Mildly affected",stress:"Moderately affected",mood:"Mildly affected"},
+    fitnessForWork:"Fit with restrictions",
+    fitRestrictFrom:"2025-08-15",
+    fitRestrictTo:"2025-11-15",
+    fitnessRestrictions:"Reduced hours (4hrs/day). No driving >20 min. Screen time limited to 1hr blocks with 20 min breaks. No night driving.",
+    cocType:"Subsequent",
+    cocCount:4,
+    cocFrom:"2025-10-15",
+    cocTo:"2025-11-15",
+    nextReviewDate:"2025-11-15",
+    rtwModifiedDate:"2025-09-01",
+    rtwNormalDate:"2026-03-01",
+    treatmentPlan:"Physiotherapy for cervical rehabilitation. Psychology referral for adjustment disorder. Headache management. Gradual return to driving.",
+    workRestrictions:"Reduced hours. Screen time restrictions. No night driving.",
+    psychosocial:{yellow:["Fear-avoidance beliefs","Sleep disturbance","Pain catastrophising"],blue:["Medicolegal proceedings active"],black:[],orange:[]},
+    barriers:"Medicolegal. Sleep disruption affecting recovery. Anxiety about driving.",
+    referrals:[
+      {id:"ref_004",specialty:"Physiotherapist",name:"Marcus Webb",clinic:"Bayside Medical Centre",email:"marcus@bayside.com.au",priority:"Routine (within 4 weeks)",reasoning:"Cervical rehabilitation — WAD graded exercise program.",status:"Approved",statusDate:"2025-08-20"},
+      {id:"ref_005",specialty:"Psychologist",name:"",clinic:"",email:"",priority:"Soon (within 2 weeks)",reasoning:"Adjustment disorder with depressed mood secondary to MVA. Fear of driving, sleep disruption, mood changes.",status:"Approved",statusDate:"2025-08-22"},
+    ],
+    outcomeScores:{
+      "NDI":[
+        {id:"sc_020",score:"32",date:"2025-08-14",notes:"Initial — moderate disability"},
+        {id:"sc_021",score:"24",date:"2025-09-14",notes:"4 weeks post treatment"},
+        {id:"sc_022",score:"16",date:"2025-10-14",notes:"8 weeks — improving"},
+      ],
+      "DASS-21":[
+        {id:"sc_023",score:"28",date:"2025-08-14",notes:"Initial — moderate"},
+        {id:"sc_024",score:"18",date:"2025-09-14",notes:"After psych sessions"},
+        {id:"sc_025",score:"12",date:"2025-10-14",notes:"Continuing to improve"},
+      ],
+      "Pain VAS/NRS":[
+        {id:"sc_026",score:"7",date:"2025-08-14",notes:"Initial"},
+        {id:"sc_027",score:"5",date:"2025-09-14",notes:"4 weeks"},
+        {id:"sc_028",score:"3",date:"2025-10-14",notes:"8 weeks"},
+      ],
+    },
+    auditTrail:[
+      {event:"Claim created",detail:"",timestamp:"2025-08-15T08:30:00.000Z",by:"Dr. Sarah Chen"},
+      {event:"Referral approved",detail:"Physiotherapy approved by TAC",timestamp:"2025-08-20T11:00:00.000Z",by:"Dr. Sarah Chen"},
+      {event:"Referral approved",detail:"Psychology approved by TAC",timestamp:"2025-08-22T14:00:00.000Z",by:"Dr. Sarah Chen"},
+    ],
+    createdAt:"2025-08-15T08:30:00.000Z",
+    lastEditedAt:"2025-10-14T10:00:00.000Z",
+    lastEditedBy:"Dr. Sarah Chen",
+    episodes:[
+      {id:"ep_demo_003_1",episodeNo:1,date:"2025-08-15T08:30:00.000Z",practitionerId:"p1",practitionerName:"Dr. Sarah Chen",practitionerProfession:"General Practitioner",label:"Initial assessment — post MVA",createdAt:"2025-08-15T08:30:00.000Z",cocCount:1},
+      {id:"ep_demo_003_2",episodeNo:2,date:"2025-09-15T09:00:00.000Z",practitionerId:"p1",practitionerName:"Dr. Sarah Chen",practitionerProfession:"General Practitioner",label:"4-week review",createdAt:"2025-09-15T09:00:00.000Z",cocCount:2},
+      {id:"ep_demo_003_3",episodeNo:3,date:"2025-10-14T09:00:00.000Z",practitionerId:"p1",practitionerName:"Dr. Sarah Chen",practitionerProfession:"General Practitioner",label:"8-week review",createdAt:"2025-10-14T09:00:00.000Z",cocCount:3},
+    ],
+    invoices:[
+      {id:"inv_demo_004",invoiceNumber:"INV-2025-0004",
+        lineItems:[{id:"li_1",itemCode:"GP-Initial",description:"Initial consultation — TAC",amount:"89.10",qty:1,treatmentDate:"2025-08-15"}],
+        amount:"89.10",date:"2025-08-15",gst:"no",status:"Paid",paidAt:"2025-09-10",createdAt:"2025-08-15T08:30:00.000Z",bankSettings:{}},
+      {id:"inv_demo_005",invoiceNumber:"INV-2025-0005",
+        lineItems:[
+          {id:"li_1",itemCode:"GP-Review",description:"Review — 4 weeks",amount:"71.20",qty:1,treatmentDate:"2025-09-15"},
+          {id:"li_2",itemCode:"COC",description:"Certificate of Capacity",amount:"71.20",qty:1,treatmentDate:"2025-09-15"},
+        ],
+        amount:"142.40",date:"2025-09-15",gst:"no",status:"Paid",paidAt:"2025-10-08",createdAt:"2025-09-15T09:00:00.000Z",bankSettings:{}},
+      {id:"inv_demo_006",invoiceNumber:"INV-2025-0006",
+        lineItems:[
+          {id:"li_1",itemCode:"GP-Review",description:"Review — 8 weeks",amount:"71.20",qty:1,treatmentDate:"2025-10-14"},
+          {id:"li_2",itemCode:"COC",description:"Certificate of Capacity",amount:"71.20",qty:1,treatmentDate:"2025-10-14"},
+        ],
+        amount:"142.40",date:"2025-10-14",gst:"no",status:"Invoiced",createdAt:"2025-10-14T09:00:00.000Z",bankSettings:{}},
+    ],
+  },
+];
+
+async function seedDemoData(clinicId) {
+  // Only seed if no claims exist yet
+  const existing = await sget("claims10:" + clinicId);
+  if (existing && existing.length > 0) return;
+  // Seed practitioners
+  await sset("practitioners:" + clinicId, DEMO_PRACTITIONERS[clinicId] || []);
+  // Seed claims
+  await sset("claims10:" + clinicId, DEMO_CLAIMS_DATA);
+  // Seed bank settings
+  await sset("banksettings:" + clinicId, {
+    bsb: "063-164",
+    accountNo: "10234567",
+    accountName: "Bayside Medical Centre"
+  });
+  await sset("paymentterms:" + clinicId, 30);
+  console.log("Demo data seeded for", clinicId);
+}
+
+async function resetDemoData(clinicId) {
+  await sset("claims10:" + clinicId, DEMO_CLAIMS_DATA);
+  await sset("practitioners:" + clinicId, DEMO_PRACTITIONERS[clinicId] || []);
+  await sset("banksettings:" + clinicId, {
+    bsb: "063-164",
+    accountNo: "10234567",
+    accountName: "Bayside Medical Centre"
+  });
+  await sset("paymentterms:" + clinicId, 30);
+}
+
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function div(props,...children){return e("div",props,...children);}
 function span(props,...children){return e("span",props,...children);}
@@ -4496,7 +4873,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
     ]),
   ]);
 }
-function SettingsPage({clinic,bankSettings,onSaveBank,insurerEmails,onSaveInsurerEmails}){
+function SettingsPage({clinic,bankSettings,onSaveBank,insurerEmails,onSaveInsurerEmails,onReset}){
   const[bank,setBank]=useState(bankSettings||{bsb:"",accountNo:"",accountName:""});
   const[emails,setEmails]=useState(insurerEmails||{});
   const[saved,setSaved]=useState(false);
@@ -4524,6 +4901,13 @@ function SettingsPage({clinic,bankSettings,onSaveBank,insurerEmails,onSaveInsure
         div({key:l,style:{fontSize:"0.88rem",lineHeight:2}},[span({key:"l",style:{color:"#5B7A99"}},l+": "),v])
       ),
     ]),
+
+    // Demo reset
+    div({key:"demo-reset",style:{...S.card,borderColor:"rgba(255,184,48,0.15)"}},[
+            div({key:"h",style:{fontWeight:700,marginBottom:6}},"Demo data"),
+            div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:14}},"Reload the 3 sample claims, patients and invoices. Any changes you've made will be overwritten."),
+            btn({key:"r",style:{...S.btnS,borderColor:"rgba(255,184,48,0.3)",color:"#FFB830"},onClick:async()=>{if(!confirm("Reset to demo data? This overwrites all current claims."))return;if(onReset)await onReset();alert("\u2713 Demo data restored");}},"\u21ba Reset to demo data"),
+          ]),
 
     // Bank details
     div({key:"bank",style:S.card},[
@@ -4573,7 +4957,7 @@ function App(){
     const b=await sget("bankSettings:"+cid);if(b)setBankSettings(b);
     const em=await sget("insurerEmails:"+cid);if(em)setInsurerEmails(em);
   };
-  const handleLogin=async c=>{setClinic(c);await sset("session10:current",{clinic:c});await loadClaims(c.id);await loadBankSettings(c.id);setNav("dashboard");};
+  const handleLogin=async c=>{setClinic(c);await sset("session10:current",{clinic:c});await seedDemoData(c.id);await loadClaims(c.id);await loadBankSettings(c.id);setNav("dashboard");};
   const handleLogout=async()=>{await sdel("session10:current");setClinic(null);setClaims([]);setActiveClaim(null);setNav("dashboard");};
   const handleSave=async claim=>{
     const up=claims.find(c=>c.id===claim.id)?claims.map(c=>c.id===claim.id?claim:c):[...claims,claim];
@@ -4593,7 +4977,7 @@ function App(){
       nav==="claims"&&e(ClaimsPage,{key:"cl",claims,onOpen:handleOpen,onNew:()=>{setActiveClaim(null);setNav("claim");}}),
       nav==="claim"&&e(ClaimForm,{key:"cf",clinic,claimData:activeClaim,onSave:handleSave,onBack:handleBack,onInvoice:()=>{if(activeClaim)handleSave(activeClaim);setNav("invoicing");}}),
       nav==="practitioners"&&e(PractitionersPage,{key:"pr",clinic}),
-      nav==="settings"&&e(SettingsPage,{key:"set",clinic,bankSettings,onSaveBank:saveBankSettings,insurerEmails,onSaveInsurerEmails:saveInsurerEmails}),
+      nav==="settings"&&e(SettingsPage,{key:"set",clinic,bankSettings,onSaveBank:saveBankSettings,insurerEmails,onSaveInsurerEmails:saveInsurerEmails,onReset:async()=>{await resetDemoData(clinic.id);const fresh=await sget("claims10:"+clinic.id)||[];setClaims(fresh);}}),
       nav==="help"&&div({key:"help",style:{padding:"28px",maxWidth:960,margin:"0 auto"}},[
         div({key:"h",style:{fontWeight:800,fontSize:"1.2rem",marginBottom:20}},"Help & Support"),
         div({key:"c",style:S.card},[
