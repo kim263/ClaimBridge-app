@@ -913,7 +913,7 @@ function Sidebar({nav,onNav,clinic,onLogout,collapsed,onToggle}){
     ),
     div({key:"ftr",style:{padding:"14px",borderTop:"1px solid rgba(255,255,255,0.07)",marginTop:"auto"}},[
       !collapsed&&div({key:"name",style:{fontSize:"0.72rem",color:"#5B7A99",marginBottom:8,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},clinic.name),
-      btn({key:"feedback",onClick:()=>window.open("https://forms.gle/REPLACE_WITH_YOUR_FORM_ID","_blank"),title:collapsed?"Leave feedback":"",
+      btn({key:"feedback",onClick:()=>window.open("https://docs.google.com/forms/d/e/1FAIpQLSciOgfE6-coT73Z4sotfMdVhJeViCUIX-vW6ptJ2dT1Zp3DuA/viewform?usp=sharing&ouid=105711730830431308086","_blank"),title:collapsed?"Leave feedback":"",
         style:{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",cursor:"pointer",
           borderRadius:8,border:"1px solid rgba(0,201,167,0.25)",
           background:"rgba(0,201,167,0.08)",color:"#00C9A7",
