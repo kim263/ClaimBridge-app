@@ -1556,7 +1556,7 @@ function sendQuickLetter({letter,toEmail,toName,ccEmail,subject,claim,up}){
   if(up){
     const ae={event:"Letter sent",detail:"Sent to "+(toName||toEmail||"recipient")+(cc?" (CC: "+cc+")":""),timestamp:new Date().toISOString(),by:"—"};
     up("auditTrail",[...(claim.auditTrail||[]),ae]);
-    const le={id:"ltr_"+Date.now(),template:subject||"Quick letter",generatedAt:new Date().toISOString(),content:letter};
+    const le={id:"ltr_"+Date.now(),template:subject||"Quick letter",generatedAt:new Date().toISOString(),content:letter,sent:true};
     up("letterHistory",[...(claim.letterHistory||[]),le]);
   }
 }
@@ -3695,7 +3695,7 @@ I am satisfied that this procedure is reasonable, necessary, and causally relate
                   const entry={event:"Letter sent",detail:"Sent to case manager / insurer: "+claim.caseManagerEmail,timestamp:new Date().toISOString(),by:"—"};
                   up("auditTrail",[...(claim.auditTrail||[]),entry]);
                   const t2=TMPLS.find(x=>x.id===tmpl);
-                  const ltrEntry={id:"ltr_"+Date.now(),template:t2?t2.label:tmpl,generatedAt:new Date().toISOString(),sentTo:"Case manager: "+claim.caseManagerEmail,content:letter};
+                  const ltrEntry={id:"ltr_"+Date.now(),template:t2?t2.label:tmpl,generatedAt:new Date().toISOString(),sentTo:"Case manager: "+claim.caseManagerEmail,content:letter,sent:true};
                   up("letterHistory",[...(claim.letterHistory||[]),ltrEntry]);
                   // Auto-set matching referral to Pending if not already set
                   const t=TMPLS.find(x=>x.id===tmpl);
@@ -4026,11 +4026,11 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
   const disputed=refs.filter(r=>r.status==="Disputed").length;
   const furtherInfo=refs.filter(r=>r.status==="Further info required").length;
   const fmtD=d=>{if(!d)return"\u2014";try{return new Date(d).toLocaleDateString("en-AU");}catch{return d;}};
-  const statusStyle=s=>s==="Approved"?S.pillT:s==="Declined"||s==="Disputed"?S.pillR:s==="Further info required"?S.pillA:S.pillM;
+  const statusStyle=s=>s==="Approved"?S.pillT:s==="Declined"||s==="Disputed"?S.pillR:s==="Further info required"?S.pillA:s==="Sent \u2014 Pending"||s==="Pending"?S.pillP:S.pillM;
   const cocStatus=claim.fitnessForWork||"";
   const cocFrom=fmtD(claim.cocFrom||claim.fitNormalFrom||claim.fitRestrictFrom||claim.unfitFrom);
   const cocTo=fmtD(claim.cocTo||claim.fitRestrictTo||claim.unfitTo);
-  const timeline=[...refs.map(r=>({id:r.id,type:"referral",date:r.statusDate||claim.createdAt,label:r.specialty+(r.name?" \u2014 "+r.name:""),status:r.status||"Pending"})),...letters.map(l=>({id:l.id,type:"letter",date:l.generatedAt,label:l.template,status:"Generated",content:l.content}))].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const timeline=[...refs.map(r=>({id:r.id,type:"referral",date:r.statusDate||claim.createdAt,label:r.specialty+(r.name?" \u2014 "+r.name:""),status:r.status||"Pending"})),...letters.map(l=>({id:l.id,type:"letter",date:l.generatedAt,label:l.template,status:l.sent?"Sent \u2014 Pending":"Generated",content:l.content}))].sort((a,b)=>new Date(b.date)-new Date(a.date));
   const[expanded,setExpanded]=useState(null);
   const[tlPage,setTlPage]=useState(0);
   const TL_PAGE_SIZE=5;
@@ -4092,7 +4092,7 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
           timeline.length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",padding:"20px 0",textAlign:"center"}},"No correspondence recorded yet"):
           timeline.slice(tlPage*TL_PAGE_SIZE,(tlPage+1)*TL_PAGE_SIZE).map((item,i)=>div({key:item.id,style:{borderBottom:"1px solid rgba(255,255,255,0.05)",paddingBottom:12,marginBottom:12}},[
             div({key:"row",style:{display:"flex",alignItems:"flex-start",gap:12}},[
-              div({key:"dot",style:{width:8,height:8,borderRadius:"50%",background:item.status==="Approved"?"#00C9A7":item.status==="Declined"||item.status==="Disputed"?"#FF4D6D":"#5B7A99",marginTop:6,flexShrink:0}}),
+              div({key:"dot",style:{width:8,height:8,borderRadius:"50%",background:item.status==="Approved"?"#00C9A7":item.status==="Declined"||item.status==="Disputed"?"#FF4D6D":item.status==="Sent \u2014 Pending"||item.status==="Pending"?"#60A5FA":"#5B7A99",marginTop:6,flexShrink:0}}),
               div({key:"info",style:{flex:1}},[
                 div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},[div({key:"l",style:{fontWeight:600,fontSize:"0.87rem"}},item.label),span({key:"s",style:{...S.pill,...statusStyle(item.status),fontSize:"0.68rem",padding:"2px 8px",cursor:"default"}},item.status)]),
                 div({key:"meta",style:{fontSize:"0.74rem",color:"#5B7A99",marginTop:2}},[span({key:"type",style:{textTransform:"uppercase",letterSpacing:"0.05em",marginRight:8}},item.type==="letter"?"\uD83D\uDCC4 Letter":"\uD83D\uDCCB Referral"),fmtD(item.date)]),
