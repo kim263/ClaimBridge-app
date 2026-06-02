@@ -1087,7 +1087,7 @@ const EPISODE_FIELDS=["treatmentPlan","goalsShort","goalsLong","selfManagement",
   "rtwNormalDate","rtwModifiedDate","rtwPlan","modifiedDuties","nextReviewDate",
   "fitnessForWork","fitnessRestrictions","fitNormalFrom","fitRestrictFrom","fitRestrictTo",
   "unfitFrom","unfitTo","cocFrom","cocTo","cocType","cocCount","cocNotes","otherConsiderations",
-  "referrals","newRef","letterHistory","alliedForm","ahrmData","hhData","gymData",
+  "referrals","newRef","letterHistory","cocHistory","alliedForm","ahrmData","hhData","gymData",
   "ps604Data","ps109Data","imagingReferral","imagingIndication","otherInvestigations",
   "medications","outcomeScores","rtwOverrides","travelRequired","travelReasoning",
   "accommodationRequired","accommodationNights","accommodationReasoning",
@@ -1644,10 +1644,10 @@ function Tab4({claim,up,clinic,practitioners}){
                   adjustments.length>0&&span({key:"adj",style:{...S.pill,...S.pillA,fontSize:"0.68rem",cursor:"default"}},adjustments.length+" psychosocial barrier"+(adjustments.length>1?"s":"")),
                 ]),
                 div({key:"diags",style:{display:"flex",flexWrap:"wrap",gap:8}},
-                  diags.map(d=>{
+                  diags.map((d,i)=>{
                     const r=calcRTW(d.label);const ov=overrides[d.label]||{};
                     if(!r)return null;
-                    return div({key:d.icd10,style:{...S.cardSm,flex:"1 0 200px",padding:"10px 14px"}},[
+                    return div({key:d.icd10||d.label||String(i),style:{...S.cardSm,flex:"1 0 200px",padding:"10px 14px"}},[
                       div({key:"n",style:{fontSize:"0.78rem",fontWeight:600,marginBottom:6,color:"rgba(239,246,255,0.7)"}},d.label),
                       div({key:"times",style:{display:"flex",gap:8}},[
                         div({key:"mod",style:{flex:1,background:"rgba(255,184,48,0.08)",borderRadius:8,padding:"6px 10px",textAlign:"center"}},[
@@ -2378,7 +2378,7 @@ function Tab5({claim,up,clinic,practitioners}){
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Certificate of Capacity"),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Auto-populated from patient, diagnosis and capacity screens."),
     div({key:"print-btn",style:{marginBottom:20,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}},[
-      btn({key:"pdf",style:{...S.btnP,display:"inline-flex",alignItems:"center",gap:8},onClick:async()=>{setPdfLoading(true);try{await generateCOCPdf(claim,prac,clinic);}catch(e){alert("PDF error: "+e.message);}finally{setPdfLoading(false);}},disabled:pdfLoading},pdfLoading?"⏳ Generating...":"📄 Download Official COC (PDF)"),
+      btn({key:"pdf",style:{...S.btnP,display:"inline-flex",alignItems:"center",gap:8},onClick:async()=>{setPdfLoading(true);try{await generateCOCPdf(claim,prac,clinic);const snap={id:"coc_"+Date.now(),type:claim.cocType||"First",number:claim.cocCount||1,fitness:claim.fitnessForWork||"",from:claim.cocFrom||"",to:claim.cocTo||"",diagnoses:(claim.diagnoses||[]).map(d=>d.label).join(", "),workRestrictions:claim.workRestrictions||"",cocNotes:claim.cocNotes||"",generatedAt:new Date().toISOString()};up("cocHistory",[...(claim.cocHistory||[]),snap]);}catch(e){alert("PDF error: "+e.message);}finally{setPdfLoading(false);}},disabled:pdfLoading},pdfLoading?"⏳ Generating...":"📄 Download Official COC (PDF)"),
       div({key:"hint",style:{fontSize:"0.78rem",color:"#5B7A99",width:"100%"}},"Downloads the official WorkSafe VIC FOR844 PDF pre-filled with claim data."),
     ]),
     e(OK,{key:"ok1"},"Patient, diagnosis and capacity details auto-populated from clinical screens."),
@@ -4984,6 +4984,11 @@ function TabClaimLog({claim,up,clinic,practitioners,setActiveEpId,setEpTab}){
       }),
     ]),
     // COC history
+    logTab==="coc"&&(claim.cocHistory||[]).length===0&&div({key:"coc-empty",style:{...S.card,marginBottom:16,textAlign:"center",padding:"28px 20px"}},[
+      div({key:"i",style:{fontSize:"1.8rem",marginBottom:8}},"\ud83d\udcc4"),
+      div({key:"t",style:{fontWeight:700,marginBottom:6}},"No COC snapshots yet"),
+      div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99"}},"A snapshot is saved automatically each time you download the Certificate of Capacity PDF from the COC tab."),
+    ]),
     logTab==="coc"&&(claim.cocHistory||[]).length>0&&div({key:"coc-hist-log",style:{...S.card,marginBottom:16}},[
             div({key:"h",style:{...S.fb,marginBottom:12}},[
               div({key:"t",style:{fontWeight:700}},"Certificate of Capacity — Saved snapshots"),
