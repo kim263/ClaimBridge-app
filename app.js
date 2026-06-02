@@ -1050,7 +1050,7 @@ const EPISODE_FIELDS=["treatmentPlan","goalsShort","goalsLong","selfManagement",
   "rtwNormalDate","rtwModifiedDate","rtwPlan","modifiedDuties","nextReviewDate",
   "fitnessForWork","fitnessRestrictions","fitNormalFrom","fitRestrictFrom","fitRestrictTo",
   "unfitFrom","unfitTo","cocFrom","cocTo","cocType","cocCount","cocNotes","otherConsiderations",
-  "referrals","newRef","letterHistory","cocHistory","alliedForm","ahrmData","hhData","gymData",
+  "referrals","newRef","letterHistory","alliedForm","ahrmData","hhData","gymData",
   "ps604Data","ps109Data","imagingReferral","imagingIndication","otherInvestigations",
   "medications","outcomeScores","rtwOverrides","travelRequired","travelReasoning",
   "accommodationRequired","accommodationNights","accommodationReasoning",
@@ -1145,7 +1145,7 @@ function Tab1({claim,up,practitioners}){
     div({key:"scheme-card",style:S.card},[
       div({key:"tog-row",style:{display:"flex",gap:8,marginBottom:16}},[
         e("button",{key:"wc",onClick:()=>{up("scheme","WorkCover");up("insurerId","");},style:{flex:1,padding:"12px",borderRadius:10,border:"none",fontWeight:700,fontSize:"1rem",cursor:"pointer",background:claim.scheme==="WorkCover"?"#0057A8":"rgba(255,255,255,0.05)",color:claim.scheme==="WorkCover"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"WorkCover"),
-        e("button",{key:"tac",onClick:()=>{up("scheme","TAC");up("insurerId","");},style:{flex:1,padding:"12px",borderRadius:10,border:"none",fontWeight:700,fontSize:"1rem",cursor:"pointer",background:claim.scheme==="TAC"?"#C0392B":"rgba(255,255,255,0.05)",color:claim.scheme==="TAC"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"Transport Accident (TAC)"),
+        e("button",{key:"tac",onClick:()=>{up("scheme","TAC");up("insurerId","");},style:{flex:1,padding:"12px",borderRadius:10,border:"none",fontWeight:700,fontSize:"1rem",cursor:"pointer",background:claim.scheme==="TAC"?"#C0392B":"rgba(255,255,255,0.05)",color:claim.scheme==="TAC"?"#fff":"rgba(255,255,255,0.4)",transition:"all 0.2s"}},"Transport Injury (TAC/CTP)"),
       ]),
       div({key:"jur-row",style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}},
         JURS.map(j=>{const active=claim.jurisdiction===j.id||(j.id==="vic"&&!claim.jurisdiction);return e("button",{key:j.id,onClick:()=>j.on?up("jurisdiction",j.id):alert(j.label+" coming soon"),style:{...S.pill,...(active?S.pillT:S.pillM),fontSize:"0.8rem",padding:"7px 16px",...(!j.on?{opacity:0.4}:{})}},j.label+(j.on?"":" (soon)"));})
@@ -3114,7 +3114,7 @@ function Tab6({claim,up,clinic,practitioners}){
   const _stored=claim.ahrmData||{};
   const _smartGoals=[1,2,3].map(n=>{const lim=claim["ahGoalLim"+n];const tgt=claim["ahGoalTarget"+n];const dt=claim["ahGoalDate"+n];if(!lim&&!tgt)return null;return(lim||"")+(tgt?" \u2192 "+tgt:"")+(dt?" (by "+new Date(dt).toLocaleDateString("en-AU")+")":"");}).filter(Boolean).join("\n");
   const _gpGoals=[claim.goalsShort&&"Short-term: "+claim.goalsShort,claim.goalsLong&&"Long-term: "+claim.goalsLong].filter(Boolean).join("\n");
-  const ah={goals:_stored.goals!==undefined?_stored.goals:(_smartGoals||_gpGoals||""),treatment:_stored.treatment!==undefined?_stored.treatment:(claim.practitionerProfession||""),frequency:_stored.frequency!==undefined?_stored.frequency:"",duration:_stored.duration!==undefined?_stored.duration:(claim.txWeeks?claim.txWeeks+" weeks":""),sessions:_stored.sessions!==undefined?_stored.sessions:(claim.txNum||""),txFrom:_stored.txFrom!==undefined?_stored.txFrom:(claim.txFrom||""),txTo:_stored.txTo!==undefined?_stored.txTo:(claim.txTo||""),outcomes:_stored.outcomes!==undefined?_stored.outcomes:"",justification:_stored.justification!==undefined?_stored.justification:(claim.treatmentPlan||""),barriers:_stored.barriers!==undefined?_stored.barriers:"", ..._stored};
+  const ah={goals:_stored.goals!==undefined?_stored.goals:(_smartGoals||_gpGoals||""),treatment:_stored.treatment!==undefined?_stored.treatment:(claim.practitionerProfession||""),frequency:_stored.frequency!==undefined?_stored.frequency:"",duration:_stored.duration!==undefined?_stored.duration:(claim.txWeeks?claim.txWeeks+" weeks":""),sessions:_stored.sessions!==undefined?_stored.sessions:(claim.txNum||""),txFrom:_stored.txFrom!==undefined?_stored.txFrom:(claim.txFrom||""),txTo:_stored.txTo!==undefined?_stored.txTo:(claim.txTo||""),outcomes:_stored.outcomes!==undefined?_stored.outcomes:"",justification:_stored.justification!==undefined?_stored.justification:(claim.treatmentPlan||""),barriers:_stored.barriers!==undefined?_stored.barriers:(()=>{const ps=claim.psychosocial||{};const all=[...(ps.yellow||[]),...(ps.blue||[]),...(ps.black||[]),...(ps.orange||[])];return all.length>0?all.join(", "):"";})(), ..._stored};
   const hh=claim.hhData||{};const gd=claim.gymData||{};const p4=claim.ps604Data||{};const p9=claim.ps109Data||{};
   const upAH=(f)=>(v)=>up("ahrmData",{..._stored,[f]:v});
   const upHH=(f)=>(v)=>up("hhData",{...hh,[f]:v});
@@ -5049,7 +5049,7 @@ function generateInvoicePdf(inv,claim,clinic,practitioners,paymentTerms,bankSett
   doc.setFillColor(...teal);doc.rect(0,0,W,18,"F");
   doc.setFont("helvetica","bold");doc.setFontSize(15);
   doc.setTextColor(7,16,30);doc.text("Claim",PL,12);
-  doc.setTextColor(255,255,255);doc.text("Bridge",PL+13,12);
+  doc.setTextColor(255,255,255);doc.text("Bridge",PL+14.5,12);
   doc.setFontSize(10);doc.setFont("helvetica","normal");doc.text("TAX INVOICE",PR,12,{align:"right"});
   // Clinic block
   doc.setTextColor(...navy);doc.setFontSize(11);doc.setFont("helvetica","bold");doc.text(clinic.name||"",PL,27);
@@ -5117,7 +5117,7 @@ function generateInvoicePdf(inv,claim,clinic,practitioners,paymentTerms,bankSett
   doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(...grey);
   const bank=inv.bankSettings||bankSettings||{};
   if(bank.accountName){doc.text("Account name: "+bank.accountName,PL,tableY);tableY+=4.5;}
-  if(bank.bsb&&bank.accountNo){doc.text("BSB: "+bank.bsb+"   Account: "+bank.accountNo,PL,tableY);tableY+=4.5;}
+  if(bank.bsb||bank.accountNo){doc.text("BSB: "+(bank.bsb||"—")+"   Account: "+(bank.accountNo||"—"),PL,tableY);tableY+=4.5;}
   doc.text("Please quote invoice number "+invNo+" on payment.",PL,tableY);
   doc.setFillColor(...teal);doc.rect(0,283,W,14,"F");
   doc.setFontSize(7.5);doc.setTextColor(255,255,255);doc.setFont("helvetica","normal");
