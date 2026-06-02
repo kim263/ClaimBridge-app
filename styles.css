@@ -1,0 +1,28 @@
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#07101E;color:#EFF6FF;font-size:16px;min-height:100vh;}
+#root{min-height:100vh;}
+input,select,textarea{font-family:inherit;font-size:16px;color:#EFF6FF;}
+button{font-family:inherit;cursor:pointer;}
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px;}
+.cb-input:focus{border-color:rgba(0,201,167,0.5)!important;background:rgba(0,201,167,0.05)!important;outline:none;}
+.cb-ta:focus{border-color:rgba(0,201,167,0.5)!important;outline:none;}
+.cb-sel:focus{border-color:rgba(0,201,167,0.5)!important;outline:none;}
+.nav-btn:hover{background:rgba(255,255,255,0.06)!important;color:rgba(255,255,255,0.8)!important;}
+.card-hover:hover{border-color:rgba(0,201,167,0.2)!important;}
+.tab-btn:hover{color:rgba(255,255,255,0.75)!important;}
+.coll-btn:hover{background:rgba(255,255,255,0.05)!important;}
+@media print {
+  body { background: white !important; color: black !important; font-size: 11px; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .coc-print-page { background: white !important; color: black !important; padding: 20px !important; max-width: 100% !important; margin: 0 !important; box-shadow: none !important; border: none !important; }
+  .coc-section-header { background: #1a1a1a !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .coc-table { border-collapse: collapse; width: 100%; }
+  .coc-table td, .coc-table th { border: 1px solid #333 !important; }
+  @page { margin: 15mm; size: A4; }
+}
+.print-only { display: none; }
+.trend-line { fill: none; stroke-width: 2.5; }
+.trend-dot { cursor: pointer; }
+.trend-dot:hover { r: 6; }
