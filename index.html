@@ -1105,7 +1105,7 @@ function mergeEpisodeToClaim(claim,ep){return {...claim,...ep,practitionerId:ep.
 function saveEpisodeToClaim(claim,ep,epData){const updatedEp={...ep,...epData};const episodes=(claim.episodes||[]).map(e=>e.id===ep.id?updatedEp:e);return {...claim,episodes};}
 
 function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
-  const ALL_TABS=["Overview","Patient & Claim","Diagnosis","Treatment Plan","Certificate of Capacity","Allied Health Forms","Referral & Export","Claim Log"];
+  const ALL_TABS=["Overview","Patient & Claim","Diagnosis","Treatment Plan","Certificate of Capacity","Allied Health Forms","Letters & Approvals","Claim Log"];
   const[tab,setTab]=useState(0);
   const[claim,setClaim]=useState(()=>ensureEpisodes(claimData||{id:"claim_"+Date.now(),scheme:"WorkCover",status:"Active",createdAt:new Date().toISOString(),clinicId:clinic.id}));
   const[activeEpId,setActiveEpId]=useState(null);
@@ -3324,6 +3324,7 @@ function Tab8({claim,up,clinic,practitioners,onInvoice}){
   const[letter,setLetter]=useState("");
   const[gen,setGen]=useState(false);
   const[errors,setErrors]=useState([]);
+  const[selectedRefId,setSelectedRefId]=useState("");
   const TMPLS=[
     {id:"specialist_opinion",label:"Specialist referral - Opinion"},
     {id:"specialist_ongoing",label:"Specialist referral - Ongoing management"},
@@ -3341,7 +3342,11 @@ function Tab8({claim,up,clinic,practitioners,onInvoice}){
   const refs=claim.referrals||[];
   const prac=practitioners.find(p=>p.id===claim.practitionerId);
   const diags=(claim.diagnoses||[]).map(d=>d.label).join(", ")||"Not specified";
-  const firstRef=refs[0]||{};
+  // firstRef: use selectedRefId if set, otherwise first referral
+  const firstRef=(selectedRefId?refs.find(r=>r.id===selectedRefId):null)||refs[0]||{};
+  // Templates that address a specific referral recipient
+  const REFERRAL_TMPLS=["specialist_opinion","specialist_ongoing","specialist_review","allied_health","psychology"];
+  const needsRefSelector=refs.length>1&&REFERRAL_TMPLS.includes(tmpl);
 
   const validate=()=>{
     const errs=[];
@@ -4425,7 +4430,7 @@ Thank you for your consideration.${sig}`;
 
 
   return div({},[
-    div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Referral & Export"),
+    div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Letters & Approvals"),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Generate professional referral letters. Auto-populated from claim data."),
 
     // Referrals from treatment plan
@@ -4441,7 +4446,7 @@ Thank you for your consideration.${sig}`;
     div({key:"gen",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:14}},"Generate referral letter"),
       !localStorage.getItem("cb_apikey")&&div({key:"nokey",style:{display:"none"}}),
-      e(Sel,{key:"t",label:"Select letter template",value:tmpl,onChange:setTmpl,options:TMPLS.map(t=>({value:t.id,label:t.label}))}),
+      e(Sel,{key:"t",label:"Select letter template",value:tmpl,onChange:v=>{setTmpl(v);setSelectedRefId("");setLetter("");},options:TMPLS.map(t=>({value:t.id,label:t.label}))}),
 
       // Validation errors
       errors.length>0&&div({key:"errs",style:{background:"rgba(255,77,109,0.08)",border:"1px solid rgba(255,77,109,0.25)",borderRadius:12,padding:"12px 16px",marginBottom:16}},[
@@ -4450,6 +4455,22 @@ Thank you for your consideration.${sig}`;
           span({key:"b",style:{color:"#FF4D6D"}},"•"),
           span({key:"f",style:{fontWeight:500}},err.field),
           span({key:"h",style:{color:"#5B7A99"}},err.hint),
+        ])),
+      ]),
+
+      needsRefSelector&&div({key:"refsel",style:{marginBottom:16,padding:"12px 14px",background:"rgba(0,201,167,0.06)",border:"1px solid rgba(0,201,167,0.2)",borderRadius:10}},[
+        div({key:"h",style:{fontSize:"0.8rem",fontWeight:700,color:"rgba(0,201,167,0.9)",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}},"Select referral recipient"),
+        div({key:"s",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:10}},"This letter will be addressed to the selected referral. Choose which one to generate the letter for."),
+        ...refs.map(r=>div({key:r.id,style:{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,marginBottom:4,cursor:"pointer",
+          background:(selectedRefId?selectedRefId===r.id:r===refs[0])?"rgba(0,201,167,0.12)":"rgba(255,255,255,0.03)",
+          border:(selectedRefId?selectedRefId===r.id:r===refs[0])?"1px solid rgba(0,201,167,0.35)":"1px solid rgba(255,255,255,0.06)"},
+          onClick:()=>setSelectedRefId(r.id)},[
+          div({key:"dot",style:{width:10,height:10,borderRadius:"50%",flexShrink:0,
+            background:(selectedRefId?selectedRefId===r.id:r===refs[0])?"rgba(0,201,167,1)":"rgba(255,255,255,0.15)"}}),
+          div({key:"info"},[
+            div({key:"n",style:{fontSize:"0.85rem",fontWeight:600}},r.specialty.replace(" (GP referral required)","")),
+            r.name&&div({key:"d",style:{fontSize:"0.75rem",color:"#5B7A99"}},r.name+(r.clinic?" — "+r.clinic:"")),
+          ]),
         ])),
       ]),
 
