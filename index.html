@@ -3319,6 +3319,7 @@ function Tab8({claim,up,clinic,practitioners,onInvoice}){
   const TMPLS=[
     {id:"specialist_opinion",label:"Specialist referral - Opinion"},
     {id:"specialist_ongoing",label:"Specialist referral - Ongoing management"},
+    {id:"specialist_review",label:"Specialist referral - Re-referral / Review"},
     {id:"allied_health",label:"Allied health referral"},
     {id:"psychology",label:"Psychology referral"},
     {id:"gym_swim",label:"Gym / Swim referral"},
@@ -3513,26 +3514,161 @@ Thank you for your assistance with ${patientName}'s ongoing care.${sig}
 
 cc: ${insurerName} — ${scheme} Claim No. ${claimNo}`;}
 
-    if(id==="specialist_ongoing")return hdr("Referral for Specialist Ongoing Management")+`
+    if(id==="specialist_ongoing"){
+      const hasMeds=(claim.medications||[]).length>0;
+      const medsList=hasMeds?claim.medications.map(m=>m.name+(m.dosage?" "+m.dosage:"")+(m.frequency?", "+m.frequency:"")+(m.duration?" ("+m.duration+")":"")).join("; "):null;
+      const hasImaging=imagingSummary||(claim.imagingReports||[]).length>0;
+      const activeReferrals=(claim.referrals||[]).filter(r=>r.name||r.specialty).map(r=>r.specialty+(r.name?" — "+r.name:"")).join(", ");
+      const cocLine=[
+        (claim.cocType||"Subsequent")+" Certificate",
+        claim.cocCount?"No. "+claim.cocCount:null,
+        (claim.cocFrom&&claim.cocTo)?"valid "+cocFrom+" – "+cocTo:null
+      ].filter(Boolean).join(", ");
+      return hdr("Request for Approval — Ongoing Specialist Management")+`
 
-I am writing to request approval for ongoing specialist management for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+I am writing to request insurer approval for ongoing specialist management for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
 
-**Diagnosis:**
+I request that ${insurerName} approve continued specialist consultations with ${firstRef.name||"the treating specialist"}${firstRef.specialty?" ("+firstRef.specialty+")":""}${firstRef.clinic?" at "+firstRef.clinic:""}, whose ongoing input remains clinically necessary for this patient's recovery.
+
+──────────────────────────────────────
+ACCEPTED DIAGNOSIS
+──────────────────────────────────────
+
+${diagList}
+
+${patientName} sustained the above ${scheme==="TAC"?"injuries in a motor vehicle accident":"compensable workplace injury"} on ${doi}${employer?", whilst employed by "+employer:""}. The diagnosis has been clinically confirmed and is accepted as causally related to the compensable event.
+
+──────────────────────────────────────
+CLINICAL JUSTIFICATION
+──────────────────────────────────────
+
+${claim.clinicalPresentation||patientName+" continues to present with symptoms and functional limitations consistent with the accepted diagnosis."}
+
+${treatPlan&&treatPlan!=="As per clinical assessment and management plan."?"Current treatment plan: "+treatPlan+"\n":""}Ongoing specialist management is considered reasonable and necessary for the following reasons:
+
+1. The accepted condition requires specialist-level assessment and treatment that cannot be appropriately managed at GP level alone.
+2. The proposed treatment pathway — ${claim.proposedProcedure||"conservative management and specialist review"} — is consistent with best practice for this condition and causally related to the compensable injury.
+3. Continued specialist involvement is necessary to monitor treatment response, guide the rehabilitation pathway, and support ${patientName}'s safe and sustainable return to work.
+
+──────────────────────────────────────
+INVESTIGATIONS
+──────────────────────────────────────
+
+${hasImaging?`Imaging:\n${imagingSummary||(claim.imagingReports||[]).map(r=>r.name+(r.summary&&r.summary.keyFindings?" — "+r.summary.keyFindings:"")).join("\n")}`:claim.imagingReferral?"No formal imaging completed to date. Imaging referral pending.":"No formal imaging to date."}
+${claim.imagingReferral?"Imaging referral pending: "+claim.imagingReferral+(claim.imagingIndication?" — "+claim.imagingIndication:""):""}
+${claim.otherInvestigations?"Other investigations:\n"+claim.otherInvestigations:""}
+──────────────────────────────────────
+CURRENT MANAGEMENT
+──────────────────────────────────────
+
+${hasMeds?"Current medications: "+medsList:"No current medications relevant to this injury."}
+${activeReferrals?"Current referrals: "+activeReferrals:""}
+──────────────────────────────────────
+CERTIFICATE OF CAPACITY
+──────────────────────────────────────
+
+${cocLine}
+Status: ${fitnessStatus||"As per Certificate of Capacity"}
+${workRestrictions&&workRestrictions!=="As per Certificate of Capacity."?"Restrictions: "+workRestrictions:""}
+${claim.cocNotes?"Additional notes: "+claim.cocNotes:""}
+──────────────────────────────────────
+REQUEST
+──────────────────────────────────────
+
+I request approval for ongoing specialist consultations with ${firstRef.name||firstRef.specialty||"the treating specialist"} for the purposes of:
+
+1. Monitoring treatment response and adjusting the management plan as clinically indicated.
+2. Providing treatment recommendations — whether conservative, interventional, or procedural — that are reasonable and necessary for the accepted condition.
+3. Supporting the patient's return to work trajectory in collaboration with the treating GP and allied health team.
+
+I am satisfied that ongoing specialist management is reasonable, necessary, and causally related to the compensable condition. I request your approval at your earliest convenience.
+${reviewDate&&reviewDate!=="[date not set]"?"\nI plan to review "+patientName+" on "+reviewDate+".":""}
+Thank you for your consideration.${sig}
+
+cc: ${firstRef.name||firstRef.specialty||"Treating Specialist"}`;
+    }
+
+    if(id==="specialist_review"){
+      const hasMeds=(claim.medications||[]).length>0;
+      const medsList=hasMeds?claim.medications.map(m=>m.name+(m.dosage?" "+m.dosage:"")+(m.frequency?", "+m.frequency:"")+(m.duration?" ("+m.duration+")":"")).join("; "):null;
+      const hasImaging=imagingSummary||(claim.imagingReports||[]).length>0;
+      const hasOrtho=(claim.orthoTestList||[]).length>0;
+      const hasROM=claim.arom||claim.prom;
+      const orthoTests=hasOrtho?claim.orthoTestList.map(t=>t.name+(t.result?": "+t.result:"")).join("; "):null;
+      const activeReferrals=(claim.referrals||[]).filter(r=>r.name||r.specialty).map(r=>r.specialty+(r.name?" — "+r.name:"")).join(", ");
+      const cocLine=[
+        (claim.cocType||"Subsequent")+" Certificate",
+        claim.cocCount?"No. "+claim.cocCount:null,
+        (claim.cocFrom&&claim.cocTo)?"valid "+cocFrom+" – "+cocTo:null
+      ].filter(Boolean).join(", ");
+      return hdr("Specialist Re-referral / Review — "+( firstRef.specialty||"Specialist"))+`
+
+I am writing to re-refer my patient, ${patientName} (DOB: ${patientDOB}), for specialist ${firstRef.specialty||"review"} under ${scheme} claim number ${claimNo}. ${insurerName} has been notified of this referral and pre-approval has been requested prior to the appointment being booked.
+
+──────────────────────────────────────
+BACKGROUND AND REASON FOR RE-REFERRAL
+──────────────────────────────────────
+
+${patientName} sustained ${claim.injuryType||"an injury"} to the ${claim.injuryBodyPart||"affected region"}${claim.injuryMechanism?" as a result of "+claim.injuryMechanism:""}${" on "+doi}${employer?", whilst employed by "+employer:""}.
+
+Accepted diagnosis:
   - ${diagList}
 
-**Clinical Background:**
-${patientName} sustained the above injury on ${doi}${employer?" while employed with "+employer:""}. ${treatmentStrategy}
+I am re-referring ${patientName} at this time due to the following:
+${claim.injuryDescription?"\n"+claim.injuryDescription:""}
+${claim.injuryCausation?"\n"+claim.injuryCausation:""}
+${!claim.injuryDescription&&!claim.injuryCausation?"\nA significant interval has passed since the last specialist review, and the patient's current presentation warrants formal specialist reassessment to determine the appropriate ongoing treatment pathway.":""}
 
-${imagingSummary?`**Imaging:**
-${imagingSummary}
+──────────────────────────────────────
+CLINICAL PRESENTATION
+──────────────────────────────────────
 
-`:""}**Request:**
-I am requesting ongoing specialist management with ${firstRef.specialty||"a specialist"} to ensure continuity of care and optimise recovery outcomes. The treating team believes ongoing specialist input is clinically necessary at this stage of rehabilitation.
+${claim.clinicalPresentation||patientName+" presents with ongoing symptoms and functional limitations consistent with the accepted diagnosis."}
+${hasROM?`
+Range of Motion:${claim.arom?"\nActive: "+claim.arom:""}${claim.prom?"\nPassive: "+claim.prom:""}`:""} 
+${hasOrtho?"Orthopaedic Testing:\n"+orthoTests:""}
+${!hasROM&&!hasOrtho?"Formal clinical assessment findings are documented in the patient's medical record.":""}
+──────────────────────────────────────
+INVESTIGATIONS
+──────────────────────────────────────
 
-**Current Status:**
-Fitness for work: ${fitnessStatus||"As per Certificate of Capacity."}
-Work restrictions: ${workRestrictions}
-${reviewDate!=="[date not set]"?"Next review: "+reviewDate:""}${sig}`;
+${hasImaging?`Imaging:\n${imagingSummary||(claim.imagingReports||[]).map(r=>r.name+(r.summary&&r.summary.keyFindings?" — "+r.summary.keyFindings:"")).join("\n")}`:claim.imagingReferral?"No formal imaging completed to date. Imaging referral pending.":"No formal imaging has been completed to date."}
+${claim.imagingReferral?"Imaging referral: "+claim.imagingReferral+(claim.imagingIndication?" — Indication: "+claim.imagingIndication:""):""}
+${claim.otherInvestigations?"Other investigations:\n"+claim.otherInvestigations:""}
+──────────────────────────────────────
+CURRENT MANAGEMENT
+──────────────────────────────────────
+
+${hasMeds?"Current medications: "+medsList:"No current medications relevant to this injury."}
+${activeReferrals?"Current referrals: "+activeReferrals:""}
+${treatPlan&&treatPlan!=="As per clinical assessment and management plan."?"Current treatment plan: "+treatPlan:""}
+──────────────────────────────────────
+CERTIFICATE OF CAPACITY
+──────────────────────────────────────
+
+${cocLine}
+Status: ${fitnessStatus||"As per Certificate of Capacity"}
+${workRestrictions&&workRestrictions!=="As per Certificate of Capacity."?"Restrictions: "+workRestrictions:""}
+${claim.cocNotes?"Additional notes: "+claim.cocNotes:""}
+──────────────────────────────────────
+REFERRAL REQUESTS
+──────────────────────────────────────
+
+I would be grateful for your reassessment of ${patientName} and your opinion on the following:
+
+1. Review of the current diagnosis in light of the patient's evolving presentation${claim.injuryCausation?" and the causation factors outlined above":""}.
+2. Your recommended treatment pathway at this stage — whether conservative, interventional, or procedural — and the clinical rationale for this approach.
+3. Where allied health input remains part of the management plan, your specific recommendations to support the treating team's AHRMP submission to ${insurerName}.
+4. Updated prognosis and anticipated return to work timeline, including any revised functional limitations.
+5. Any further investigations you consider necessary to inform the next phase of management.
+${workRestrictions||fitnessStatus?`
+For context, ${patientName} is currently ${fitnessStatus||"on a Certificate of Capacity"}${workRestrictions&&workRestrictions!=="As per Certificate of Capacity."?" with the following restrictions: "+workRestrictions:""}. Your updated opinion on capacity would be appreciated.`:""}
+Please direct your report to the undersigned and provide a copy to ${insurerName} at the claim reference above.
+${reviewDate&&reviewDate!=="[date not set]"?"I plan to review "+patientName+" on "+reviewDate+".":""}
+Thank you for your assistance with ${patientName}'s ongoing care.${sig}
+
+cc: ${insurerName} — ${scheme} Claim No. ${claimNo}`;
+    }
 
     if(id==="allied_health"){const ahMeds=(claim.medications||[]);return hdr("Request for Approval — Allied Health Referral")+`
 
