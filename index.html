@@ -1563,12 +1563,20 @@ function sendQuickLetter({letter,toEmail,toName,ccEmail,subject,claim,up}){
 function buildQuickLetter(templateId,claim,practitioners,clinic){
   const prac=practitioners.find(p=>p.id===claim.practitionerId)||{};
   const refs=claim.referrals||[];const firstRef=refs[0]||{};
-  const refsWithTravel=refs.filter(r=>r.travelRequired&&r.travelRequired!=="No travel required");
-  const travelSection=refsWithTravel.length>0
-    ?`\n\n**Travel Request:**\n`+refsWithTravel.map(r=>
-        `For referral to ${r.specialty||r.name||"treating practitioner"}: ${r.travelRequired}${r.travelReasoning?"\\n"+r.travelReasoning:""}`
-      ).join("\n")+`\n\nI request approval for the above travel as it is required for the worker to attend approved treatment.`
-    :"";
+  const refsWithTravel=refs.filter(r=>r.travelRequired&&r.travelRequired!=="No travel required"&&r.travelRequired!=="Travel required?");
+  const travelSection=refsWithTravel.length>0?`
+
+──────────────────────────────────────
+TRAVEL REQUEST
+──────────────────────────────────────
+
+I am also requesting approval for travel assistance for ${claim.patientName||"the patient"} to attend the above approved appointment(s). Travel assistance is required as the patient's physical capacity prevents independent travel by their usual means.
+
+${refsWithTravel.map(r=>`Referral: ${r.specialty||r.name||"Treating practitioner"}\nTransport mode: ${r.travelRequired}${r.travelReasoning?"\nReason: "+r.travelReasoning:""}`).join("\n\n")}
+
+Please note that if travel is arranged by the patient, a tax invoice or receipt will be submitted to ${claim.insurerName||"the insurer"} for reimbursement following the appointment. Prior approval is required before any arrangements are made.
+
+I am satisfied that the requested travel assistance is reasonable and necessary to ensure ${claim.patientName||"the patient"} can attend approved treatment related to the compensable condition.`:"";
   const diags=(claim.diagnoses||[]).map(d=>d.label+(d.icd10?" ("+d.icd10+")":"")).join("\n  - ")||"[Diagnosis not recorded]";
   const today=new Date().toLocaleDateString("en-AU",{day:"2-digit",month:"long",year:"numeric"});
   const fD=d=>{if(!d)return"[date]";try{return new Date(d).toLocaleDateString("en-AU",{day:"2-digit",month:"long",year:"numeric"});}catch{return d;}};
@@ -3327,6 +3335,8 @@ function Tab8({claim,up,clinic,practitioners,onInvoice}){
     {id:"household",label:"Household / ADL assessment"},
     {id:"travel",label:"Travel & accommodation request"},
     {id:"procedure",label:"Procedure / Surgery request"},
+    {id:"ketamine",label:"Ketamine infusion request"},
+    {id:"cannabis",label:"Medicinal cannabis request"},
   ];
   const refs=claim.referrals||[];
   const prac=practitioners.find(p=>p.id===claim.practitionerId);
@@ -3719,126 +3729,685 @@ Please note that under WorkSafe Victoria guidelines, the referred practitioner m
 
 I am satisfied that this referral is reasonable, necessary, and causally related to the compensable condition. I request your approval at your earliest convenience given the statutory timeframes that apply.${sig}`;}
 
-    if(id==="psychology")return hdr("Request for Approval — Psychological Assessment and Treatment")+`
+    if(id==="psychology"){
+      const isPrimary=(claim.psychType||"Primary")==="Primary";
+      const hasMeds=(claim.medications||[]).length>0;
+      const medsList=hasMeds?claim.medications.map(m=>m.name+(m.dosage?" "+m.dosage:"")+(m.frequency?", "+m.frequency:"")+(m.duration?" ("+m.duration+")":"")).join("; "):null;
+      const psychFlags=(()=>{const fl=claim.psychosocial||{};const fb=[...(fl.yellow||[]),...(fl.blue||[]),...(fl.black||[]),...(fl.orange||[])];return fb.length>0?fb.join(", "):null;})();
+      const cocLine=[
+        (claim.cocType||"Subsequent")+" Certificate",
+        claim.cocCount?"No. "+claim.cocCount:null,
+        (claim.cocFrom&&claim.cocTo)?"valid "+cocFrom+" – "+cocTo:null
+      ].filter(Boolean).join(", ");
+      const psychSubject=isPrimary
+        ?"Referral for Psychological Assessment and Treatment — Primary Psychological Injury"
+        :"Referral for Psychological Assessment — Secondary Psychological Condition";
+      return hdr(psychSubject)+`
 
-I am writing to request approval for psychological assessment and treatment for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+I am writing to refer my patient, ${patientName} (DOB: ${patientDOB}), for formal psychological assessment and treatment under ${scheme} claim number ${claimNo}. ${insurerName} has been notified of this referral and pre-approval has been requested prior to the first appointment being booked.
 
-**Physical Diagnosis (Compensable Injury):**
+──────────────────────────────────────
+${isPrimary?"PRIMARY PSYCHOLOGICAL INJURY":"BACKGROUND — COMPENSABLE INJURY"}
+──────────────────────────────────────
+
+${isPrimary
+  ? `${patientName} sustained a primary psychological injury${claim.injuryMechanism?" as a result of "+claim.injuryMechanism:""}${" on "+doi}${employer?", whilst employed by "+employer:""}.\n\n${claim.injuryDescription||claim.injuryCausation||patientName+" presents with psychological symptoms arising directly from the workplace incident."}`
+  : `${patientName} sustained ${claim.injuryType||"a compensable physical injury"} to the ${claim.injuryBodyPart||"affected region"}${claim.injuryMechanism?" as a result of "+claim.injuryMechanism:""}${" on "+doi}${employer?", whilst employed by "+employer:""}.\n\nAccepted physical diagnosis:\n  - ${diagList}\n\n${claim.injuryDescription||""}`
+}
+
+──────────────────────────────────────
+${isPrimary?"ACCEPTED DIAGNOSIS":"SECONDARY PSYCHOLOGICAL CONDITION"}
+──────────────────────────────────────
+
+${isPrimary
+  ? `Accepted diagnosis:\n  - ${diagList}\n\n${claim.clinicalPresentation||patientName+" presents with psychological symptoms consistent with the above accepted condition."}`
+  : `${patientName} is presenting with psychological symptoms that are believed to be consequential to the above compensable physical injury. A formal DSM-5 diagnostic assessment by a qualified psychologist is required to determine the nature and extent of any psychological condition and to establish whether it is causally related to the compensable injury for the purpose of claim acceptance.\n\n${claim.secondaryInjuryCorrelation||claim.injuryCausation||claim.clinicalPresentation
+      ? `The following clinical observations are offered as a provisional indication of the potential correlation between the physical injury and the psychological presentation, for the psychologist's consideration:\n\n${claim.secondaryInjuryCorrelation||claim.injuryCausation||claim.clinicalPresentation}`
+      : "Clinical observations supporting the potential correlation are documented in the patient's medical record and are available upon request."
+    }`
+}
+
+──────────────────────────────────────
+PSYCHOSOCIAL FLAGS AND BARRIERS
+──────────────────────────────────────
+
+${psychFlags
+  ? `The following psychosocial barriers to recovery have been identified and are presented for the psychologist's awareness:\n${psychFlags}.`
+  : "No formal psychosocial barriers have been identified at this time. The psychologist is encouraged to conduct their own screening as part of the initial assessment."
+}
+
+──────────────────────────────────────
+CURRENT MANAGEMENT
+──────────────────────────────────────
+
+${hasMeds?"Current medications: "+medsList:"No current medications relevant to this presentation."}
+${treatPlan&&treatPlan!=="As per clinical assessment and management plan."?"Current treatment: "+treatPlan:""}
+──────────────────────────────────────
+CERTIFICATE OF CAPACITY
+──────────────────────────────────────
+
+${cocLine}
+Status: ${fitnessStatus||"As per Certificate of Capacity"}
+${workRestrictions&&workRestrictions!=="As per Certificate of Capacity."?"Restrictions: "+workRestrictions:""}
+${claim.cocNotes?"Additional notes: "+claim.cocNotes:""}
+──────────────────────────────────────
+REFERRAL REQUESTS
+──────────────────────────────────────
+
+I would be grateful for your expert assessment of ${patientName} and ask that you address the following:
+
+1. Formal DSM-5 diagnostic formulation based on your clinical assessment.
+
+2. Your recommended treatment approach — modality, frequency, and anticipated duration — based on your independent clinical findings.
+
+3. ${isPrimary
+  ? `Submission of your treatment plan and clinical justification directly to ${insurerName} for approval of ongoing psychological treatment sessions.`
+  : `Submission of a formal report to ${insurerName} with sufficient clinical evidence to support acceptance of the secondary psychological condition on the claim, including your DSM-5 diagnosis and established causal link to the compensable physical injury.`
+}
+
+4. Any psychosocial or occupational factors you identify that may be contributing to the presentation or creating barriers to recovery.
+
+5. Your opinion on ${patientName}'s capacity for work and any psychological restrictions that should be reflected in the Certificate of Capacity.
+
+Please note that the psychologist will determine the appropriate treatment approach, session frequency, and duration based on their own clinical assessment. ${isPrimary?"The treating GP will provide supporting documentation as required.":"The GP's role in this referral is to provide clinical context and facilitate access — the establishing of the causal link and diagnostic formulation rests with you as the treating psychologist."}
+
+Please direct your report to the undersigned and provide a copy to ${insurerName} at the claim reference above.
+${reviewDate&&reviewDate!=="[date not set]"?"I plan to review "+patientName+" on "+reviewDate+".":""}
+Thank you for your assistance with ${patientName}'s care.${sig}
+
+cc: ${insurerName} — ${scheme} Claim No. ${claimNo}`;
+    }
+
+    if(id==="gym_swim"){
+      const gd=claim.gymData||{};
+      const gymType=gd.type||"Gym / Hydrotherapy";
+      const isGymOnly=gymType.toLowerCase().includes("gym")&&!gymType.toLowerCase().includes("hydro");
+      const isHydroOnly=gymType.toLowerCase().includes("hydro")&&!gymType.toLowerCase().includes("gym");
+      const isCombined=gymType.toLowerCase().includes("gym")&&gymType.toLowerCase().includes("hydro");
+      const typeLabel=isGymOnly?"gym-based exercise program":isHydroOnly?"hydrotherapy program":isCombined?"combined gym and hydrotherapy program":"exercise/hydrotherapy program";
+      const isSupervised=(gd.supervised||"Supervised").toLowerCase().includes("supervis");
+      const cocLine=[
+        (claim.cocType||"Subsequent")+" Certificate",
+        claim.cocCount?"No. "+claim.cocCount:null,
+        (claim.cocFrom&&claim.cocTo)?"valid "+cocFrom+" – "+cocTo:null
+      ].filter(Boolean).join(", ");
+      return hdr("Request for Approval — "+gymType+" Program")+`
+
+I am writing to request insurer approval for a ${typeLabel} for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}. Once approved, the patient will present the insurer's approval letter directly to their chosen ${scheme==="TAC"?"TAC-approved":"WorkCover-registered"} facility.
+
+──────────────────────────────────────
+ACCEPTED DIAGNOSIS
+──────────────────────────────────────
+
   - ${diagList}
 
-**Clinical Indication:**
-${patientName} sustained the above compensable injury on ${doi}${employer?" while employed with "+employer:""}. ${patientName} is presenting with psychological difficulties that are believed to be related to the compensable injury and/or the workplace incident. ${treatmentStrategy}
+${patientName} sustained the above ${scheme==="TAC"?"injuries in a motor vehicle accident":"compensable workplace injury"} on ${doi}${employer?", whilst employed by "+employer:""}.
 
-A formal psychological assessment and DSM-5 diagnostic formulation by a qualified psychologist is required to determine the nature and extent of any psychological condition, and whether it is secondary to the physical injury or arose directly from the workplace incident.
+──────────────────────────────────────
+CLINICAL JUSTIFICATION
+──────────────────────────────────────
 
-**Psychosocial Barriers and Flags:**
-The following barriers to recovery have been identified and are presented for the psychologist's awareness:
-${(()=>{const fl=claim.psychosocial||{};const fb=[...(fl.yellow||[]),...(fl.blue||[]),...(fl.black||[]),...(fl.orange||[])];return fb.length>0?fb.join(", ")+".":"No psychosocial barriers formally identified at this time."})()}
+${gd.justification||treatPlan||"A structured exercise program is indicated as part of the rehabilitation plan for the above compensable condition."}
 
-I am requesting your expert assessment and recommendations. The psychologist will determine the appropriate diagnosis, treatment approach, frequency and duration based on their own clinical assessment.${sig}`;
+A ${typeLabel} is considered reasonable and necessary for the following reasons:
 
-    if(id==="gym_swim")return hdr("Request for Approval — Gym / Hydrotherapy Membership")+`
+${isGymOnly||isCombined?"- Gym-based progressive strengthening and conditioning is required to restore functional capacity, address deconditioning secondary to the injury, and support a safe return to work.\n":""}${isHydroOnly||isCombined?"- Hydrotherapy provides a low-impact rehabilitation environment appropriate for this patient's current functional limitations, enabling exercise that would not be tolerated on land at this stage of recovery.\n":""}${isSupervised?"- The program will be supervised by a qualified exercise professional to ensure clinical safety, appropriate progression, and alignment with the treating team's rehabilitation goals.":"- The program will be undertaken as a self-managed exercise regimen, in accordance with the treating practitioner's prescribed program and rehabilitation goals."}
 
-I am writing to request approval for a ${(claim.gymData&&claim.gymData.type)||"gym / hydrotherapy"} membership for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+──────────────────────────────────────
+PROPOSED PROGRAM
+──────────────────────────────────────
 
-**Diagnosis:**
+Type: ${gymType}
+Duration: ${gd.duration||ahrmDuration||"3 months"}
+Supervision: ${gd.supervised||"Supervised"}
+${gd.program?"Program detail: "+gd.program:"Program: Progressive rehabilitation program as directed by the treating practitioner, targeting restoration of functional capacity and return to work."}
+
+──────────────────────────────────────
+CERTIFICATE OF CAPACITY
+──────────────────────────────────────
+
+${cocLine}
+Status: ${fitnessStatus||"As per Certificate of Capacity"}
+${workRestrictions&&workRestrictions!=="As per Certificate of Capacity."?"Restrictions: "+workRestrictions:""}
+${claim.cocNotes?"Additional notes: "+claim.cocNotes:""}
+──────────────────────────────────────
+EXPECTED OUTCOMES
+──────────────────────────────────────
+
+The proposed program is expected to achieve the following outcomes relevant to the compensable condition:
+
+- Improved strength, conditioning, and functional capacity
+- Reduction in pain and disability associated with the accepted diagnosis
+- Support for a safe and sustainable return to ${workRestrictions?"modified":"pre-injury"} duties
+${rtwMod&&rtwMod!=="[date not set]"?"- Target return to modified duties: "+rtwMod:""}
+${rtwNorm&&rtwNorm!=="[date not set]"?"- Target return to normal duties: "+rtwNorm:""}
+──────────────────────────────────────
+ATTACHED DOCUMENTATION
+──────────────────────────────────────
+
+The WorkSafe ${scheme==="TAC"?"TAC":"Victoria"} Gym / Swim Request Form is attached to this letter, completed as follows:
+- Patient details, claim information, and work status have been pre-populated from ClaimBridge.
+${pracProf.toLowerCase().includes("dr")||pracProf.toLowerCase().includes("doctor")||pracProf.toLowerCase().includes("gp")||pracProf.toLowerCase().includes("physician")?"- The 'List Claim Activity' section has been completed by the referring medical practitioner and is included on the attached form.\n":"- Note: The 'List Claim Activity' section on the form is required to be completed by a medical practitioner prior to submission.\n"}- Any remaining sections on the form requiring practitioner sign-off have been completed and are ready for submission.
+
+I am satisfied that this request is reasonable, necessary, and causally related to the compensable condition. I request your approval at your earliest convenience.
+${reviewDate&&reviewDate!=="[date not set]"?"\nI plan to review "+patientName+" on "+reviewDate+".":""}
+Thank you for your consideration.${sig}
+
+cc: ${patientName}`;
+    }
+
+    if(id==="radiology"){
+      const modality=claim.imagingReferral||"radiological imaging";
+      const modalityDetail=(()=>{
+        const m=(claim.imagingReferral||"").toLowerCase();
+        if(m==="mri")return "MRI provides superior soft tissue resolution and is the most appropriate modality to characterise the extent of the injury and inform the ongoing management plan.";
+        if(m==="ct scan")return "CT imaging provides detailed cross-sectional assessment and is the most appropriate modality to evaluate bony and structural pathology in the context of this injury.";
+        if(m==="x-ray")return "Plain radiography is indicated as the appropriate first-line imaging modality to assess for bony injury and structural abnormality.";
+        if(m==="ultrasound")return "Ultrasound imaging is indicated to assess soft tissue and dynamic structures relevant to this injury, providing real-time evaluation to guide clinical management.";
+        if(m==="bone scan")return "Bone scintigraphy is indicated to evaluate for occult bony injury, stress response, or metabolic activity not readily identifiable on plain radiography.";
+        if(m==="dexa scan")return "DEXA scanning is indicated to quantify bone mineral density relevant to the clinical presentation and inform the ongoing management plan.";
+        if(m==="pet scan")return "PET imaging is indicated to provide metabolic and functional assessment to guide the ongoing management of this condition.";
+        return "The requested imaging modality is considered the most appropriate to further characterise the injury and inform the clinical management plan.";
+      })();
+      const cocLine=[
+        (claim.cocType||"Subsequent")+" Certificate",
+        claim.cocCount?"No. "+claim.cocCount:null,
+        (claim.cocFrom&&claim.cocTo)?"valid "+cocFrom+" – "+cocTo:null
+      ].filter(Boolean).join(", ");
+      return hdr("Request for Approval — "+modality+" (Radiological Imaging)")+`
+
+I am writing to request insurer approval for ${modality} for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}. This imaging is requested by the treating medical practitioner and is considered reasonable and necessary for the clinical management of the accepted compensable condition.
+
+──────────────────────────────────────
+ACCEPTED DIAGNOSIS
+──────────────────────────────────────
+
   - ${diagList}
 
-**Clinical Justification:**
-${(claim.gymData&&claim.gymData.justification)||treatPlan}
+${patientName} sustained the above ${scheme==="TAC"?"injuries in a motor vehicle accident":"compensable workplace injury"} on ${doi}${employer?", whilst employed by "+employer:""}.
 
-**Proposed Program:**
-Type: ${(claim.gymData&&claim.gymData.type)||"Gym / hydrotherapy"}
-Duration: ${(claim.gymData&&claim.gymData.duration)||ahrmDuration||"3 months"}
-Supervision: ${(claim.gymData&&claim.gymData.supervised)||"Supervised"}
-Program: ${(claim.gymData&&claim.gymData.program)||"Progressive strengthening and conditioning program to restore functional capacity."}
+──────────────────────────────────────
+IMAGING REQUESTED
+──────────────────────────────────────
 
-**Expected Outcomes:**
-Improved cardiovascular fitness, strength, and functional capacity to support return to work and daily activities.${sig}`;
+Modality: ${modality}
+Body region / indication: ${claim.imagingIndication||"As per clinical assessment — region and indication documented in the patient's medical record."}
 
-    if(id==="radiology")return hdr("Request for Approval — Radiological Imaging")+`
+${modalityDetail}
 
-I am writing to request approval for radiological imaging for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+──────────────────────────────────────
+CLINICAL JUSTIFICATION
+──────────────────────────────────────
 
-**Diagnosis:**
+${claim.clinicalPresentation||patientName+" presents with symptoms and functional limitations consistent with the accepted diagnosis."}
+
+This imaging is requested to:
+
+1. Further characterise the nature and extent of the injury causally related to the compensable condition.
+2. Inform and guide the ongoing treatment and rehabilitation plan.
+3. Assess treatment response and identify any structural pathology requiring intervention.
+${claim.otherInvestigations?`\nOther investigations ordered or pending:\n${claim.otherInvestigations}`:""}
+──────────────────────────────────────
+CERTIFICATE OF CAPACITY
+──────────────────────────────────────
+
+${cocLine}
+Status: ${fitnessStatus||"As per Certificate of Capacity"}
+${workRestrictions&&workRestrictions!=="As per Certificate of Capacity."?"Restrictions: "+workRestrictions:""}
+${claim.cocNotes?"Additional notes: "+claim.cocNotes:""}
+──────────────────────────────────────
+REQUEST
+──────────────────────────────────────
+
+I request your approval for the above ${modality} at your earliest convenience. Timely access to this imaging is important to avoid delays in diagnosis and treatment planning that could adversely affect ${patientName}'s recovery and return to work trajectory.
+
+Once approved, imaging results will be reviewed by the treating medical practitioner and the findings will inform the next phase of the clinical management plan.
+
+I am satisfied that this imaging request is reasonable, necessary, and causally related to the compensable condition.
+${reviewDate&&reviewDate!=="[date not set]"?"\nI plan to review "+patientName+" on "+reviewDate+".":""}
+Thank you for your consideration.${sig}`;
+    }
+
+    if(id==="household"){
+      const hh=claim.hhData||{};
+      const tasks=hh.tasks||claim.hhTasks||"";
+      const frequency=hh.frequency||claim.hhFrequency||"";
+      const duration=hh.duration||claim.hhDuration||"";
+      const hoursPerVisit=hh.hoursPerVisit||"";
+      const justification=hh.justification||claim.hhJustification||treatPlan||"";
+      const cocLine=[
+        (claim.cocType||"Subsequent")+" Certificate",
+        claim.cocCount?"No. "+claim.cocCount:null,
+        (claim.cocFrom&&claim.cocTo)?"valid "+cocFrom+" – "+cocTo:null
+      ].filter(Boolean).join(", ");
+      return hdr("Request for Approval — Household Help Services (FOR592)")+`
+
+I am writing to request approval for household help services for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}. This request is submitted in accordance with WorkSafe Victoria's household help services guidelines, and the completed FOR592 Request Form is attached.
+
+Please note that a worker declaration form (FOR592 — Worker Declaration) is required to be completed and signed by ${patientName} and submitted to you directly, if not already on file.
+
+──────────────────────────────────────
+ACCEPTED DIAGNOSIS
+──────────────────────────────────────
+
   - ${diagList}
 
-**Imaging Requested:**
-${claim.imagingReferral||"MRI / CT / X-Ray — as clinically indicated"}
+${patientName} sustained the above ${scheme==="TAC"?"injuries in a motor vehicle accident":"compensable workplace injury"} on ${doi}${employer?", whilst employed by "+employer:""}.
 
-**Clinical Indication:**
-${claim.imagingIndication||"To further investigate the clinical presentation and assist with diagnosis, treatment planning, and assessment of injury severity related to the compensable condition."}
+──────────────────────────────────────
+FUNCTIONAL LIMITATIONS
+──────────────────────────────────────
 
-${claim.otherInvestigations?"\n**Other investigations:**\n"+claim.otherInvestigations:""}
+As a direct result of the compensable injury, ${patientName} has the following functional limitations that prevent them from performing essential household tasks:
 
-I request your approval for the above imaging to assist with the ongoing clinical management of this patient.${sig}`;
+${claim.clinicalPresentation||workRestrictions||"Functional limitations as per clinical assessment and Certificate of Capacity."}
 
-    if(id==="household")return hdr("Request for Approval — Household Assistance")+`
+The following household tasks cannot be performed by ${patientName} as a result of these limitations:
 
-I am writing to request approval for household assistance services for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+${tasks||"As documented in the attached FOR592 Request Form."}
 
-**Diagnosis:**
+──────────────────────────────────────
+CLINICAL JUSTIFICATION
+──────────────────────────────────────
+
+${justification||"Household assistance is considered reasonable and necessary as a direct consequence of the functional limitations arising from the compensable injury."}
+
+Household help services are requested to prevent aggravation of the compensable condition, support safe recovery, and ensure ${patientName} is not placed at risk of re-injury through attempting tasks beyond their current functional capacity.
+
+──────────────────────────────────────
+ASSISTANCE REQUESTED
+──────────────────────────────────────
+
+Frequency: ${frequency||"As clinically indicated"}
+Duration: ${duration||"Up to 12 weeks — subject to review"}
+${hoursPerVisit?"Hours per visit: "+hoursPerVisit:""}
+
+Please note that in accordance with WorkSafe Victoria guidelines, an updated request form will be submitted at the end of each approval period, or every 12 weeks (whichever comes first), should ongoing household assistance remain clinically necessary. Where longer-term services beyond 6 months are required, this will be supported with appropriate clinical documentation.
+
+──────────────────────────────────────
+CERTIFICATE OF CAPACITY
+──────────────────────────────────────
+
+${cocLine}
+Status: ${fitnessStatus||"As per Certificate of Capacity"}
+${workRestrictions&&workRestrictions!=="As per Certificate of Capacity."?"Restrictions: "+workRestrictions:""}
+${claim.cocNotes?"Additional notes: "+claim.cocNotes:""}
+──────────────────────────────────────
+ATTACHED DOCUMENTATION
+──────────────────────────────────────
+
+The FOR592 Household Help Request Form is attached to this letter, completed as follows:
+- Patient details, claim information, diagnosis, and capacity limitations have been pre-populated from ClaimBridge.
+- Tasks the patient cannot perform, frequency, duration, hours per visit, and clinical justification have been completed by the treating practitioner.
+- Any remaining sections on the form requiring practitioner sign-off have been completed and are ready for submission.
+
+Note: The FOR592 Worker Declaration must be completed and signed by ${patientName}. This is the worker's responsibility and is required once per claim, unless living circumstances change.
+
+I am satisfied that the requested household help services are reasonable, necessary, and causally related to the compensable condition. I request your approval at your earliest convenience.
+${reviewDate&&reviewDate!=="[date not set]"?"\nI plan to review "+patientName+" on "+reviewDate+".":""}
+Thank you for your consideration.${sig}`;
+    }
+
+    if(id==="travel"){
+      const refsTravel=(claim.referrals||[]).filter(r=>r.travelRequired&&r.travelRequired!=="No travel required"&&r.travelRequired!=="Travel required?");
+      const needsAccom=claim.accommodationRequired==="yes";
+      const travelSubject=needsAccom?"Request for Approval — Travel and Accommodation":"Request for Approval — Travel Assistance";
+      const cocLine=[
+        (claim.cocType||"Subsequent")+" Certificate",
+        claim.cocCount?"No. "+claim.cocCount:null,
+        (claim.cocFrom&&claim.cocTo)?"valid "+cocFrom+" – "+cocTo:null
+      ].filter(Boolean).join(", ");
+      return hdr(travelSubject)+`
+
+I am writing to request approval for travel assistance${needsAccom?" and accommodation":""} for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}, to attend approved treatment related to the compensable condition.
+
+Note: Travel and accommodation requests are most commonly submitted as part of a referral or procedure approval letter. This standalone letter should be used where travel approval is required independently of another concurrent request.
+
+──────────────────────────────────────
+ACCEPTED DIAGNOSIS
+──────────────────────────────────────
+
   - ${diagList}
 
-**Functional Limitations:**
-As a direct result of the compensable injury, ${patientName} is unable to perform the following household tasks:
-${(claim.hhData&&claim.hhData.tasks)||claim.hhTasks||"As documented in the Household Help Request form (FOR592)."}
+${patientName} sustained the above ${scheme==="TAC"?"injuries in a motor vehicle accident":"compensable workplace injury"} on ${doi}${employer?", whilst employed by "+employer:""}.
 
-**Assistance Required:**
-Frequency: ${(claim.hhData&&claim.hhData.frequency)||claim.hhFrequency||"As clinically indicated"}
-Duration: ${(claim.hhData&&claim.hhData.duration)||claim.hhDuration||"Until functional capacity improves"}
+──────────────────────────────────────
+TRAVEL REQUEST
+──────────────────────────────────────
 
-**Clinical Justification:**
-${(claim.hhData&&claim.hhData.justification)||claim.hhJustification||treatPlan}
+${claim.travelReasoning||"Travel assistance is required as the patient's physical capacity prevents independent travel to attend approved treatment appointments related to the compensable condition."}
 
-**Work/Activity Restrictions:**
-${workRestrictions}
+${refsTravel.length>0?refsTravel.map(r=>`Referral: ${r.specialty||r.name||"Treating practitioner"}\nTransport mode: ${r.travelRequired}${r.travelReasoning?"\nReason: "+r.travelReasoning:""}`).join("\n\n"):"Transport mode: As required to attend approved treatment\nReason: "+( claim.travelReasoning||"Patient is unable to travel independently due to functional limitations arising from the compensable injury.")}
 
-I am satisfied that the requested household assistance is reasonable and necessary as a direct consequence of the compensable injury.${sig}`;
+Please note that if travel is arranged by the patient, a tax invoice or receipt will be submitted to ${insurerName} for reimbursement following the appointment. Prior approval is required before any arrangements are made. If the insurer arranges transport directly through their own providers, no further action is required from the patient.
 
-    if(id==="travel")return hdr("Request for Approval — Travel and/or Accommodation")+`
+──────────────────────────────────────
+${needsAccom?"ACCOMMODATION REQUEST":"CERTIFICATE OF CAPACITY"}
+──────────────────────────────────────
 
-I am writing to request approval for funded travel${claim.accommodationRequired==="yes"?" and accommodation":""} for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+${needsAccom?`Accommodation is required in conjunction with the above approved treatment for the following reason:
 
-**Diagnosis:**
+${claim.accommodationReasoning||"The treatment facility is located more than 40km from the patient's residence, and/or the nature of the procedure or treatment requires an overnight stay for clinical monitoring and safety."}
+
+Nights required: ${claim.accommodationNights||"[number of nights — to be confirmed with treating facility]"}
+
+Accommodation will be arranged in accordance with ${scheme==="TAC"?"TAC":"WorkSafe Victoria"} guidelines, at a reasonable and appropriate standard proximate to the treatment facility.
+
+──────────────────────────────────────
+CERTIFICATE OF CAPACITY
+──────────────────────────────────────`:""}
+
+${cocLine}
+Status: ${fitnessStatus||"As per Certificate of Capacity"}
+${workRestrictions&&workRestrictions!=="As per Certificate of Capacity."?"Restrictions: "+workRestrictions:""}
+${claim.cocNotes?"Additional notes: "+claim.cocNotes:""}
+──────────────────────────────────────
+REQUEST
+──────────────────────────────────────
+
+I am satisfied that the requested travel${needsAccom?" and accommodation":""} assistance is reasonable and necessary to ensure ${patientName} can access approved treatment related to the compensable condition. Failure to provide travel assistance would prevent the patient from attending approved appointments and would adversely affect their recovery and return to work trajectory.
+
+I request your approval at your earliest convenience.
+${reviewDate&&reviewDate!=="[date not set]"?"\nI plan to review "+patientName+" on "+reviewDate+".":""}
+Thank you for your consideration.${sig}`;
+    }
+
+    if(id==="procedure"){
+      const procName=claim.procedureCustom||proposedProcedure||"[Procedure / surgical intervention]";
+      const procHospital=claim.procedureHospital||firstRef.clinic||"";
+      const procDate=claim.procedureDate?fmtD(claim.procedureDate):"";
+      const procNotes=claim.procedureNotes||"";
+      const surgeon=firstRef.name||"";
+      const surgeonSpecialty=firstRef.specialty||"";
+      const priorReferrals=(claim.referrals||[]);
+      const approvedRefs=priorReferrals.filter(r=>r.status==="Approved");
+      const refsTravel=priorReferrals.filter(r=>r.travelRequired&&r.travelRequired!=="No travel required"&&r.travelRequired!=="Travel required?");
+      const needsAccom=claim.accommodationRequired==="yes";
+      const cocLine=[
+        (claim.cocType||"Subsequent")+" Certificate",
+        claim.cocCount?"No. "+claim.cocCount:null,
+        (claim.cocFrom&&claim.cocTo)?"valid "+cocFrom+" – "+cocTo:null
+      ].filter(Boolean).join(", ");
+      return hdr("Request for Approval — Procedure / Surgical Intervention")+`
+
+I am writing to request insurer approval for a surgical/procedural intervention for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}. This request is submitted in accordance with the WIRC Act 2013 and the Clinical Framework for the Delivery of Health Services.
+
+──────────────────────────────────────
+ACCEPTED DIAGNOSIS
+──────────────────────────────────────
+
   - ${diagList}
 
-**Travel Request:**
-${claim.travelReasoning||"Travel is required to attend approved treatment. The patient is unable to use their private vehicle due to the nature of their compensable injury, and public transport is not a viable option."}
-${claim.accommodationRequired==="yes"?`
-**Accommodation Request:**
-Nights required: ${claim.accommodationNights||"[number of nights]"}
-${claim.accommodationReasoning||"Accommodation is required due to the distance from the patient's residence to the treatment facility."}`:""} 
+${patientName} sustained the above ${scheme==="TAC"?"injuries in a motor vehicle accident":"compensable workplace injury"} on ${doi}${employer?", whilst employed by "+employer:""}.
 
-I request your approval for the above at your earliest convenience to ensure continuity of treatment.${sig}`;
+──────────────────────────────────────
+PROPOSED PROCEDURE
+──────────────────────────────────────
 
-    if(id==="procedure")return hdr("Request for Approval — Procedure / Surgical Intervention")+`
+Procedure: ${procName}
+Performing practitioner: ${surgeon||"[Surgeon / specialist name]"}${surgeonSpecialty?" ("+surgeonSpecialty+")":""}
+Facility: ${procHospital||"[Hospital / clinic — to be confirmed]"}
+${procDate?"Proposed date: "+procDate:""}
 
-I am writing to request approval for a procedure / surgical intervention for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}.
+${procNotes||""}
+──────────────────────────────────────
+CLINICAL JUSTIFICATION
+──────────────────────────────────────
 
-**Diagnosis:**
+${patientName} sustained the above injury on ${doi}${employer?", whilst employed by "+employer:""}. Conservative management has been undertaken as follows and has been insufficient to restore adequate function or relieve symptoms to a level that supports safe return to work:
+
+${treatmentStrategy}
+
+${priorReferrals.length>0?`Prior treatment and referrals:\n${priorReferrals.map(r=>r.specialty+(r.name?" — "+r.name:"")+(r.status?" ("+r.status+")":"")).join("\n")}`:""} 
+
+The proposed procedure is considered the most appropriate next step in the management of this patient's compensable condition. It is clinically justified on the basis that conservative treatment has been trialled without sufficient improvement, and the procedure offers the best prospect of meaningful functional restoration and return to work.
+
+──────────────────────────────────────
+SUPPORTING INVESTIGATIONS
+──────────────────────────────────────
+
+${imagingSummary?`Imaging:\n${imagingSummary}`:"No formal imaging on file. Relevant investigations are documented in the patient's medical record and are available upon request."}
+${claim.otherInvestigations?"Other investigations:\n"+claim.otherInvestigations:""}
+──────────────────────────────────────
+POST-PROCEDURE MANAGEMENT PLAN
+──────────────────────────────────────
+
+Following the procedure, the anticipated management plan includes:
+
+${goalsText||"Progressive rehabilitation, restoration of functional capacity, and graded return to pre-injury duties."}
+${approvedRefs.length>0?"Ongoing approved referrals to continue post-procedure: "+approvedRefs.map(r=>r.specialty+(r.name?" — "+r.name:"")).join(", ")+".":""}
+Additional referrals or investigations may be required post-procedure as clinically indicated and will be requested separately.
+
+──────────────────────────────────────
+RETURN TO WORK
+──────────────────────────────────────
+
+${rtwMod&&rtwMod!=="[date not set]"?"Estimated return to modified duties: "+rtwMod:""}
+${rtwNorm&&rtwNorm!=="[date not set]"?"Estimated return to normal duties: "+rtwNorm:""}
+${!rtwMod&&!rtwNorm?"Return to work timeline will be assessed post-procedure in consultation with the treating team and employer.":""}
+──────────────────────────────────────
+CERTIFICATE OF CAPACITY
+──────────────────────────────────────
+
+${cocLine}
+Status: ${fitnessStatus||"As per Certificate of Capacity"}
+${workRestrictions&&workRestrictions!=="As per Certificate of Capacity."?"Restrictions: "+workRestrictions:""}
+${claim.cocNotes?"Additional notes: "+claim.cocNotes:""}
+${needsAccom||refsTravel.length>0?`
+──────────────────────────────────────
+TRAVEL AND ACCOMMODATION
+──────────────────────────────────────
+${refsTravel.length>0?`\nTravel assistance is also requested for ${patientName} to attend the above procedure:\n${refsTravel.map(r=>`Transport mode: ${r.travelRequired}${r.travelReasoning?"\nReason: "+r.travelReasoning:""}`).join("\n")}`:""} ${needsAccom?`\nAccommodation is required${claim.accommodationReasoning?" — "+claim.accommodationReasoning:claim.procedureHospital?" due to the location of "+procHospital:""}.\nNights required: ${claim.accommodationNights||"[to be confirmed with facility]"}`:""}`:""}
+──────────────────────────────────────
+REQUEST
+──────────────────────────────────────
+
+I am satisfied that the proposed procedure is reasonable, necessary, and causally related to the compensable condition. I request your approval at your earliest convenience so that arrangements can be made with the treating surgeon and facility.
+${reviewDate&&reviewDate!=="[date not set]"?"\nI plan to review "+patientName+" on "+reviewDate+".":""}
+Thank you for your consideration.${sig}`;
+    }
+
+    if(id==="ketamine"){
+      const hasMeds=(claim.medications||[]).length>0;
+      const medsList=hasMeds?claim.medications.map(m=>m.name+(m.dosage?" "+m.dosage:"")+(m.frequency?", "+m.frequency:"")+(m.duration?" ("+m.duration+")":"")).join("\n  - "):null;
+      const cocLine=[
+        (claim.cocType||"Subsequent")+" Certificate",
+        claim.cocCount?"No. "+claim.cocCount:null,
+        (claim.cocFrom&&claim.cocTo)?"valid "+cocFrom+" – "+cocTo:null
+      ].filter(Boolean).join(", ");
+      const adminRoute=claim.ketamineData&&claim.ketamineData.route||"intravenous (IV)";
+      const provider=claim.ketamineData&&claim.ketamineData.provider||firstRef.name||"";
+      const providerClinic=claim.ketamineData&&claim.ketamineData.clinic||firstRef.clinic||"";
+      const justification=claim.ketamineData&&claim.ketamineData.justification||claim.procedureNotes||treatPlan||"";
+      const mentalHealthSafety=claim.ketamineData&&claim.ketamineData.mentalHealthSafety||"";
+      return hdr("Request for Approval — Ketamine Infusion (Chronic Non-Cancer Pain)")+`
+
+I am writing to request prior approval for ketamine infusion therapy for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}. This request is submitted in accordance with WorkSafe Victoria's Ketamine Infusion Guidelines and the WIRC Act 2013.
+
+Please note that WorkSafe will not fund ketamine infusion services provided without prior approval. This letter is accompanied by the supporting documentation required under the guidelines.
+
+──────────────────────────────────────
+ACCEPTED DIAGNOSIS / PAIN CONDITION
+──────────────────────────────────────
+
   - ${diagList}
 
-**Proposed Procedure:**
-${proposedProcedure||firstRef.specialty||"[Procedure / surgical intervention]"} — to be performed by ${firstRef.name||"[Specialist name]"}${firstRef.clinic?" at "+firstRef.clinic:""}.
+${patientName} sustained the above ${scheme==="TAC"?"injuries in a motor vehicle accident":"compensable workplace injury"} on ${doi}${employer?", whilst employed by "+employer:""}. The above diagnosis has been established and is accepted as causally related to the compensable event.
 
-**Clinical Justification:**
-${patientName} sustained the above compensable injury on ${doi}${employer?" while employed with "+employer:""}. Conservative management has been undertaken and ${treatmentStrategy}
+${patientName} presents with chronic non-cancer pain (CNCP) that has persisted beyond the expected healing timeframe and has failed to respond adequately to first-line treatments.
 
-**Treatment Summary — Previously Approved Treatment:**
-${(claim.referrals||[]).length>0?(claim.referrals||[]).map(r=>r.specialty+(r.name?" — "+r.name:"")+(r.status?" ("+r.status+")":"")).join("\n"):"No prior referrals recorded."}
+──────────────────────────────────────
+EVIDENCE OF FAILED FIRST-LINE TREATMENT
+──────────────────────────────────────
 
-${imagingSummary?`**Supporting Imaging:**
-${imagingSummary}
+The following treatments and services have been trialled for the management of this patient's chronic pain condition with limited or insufficient efficacy:
 
-`:""}**Post-Procedure Treatment Plan and Recommendations:**
-${goalsText||"Restoration of functional capacity, pain reduction, and progressive return to pre-injury level of function."}
-${(claim.referrals||[]).filter(r=>r.status==="Approved").length>0?"Ongoing approved referrals to continue post-procedure: "+(claim.referrals||[]).filter(r=>r.status==="Approved").map(r=>r.specialty).join(", ")+".\n":""}Additional referrals or investigations may be required following the procedure as clinically indicated.
+${justification||"[Please document specific treatments trialled, duration, and outcomes]"}
 
-**Return to Work:**
-${rtwMod!=="[date not set]"?"Estimated return to modified duties: "+rtwMod+"\n":""}${rtwNorm!=="[date not set]"?"Estimated return to normal duties: "+rtwNorm:""}
+${hasMeds?`Current and relevant past medications (with outcomes):\n  - ${medsList}`:"No current medications. Medication history documented in the patient's medical record."}
 
-I am satisfied that this procedure is reasonable, necessary, and causally related to the compensable condition. I request your approval at your earliest convenience.${sig}`;
+${claim.clinicalPresentation||""}
+
+──────────────────────────────────────
+PROPOSED KETAMINE INFUSION
+──────────────────────────────────────
+
+Administration route: ${adminRoute}
+Providing practitioner: ${provider||"[Pain specialist / anaesthetist — AHPRA registered]"}${providerClinic?" at "+providerClinic:""}
+Clinical indication: Chronic non-cancer pain — failed first-line treatments${claim.injuryBodyPart?" ("+claim.injuryBodyPart+")":""}
+
+The proposed ketamine infusion is intended to:
+${claim.ketamineData&&claim.ketamineData.opioidReduction?"- Reduce opioid dependency / opioid medication usage\n":""}- Achieve measurable improvement in functional capacity and pain levels
+- Promote progress toward functional independence and self-management
+- Support a safe and sustainable return to work
+
+──────────────────────────────────────
+STANDARDISED OUTCOME MEASURES
+──────────────────────────────────────
+
+Baseline outcome measures have been completed using the Brief Pain Inventory (BPI) and are included with this request. Pre- and post-treatment measures will be provided with any subsequent requests to demonstrate treatment efficacy in line with the Clinical Framework.
+
+${claim.ketamineData&&claim.ketamineData.outcomeMeasures||"[Attach Brief Pain Inventory baseline scores]"}
+
+──────────────────────────────────────
+MENTAL HEALTH SAFETY
+──────────────────────────────────────
+
+${mentalHealthSafety||"The patient has been assessed for mental health risk factors. No significant risk factors have been identified that would increase the likelihood of an adverse psychiatric event. Ongoing mental health monitoring will be maintained throughout the treatment period."}
+
+──────────────────────────────────────
+CERTIFICATE OF CAPACITY
+──────────────────────────────────────
+
+${cocLine}
+Status: ${fitnessStatus||"As per Certificate of Capacity"}
+${workRestrictions&&workRestrictions!=="As per Certificate of Capacity."?"Restrictions: "+workRestrictions:""}
+${claim.cocNotes?"Additional notes: "+claim.cocNotes:""}
+──────────────────────────────────────
+REQUEST
+──────────────────────────────────────
+
+I am satisfied that this request meets the criteria set out in WorkSafe Victoria's Ketamine Infusion Guidelines:
+
+- The patient has an established and reliable diagnosis of a chronic pain condition causally related to the accepted work injury.
+- First-line treatments have been trialled and have not produced sufficient clinical improvement.
+- The proposed treatment is clinically justified, safe, and is expected to achieve measurable improvement in functioning.
+- The treatment promotes progress toward functional independence and return to work.
+- The treatment will be delivered by an AHPRA-registered medical practitioner with appropriate professional indemnity insurance.
+
+I request WorkSafe's consideration and approval within the 28-day timeframe prescribed by the guidelines. I am available to discuss this request further if required.
+${reviewDate&&reviewDate!=="[date not set]"?"\nI plan to review "+patientName+" on "+reviewDate+".":""}
+Thank you for your consideration.${sig}`;
+    }
+
+    if(id==="cannabis"){
+      const hasMeds=(claim.medications||[]).length>0;
+      const medsList=hasMeds?claim.medications.map(m=>m.name+(m.dosage?" "+m.dosage:"")+(m.frequency?", "+m.frequency:"")+(m.duration?" ("+m.duration+")":"")).join("\n  - "):null;
+      const cocLine=[
+        (claim.cocType||"Subsequent")+" Certificate",
+        claim.cocCount?"No. "+claim.cocCount:null,
+        (claim.cocFrom&&claim.cocTo)?"valid "+cocFrom+" – "+cocTo:null
+      ].filter(Boolean).join(", ");
+      const prescriber=claim.cannabisData&&claim.cannabisData.prescriber||firstRef.name||"";
+      const prescriberClinic=claim.cannabisData&&claim.cannabisData.clinic||firstRef.clinic||"";
+      const product=claim.cannabisData&&claim.cannabisData.product||"";
+      const route=claim.cannabisData&&claim.cannabisData.route||"";
+      const justification=claim.cannabisData&&claim.cannabisData.justification||claim.procedureNotes||treatPlan||"";
+      const painSpecialistSupport=claim.cannabisData&&claim.cannabisData.painSpecialistSupport||"";
+      const addictionRisk=claim.cannabisData&&claim.cannabisData.addictionRisk||"";
+      const outcomeMeasures=claim.cannabisData&&claim.cannabisData.outcomeMeasures||"";
+      const tgaPathway=claim.cannabisData&&claim.cannabisData.tgaPathway||"Special Access Scheme (SAS-B)";
+      return hdr("Request for Approval — Medicinal Cannabis (Exceptional Circumstances — CNCP)")+`
+
+I am writing to request prior approval for medicinal cannabis for my patient, ${patientName} (DOB: ${patientDOB}), under ${scheme} claim number ${claimNo}. This request is submitted in accordance with WorkSafe Victoria's Medicinal Cannabis Policy and the NeNETS (Non-Established, New or Emerging Treatments and Services) framework.
+
+IMPORTANT NOTICE: WorkSafe Victoria does not routinely support the use of medicinal cannabis for the treatment of chronic non-cancer pain (CNCP) due to the current lack of robust evidence. This request is made on the basis of exceptional circumstances, as all other reasonable established treatments and services have been exhausted. This letter is accompanied by the supporting documentation required under the policy.
+
+──────────────────────────────────────
+ACCEPTED DIAGNOSIS / PAIN CONDITION
+──────────────────────────────────────
+
+  - ${diagList}
+
+${patientName} sustained the above ${scheme==="TAC"?"injuries in a motor vehicle accident":"compensable workplace injury"} on ${doi}${employer?", whilst employed by "+employer:""}. The patient presents with chronic non-cancer pain (CNCP) — defined as pain persisting beyond 3 months or beyond expected healing time — that is causally related to the compensable injury.
+
+──────────────────────────────────────
+EVIDENCE OF EXHAUSTED TREATMENTS
+──────────────────────────────────────
+
+The following treatments have been trialled with limited efficacy, or were inappropriate for the specific reasons noted. This evidence has been provided by and is supported by the treating pain specialist:
+
+${justification||"[Document all treatments trialled, duration, outcomes, and reasons for failure or contraindication]"}
+
+${hasMeds?`Current and relevant past medications:\n  - ${medsList}`:"Medication history documented in the patient's medical record."}
+
+──────────────────────────────────────
+PAIN SPECIALIST SUPPORT
+──────────────────────────────────────
+
+${painSpecialistSupport||`A treating pain specialist has assessed ${patientName} and is supportive of the use of medicinal cannabis for the management of CNCP symptoms in this patient. Specialist report is attached.\n\n[Attach pain specialist report confirming support for medicinal cannabis]`}
+
+──────────────────────────────────────
+PROPOSED TREATMENT PLAN
+──────────────────────────────────────
+
+Prescribing practitioner: ${prescriber||"[Pain specialist / authorised prescriber]"}${prescriberClinic?" at "+prescriberClinic:""}
+TGA access pathway: ${tgaPathway}
+${product?"Product: "+product:""}
+${route?"Administration route: "+route:""}
+
+A treatment plan including baseline standardised outcome measures has been prepared and is attached. The plan includes:
+- Baseline outcome measures to assess efficacy and monitor for adverse effects
+- Documented advice to the patient regarding potential risks, adverse effects, and the potential for workplace impairment
+- A review schedule — initial trial period of approximately 3 months, with outcome measures reviewed at the end of the trial period and annually thereafter
+
+${outcomeMeasures||"[Attach baseline standardised outcome measures]"}
+
+──────────────────────────────────────
+OPIOID AND DEPENDENCY CONSIDERATIONS
+──────────────────────────────────────
+
+${addictionRisk||"The patient's opioid use and dependency risk has been assessed. No significant dependency risk has been identified at this time. This will be monitored throughout the treatment period."}
+
+${claim.cannabisData&&claim.cannabisData.morphineEquivalent&&parseInt(claim.cannabisData.morphineEquivalent)>=100?`NOTE: The patient is using an oral morphine equivalent of ${claim.cannabisData.morphineEquivalent}mg/day or greater. Evidence from an addiction specialist regarding the risk of adverse events and dependence has been obtained and is attached, as required under the WorkSafe Medicinal Cannabis Policy.`:""}
+
+──────────────────────────────────────
+GP SUPPORT
+──────────────────────────────────────
+
+As the treating GP for ${patientName}, I am supportive of this medicinal cannabis request. I have conducted a face-to-face assessment with ${patientName} and am satisfied that:
+
+1. All other reasonable established treatments have been trialled and have not provided sufficient clinical benefit.
+2. The treating pain specialist supports the use of medicinal cannabis for this patient.
+3. The patient has been fully informed of the potential risks, adverse effects, and workplace impairment implications.
+4. A structured treatment plan with baseline outcome measures is in place.
+
+──────────────────────────────────────
+CERTIFICATE OF CAPACITY
+──────────────────────────────────────
+
+${cocLine}
+Status: ${fitnessStatus||"As per Certificate of Capacity"}
+${workRestrictions&&workRestrictions!=="As per Certificate of Capacity."?"Restrictions: "+workRestrictions:""}
+${claim.cocNotes?"Additional notes: "+claim.cocNotes:""}
+
+Note: The potential for workplace impairment associated with medicinal cannabis use has been discussed with ${patientName}. Any changes to work capacity arising from commencement of this treatment will be reflected in subsequent Certificates of Capacity.
+
+──────────────────────────────────────
+REQUEST
+──────────────────────────────────────
+
+I request WorkSafe's consideration of this exceptional circumstances application within the 28-day timeframe prescribed by the policy. All required supporting documentation is attached, including:
+
+- Pain specialist report confirming treatment failure and support for medicinal cannabis
+- Baseline standardised outcome measures
+- Treatment plan including review schedule
+${claim.cannabisData&&claim.cannabisData.morphineEquivalent&&parseInt(claim.cannabisData.morphineEquivalent)>=100?"- Addiction specialist report (required — morphine equivalent ≥100mg/day)\n":""}- Evidence of face-to-face GP assessment
+
+I am available to provide further clinical information if required.
+${reviewDate&&reviewDate!=="[date not set]"?"\nI plan to review "+patientName+" on "+reviewDate+".":""}
+Thank you for your consideration.${sig}`;
+    }
 
     return "Template not found.";
   };
