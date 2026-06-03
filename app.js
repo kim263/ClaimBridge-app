@@ -5241,7 +5241,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
     if(!selClaim||!lineItems.some(l=>l.description&&l.amount))return;
     const inv={id:"inv_"+Date.now(),invoiceNumber:nextInvNumber(),episodeId:selEpisode,lineItems,
       amount:String(lineItems.reduce((s,l)=>(parseFloat(l.amount)||0)*(l.qty||1)+s,0).toFixed(2)),
-      date:invoiceDate,gst,status:"Invoiced",createdAt:new Date().toISOString(),bankSettings};
+      date:invoiceDate,gst,status:"Invoiced",createdAt:new Date().toISOString()};
     const logEntry={event:"Invoice created",detail:inv.invoiceNumber+" — "+fmtAUD(getTotal(inv)),timestamp:new Date().toISOString(),by:claimPrac?claimPrac.name:clinic.name};
     const updated={...claim,invoices:[...(claim.invoices||[]),inv],auditTrail:[...(claim.auditTrail||[]),logEntry]};
     onSaveClaim(updated);setSaved(true);setTimeout(()=>setSaved(false),2500);
