@@ -5115,7 +5115,7 @@ function generateInvoicePdf(inv,claim,clinic,practitioners,paymentTerms,bankSett
   tableY+=4;doc.setDrawColor(...teal);doc.setLineWidth(0.4);doc.line(PL,tableY,PR,tableY);tableY+=5;
   doc.setFont("helvetica","bold");doc.setFontSize(9);doc.setTextColor(...navy);doc.text("Payment Details",PL,tableY);tableY+=5;
   doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(...grey);
-  const bank=inv.bankSettings||bankSettings||{};
+  const bank=(inv.bankSettings&&(inv.bankSettings.bsb||inv.bankSettings.accountName||inv.bankSettings.accountNo))?inv.bankSettings:(bankSettings||{});
   if(bank.accountName){doc.text("Account name: "+bank.accountName,PL,tableY);tableY+=4.5;}
   if(bank.bsb||bank.accountNo){doc.text("BSB: "+(bank.bsb||"—")+"   Account: "+(bank.accountNo||"—"),PL,tableY);tableY+=4.5;}
   doc.text("Please quote invoice number "+invNo+" on payment.",PL,tableY);
