@@ -5097,7 +5097,7 @@ function generateInvoicePdf(inv,claim,clinic,practitioners,paymentTerms,bankSett
     doc.setFontSize(8.5);doc.setFont("helvetica","normal");doc.setTextColor(...navy);
     doc.text(fmtD(item.treatmentDate||inv.date),PL+2,tableY+5.5);
     doc.text(String(item.itemCode||"\u2014"),PL+30,tableY+5.5);
-    const desc=String(item.description||"");
+    const desc=Array.isArray(item.description)?item.description.join(""):String(item.description||"");
     doc.text(desc.length>34?desc.substring(0,32)+"\u2026":desc,PL+48,tableY+5.5);
     const qty=item.qty||1,unit=parseFloat(item.amount||0);
     doc.text(String(qty),PR-42,tableY+5.5,{align:"right"});doc.text(fmtAUD(unit),PR-26,tableY+5.5,{align:"right"});doc.text(fmtAUD(unit*qty),PR,tableY+5.5,{align:"right"});
@@ -5115,7 +5115,7 @@ function generateInvoicePdf(inv,claim,clinic,practitioners,paymentTerms,bankSett
   tableY+=4;doc.setDrawColor(...teal);doc.setLineWidth(0.4);doc.line(PL,tableY,PR,tableY);tableY+=5;
   doc.setFont("helvetica","bold");doc.setFontSize(9);doc.setTextColor(...navy);doc.text("Payment Details",PL,tableY);tableY+=5;
   doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(...grey);
-  const bank=(inv.bankSettings&&(inv.bankSettings.bsb||inv.bankSettings.accountName||inv.bankSettings.accountNo))?inv.bankSettings:(bankSettings||{});
+  console.log("[ClaimBridge] bankSettings param:",JSON.stringify(bankSettings),"inv.bankSettings:",JSON.stringify(inv.bankSettings));const bank=(inv.bankSettings&&(inv.bankSettings.bsb||inv.bankSettings.accountName||inv.bankSettings.accountNo))?inv.bankSettings:(bankSettings||{});console.log("[ClaimBridge] resolved bank:",JSON.stringify(bank));
   if(bank.accountName){doc.text("Account name: "+bank.accountName,PL,tableY);tableY+=4.5;}
   if(bank.bsb||bank.accountNo){doc.text("BSB: "+(bank.bsb||"—")+"   Account: "+(bank.accountNo||"—"),PL,tableY);tableY+=4.5;}
   doc.text("Please quote invoice number "+invNo+" on payment.",PL,tableY);
