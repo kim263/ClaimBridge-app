@@ -72,7 +72,7 @@ const S={
   pillD:{background:"rgba(234,88,12,0.12)",borderColor:"rgba(234,88,12,0.35)",color:"#EA580C"},
   ok:{background:"rgba(0,201,167,0.1)",border:"1px solid rgba(0,201,167,0.25)",borderRadius:12,padding:"12px 16px",color:"#00C9A7",fontSize:"0.84rem",marginBottom:16,display:"flex",alignItems:"center",gap:8},
   warn:{background:"rgba(255,184,48,0.08)",border:"1px solid rgba(255,184,48,0.2)",borderRadius:12,padding:"12px 16px",color:"#FFB830",fontSize:"0.84rem",marginBottom:16,display:"flex",alignItems:"center",gap:8},
-  g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16},
+  g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,flexWrap:"wrap"},
   fb:{display:"flex",alignItems:"center",justifyContent:"space-between"},
   fr:{display:"flex",alignItems:"center",gap:12},
 };
@@ -1152,7 +1152,7 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
     savedModal&&e(Modal,{key:"sm",msg:"Claim saved successfully!",onClose:()=>setSavedModal(false)}),
     draftModal&&e(Modal,{key:"dm",msg:"Draft saved! Continue from Claims list.",onClose:()=>{setDraftModal(false);onBack();},onConfirm:()=>{setDraftModal(false);onBack();}}),
     div({key:"hdr",style:{...S.fb,marginBottom:isMobile?14:22,flexWrap:"wrap",gap:8}},[
-      div({key:"l",style:{...S.fr,flex:1,minWidth:0}},[btn({key:"back",style:S.btnS,onClick:onBack,"aria-label":"Back to dashboard"},"← Back"),div({key:"t",style:{fontWeight:700,fontSize:"0.95rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},claim.patientName||"New Claim")]),
+      div({key:"l",style:{...S.fr,flex:1,minWidth:0}},[btn({key:"back",style:S.btnS,onClick:onBack,"aria-label":"Back to dashboard"},"← Back"),div({key:"t",style:{fontWeight:700,fontSize:"0.9rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}},claim.patientName||"New Claim")]),
       div({key:"r",style:{display:"flex",gap:8,flexShrink:0}},[btn({key:"draft",style:S.btnS,onClick:saveDraft},"Save draft"),btn({key:"save",style:S.btnP,onClick:save},"Save claim")]),
     ]),
     activeEpId&&(()=>{
@@ -4868,9 +4868,9 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
   const EP_PAGE_SIZE=5;
   return div({style:{padding:"0"}},[
     div({key:"hdr",style:{...S.card,marginBottom:16,padding:"20px 24px"}},[
-      div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}},[
+      div({key:"top",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,flexWrap:"wrap",gap:10}},[
         div({key:"l"},[
-          div({key:"name",style:{fontWeight:800,fontSize:"1.35rem",letterSpacing:"-0.02em",marginBottom:4}},claim.patientName||"Unnamed patient"),
+          div({key:"name",style:{fontWeight:800,fontSize:"1.25rem",letterSpacing:"-0.02em",marginBottom:4,wordBreak:"break-word"}},claim.patientName||"Unnamed patient"),
           div({key:"meta",style:{marginTop:6}},[
             div({key:"r1",style:{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",marginBottom:5}},[
               claim.scheme&&span({key:"sch",style:{...S.pill,...(claim.scheme==="TAC"?S.pillR:S.pillT),fontSize:"0.72rem",cursor:"default",padding:"2px 8px"}},claim.scheme),
@@ -4897,11 +4897,11 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
       ]),
       div({key:"diags",style:{display:"flex",flexWrap:"wrap",gap:6}},(claim.diagnoses||[]).length>0?(claim.diagnoses||[]).map(d=>span({key:d.icd10,style:{...S.pill,...S.pillM,fontSize:"0.72rem",cursor:"default"}},d.label)):[span({key:"none",style:{fontSize:"0.8rem",color:"#5B7A99"}},"No diagnoses recorded")]),
     ]),
-    div({key:"stats",style:{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:16}},[{label:"Total requests",val:total,col:"#60A5FA"},{label:"Approved",val:approved,col:"#00C9A7"},{label:"Pending",val:pending,col:"#FFB830"},{label:"Declined",val:declined,col:"#FF4D6D"},{label:"Disputed",val:disputed,col:"#F97316"}].map(s=>div({key:s.label,style:{...S.card,textAlign:"center",padding:"16px 12px",marginBottom:0}},[div({key:"v",style:{fontWeight:800,fontSize:"1.8rem",color:s.col,lineHeight:1,marginBottom:4}},s.val),div({key:"l",style:{fontSize:"0.72rem",color:"#5B7A99",lineHeight:1.3}},s.label)]))),
-    div({key:"cols",style:{display:"grid",gridTemplateColumns:"1fr 340px",gap:16}},[
+    div({key:"stats",style:{display:"grid",gridTemplateColumns:"repeat(5,minmax(80px,1fr))",gap:8,marginBottom:16,overflowX:"auto",WebkitOverflowScrolling:"touch"}},[{label:"Total requests",val:total,col:"#60A5FA"},{label:"Approved",val:approved,col:"#00C9A7"},{label:"Pending",val:pending,col:"#FFB830"},{label:"Declined",val:declined,col:"#FF4D6D"},{label:"Disputed",val:disputed,col:"#F97316"}].map(s=>div({key:s.label,style:{...S.card,textAlign:"center",padding:"16px 12px",marginBottom:0}},[div({key:"v",style:{fontWeight:800,fontSize:"1.8rem",color:s.col,lineHeight:1,marginBottom:4}},s.val),div({key:"l",style:{fontSize:"0.72rem",color:"#5B7A99",lineHeight:1.3}},s.label)]))),
+    div({key:"cols",className:"cb-grid-2",style:{alignItems:"start"}},[
       div({key:"left"},[
         div({key:"episodes",style:{...S.card,marginBottom:16}},[
-          div({key:"h",style:{...S.fb,marginBottom:14}},[div({key:"t",style:{fontWeight:700}},"Treatment requests"),btn({key:"new",style:{...S.btnP,fontSize:"0.82rem",padding:"8px 16px"},onClick:()=>{if(createEpisode)createEpisode();}},"+ New request")]),
+          div({key:"h",style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}},[div({key:"t",style:{fontWeight:700}},"Treatment requests"),btn({key:"new",style:{...S.btnP,fontSize:"0.82rem",padding:"8px 14px",flexShrink:0},onClick:()=>{if(createEpisode)createEpisode();}},"+ New request")]),
           (claim.episodes||[]).length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",padding:"12px 0",textAlign:"center"}},"No episodes yet \u2014 click New Request to begin"):
           [...(claim.episodes||[])].reverse().slice(epPage*EP_PAGE_SIZE,(epPage+1)*EP_PAGE_SIZE).map(ep=>{
             const epRefs=ep.referrals||[];const epLetters=ep.letterHistory||[];
@@ -5463,7 +5463,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
         overdueInvoices.length>3&&div({key:"more",style:{fontSize:"0.75rem",color:"#5B7A99",textAlign:"center",paddingTop:8}},overdueInvoices.length-3+" more overdue"),
       ]),
 
-      div({key:"cols",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}},[
+      div({key:"cols",className:"cb-grid-2",style:{alignItems:"start"}},[
         // Create invoice form
         div({key:"form",style:S.card},[
           div({key:"h",style:{fontWeight:700,marginBottom:20}},"Create invoice"),
@@ -5852,6 +5852,12 @@ function App(){
       .cb-grid-3 { grid-template-columns: 1fr !important; }
       .cb-cap-table { grid-template-columns: 1fr 72px 72px 72px; gap: 4px; font-size: 0.78rem; }
       .cb-line-item-row { grid-template-columns: 1fr !important; }
+      /* Claim overview stat cards - let them scroll rather than squeeze */
+      .cb-stat-row { display: grid; grid-template-columns: repeat(5, minmax(80px, 1fr)); gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+      /* Any direct S.g2 usage also collapses */
+      @media (max-width: 767px) {
+        [style*="gridTemplateColumns: 1fr 1fr"], [style*="gridTemplateColumns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+      }
     }
     @media (min-width: 768px) {
       input, select, textarea { font-size: 0.95rem !important; }
