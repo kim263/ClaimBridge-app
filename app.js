@@ -781,16 +781,18 @@ function lbl(props,...children){return e("label",props,...children);}
 function fmtMoney(n){return"$"+(parseFloat(n)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,",");}
 function fmtDate2(d){if(!d)return"";try{return new Date(d).toLocaleDateString("en-AU");}catch{return d;}}
 
-function Inp({label:l,value,onChange,placeholder,type="text",required,mb=16}){
+function Inp({label:l,value,onChange,placeholder,type="text",required,mb=16,id:idProp}){
+  const id=idProp||(l?("inp_"+l.toLowerCase().replace(/[^a-z0-9]/g,"_")):undefined);
   return div({style:{marginBottom:mb}},[
-    l&&e("label",{key:"l",style:S.label},l,required&&span({key:"r",style:{color:"#FF4D6D",marginLeft:3}},"*")),
-    inp({key:"i",className:"cb-input",style:S.inp,type,value:value||"",onChange:ev=>onChange(ev.target.value),placeholder:placeholder||""}),
+    l&&e("label",{key:"l",htmlFor:id,style:S.label},l,required&&span({key:"r",style:{color:"#FF4D6D",marginLeft:3}},"*")),
+    inp({key:"i",id,className:"cb-input",style:S.inp,type,value:value||"",onChange:ev=>onChange(ev.target.value),placeholder:placeholder||""}),
   ]);
 }
-function Sel({label:l,value,onChange,options,required,mb=16}){
+function Sel({label:l,value,onChange,options,required,mb=16,id:idProp}){
+  const id=idProp||(l?("sel_"+l.toLowerCase().replace(/[^a-z0-9]/g,"_")):undefined);
   return div({style:{marginBottom:mb}},[
-    l&&e("label",{key:"l",style:S.label},l,required&&span({key:"r",style:{color:"#FF4D6D",marginLeft:3}},"*")),
-    e("select",{key:"s",className:"cb-sel",style:S.sel,value:value||"",onChange:ev=>onChange(ev.target.value)},[
+    l&&e("label",{key:"l",htmlFor:id,style:S.label},l,required&&span({key:"r",style:{color:"#FF4D6D",marginLeft:3}},"*")),
+    e("select",{key:"s",id,className:"cb-sel",style:S.sel,value:value||"",onChange:ev=>onChange(ev.target.value)},[
       e("option",{key:"__",value:""},"Select..."),
       ...(options||[]).map(o=>typeof o==="string"?e("option",{key:o,value:o},o):e("option",{key:o.value||o.id,value:o.value||o.id},o.label||o.name)),
     ]),
@@ -878,20 +880,20 @@ function Sidebar({nav,onNav,clinic,onLogout,collapsed,onToggle}){
   if(isMobile){
     const mobileItems=items.slice(0,5);
     return div({style:{position:"fixed",bottom:0,left:0,right:0,background:"#0C1A2E",borderTop:"1px solid rgba(255,255,255,0.1)",display:"flex",zIndex:100,paddingBottom:"env(safe-area-inset-bottom)"}},
-      mobileItems.map(item=>btn({key:item.id,onClick:()=>onNav(item.id),style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px",border:"none",background:"transparent",color:active(item.id)?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.6rem",fontWeight:active(item.id)?700:400,cursor:"pointer",gap:3,minHeight:56}},[
+      mobileItems.map(item=>btn({key:item.id,"aria-label":item.label,"aria-current":active(item.id)?"page":undefined,onClick:()=>onNav(item.id),style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px",border:"none",background:"transparent",color:active(item.id)?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.6rem",fontWeight:active(item.id)?700:400,cursor:"pointer",gap:3,minHeight:56}},[
         span({key:"i",style:{fontSize:"1.3rem"}},item.icon),
         span({key:"l"},item.label),
       ]))
     );
   }
-  return div({style:{width:collapsed?60:220,background:"#0C1A2E",borderRight:"1px solid rgba(255,255,255,0.07)",display:"flex",flexDirection:"column",transition:"width 0.25s",flexShrink:0}},[
+  return e("nav",{role:"navigation","aria-label":"Main navigation",style:{width:collapsed?60:220,background:"#0C1A2E",borderRight:"1px solid rgba(255,255,255,0.07)",display:"flex",flexDirection:"column",transition:"width 0.25s",flexShrink:0}},[
     div({key:"hdr",style:{padding:"18px 14px",borderBottom:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"space-between"}},[
       !collapsed&&div({key:"logo",style:{fontWeight:800,fontSize:"1.05rem",letterSpacing:"-0.02em"}},["Claim",span({key:"s",style:{color:"#00C9A7"}},"Bridge")]),
       collapsed&&div({key:"logo2",style:{fontWeight:800,color:"#00C9A7"}},"CB"),
-      btn({key:"tog",onClick:onToggle,style:{background:"transparent",border:"none",color:"rgba(255,255,255,0.35)",cursor:"pointer",fontSize:"1.1rem"}},collapsed?"›":"‹"),
+      btn({key:"tog",onClick:onToggle,"aria-label":collapsed?"Expand sidebar":"Collapse sidebar",style:{background:"transparent",border:"none",color:"rgba(255,255,255,0.35)",cursor:"pointer",fontSize:"1.1rem"}},collapsed?"›":"‹"),
     ]),
     div({key:"nav",style:{padding:"8px 0",flex:1}},
-      items.map(item=>btn({key:item.id,className:"nav-btn",onClick:()=>onNav(item.id),title:collapsed?item.label:"",style:{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",cursor:"pointer",borderRadius:8,margin:"2px 8px",border:"1px solid "+(active(item.id)?"rgba(0,201,167,0.2)":"transparent"),background:active(item.id)?"rgba(0,201,167,0.12)":"transparent",color:active(item.id)?"#00C9A7":"rgba(255,255,255,0.5)",fontSize:"0.87rem",fontWeight:500,width:"calc(100% - 16px)",textAlign:"left"}},[
+      items.map(item=>btn({key:item.id,className:"nav-btn","aria-label":item.label,"aria-current":active(item.id)?"page":undefined,onClick:()=>onNav(item.id),title:collapsed?item.label:"",style:{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",cursor:"pointer",borderRadius:8,margin:"2px 8px",border:"1px solid "+(active(item.id)?"rgba(0,201,167,0.2)":"transparent"),background:active(item.id)?"rgba(0,201,167,0.12)":"transparent",color:active(item.id)?"#00C9A7":"rgba(255,255,255,0.5)",fontSize:"0.87rem",fontWeight:500,width:"calc(100% - 16px)",textAlign:"left"}},[
         span({key:"i",style:{fontSize:"1.05rem",flexShrink:0,width:20,textAlign:"center"}},item.icon),
         !collapsed&&span({key:"l",style:{whiteSpace:"nowrap"}},item.label),
       ]))
@@ -907,7 +909,7 @@ function Sidebar({nav,onNav,clinic,onLogout,collapsed,onToggle}){
         span({key:"i",style:{fontSize:"1rem",width:20,textAlign:"center",flexShrink:0}},"📝"),
         !collapsed&&span({key:"l"},"Leave feedback"),
       ]),
-      btn({key:"out",onClick:onLogout,title:collapsed?"Sign out":"",style:{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",cursor:"pointer",borderRadius:8,border:"none",background:"transparent",color:"#FF4D6D",fontSize:"0.85rem",width:"100%",textAlign:"left"}},[
+      btn({key:"out",onClick:onLogout,"aria-label":"Sign out",title:collapsed?"Sign out":"",style:{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",cursor:"pointer",borderRadius:8,border:"none",background:"transparent",color:"#FF4D6D",fontSize:"0.85rem",width:"100%",textAlign:"left"}},[
         span({key:"i",style:{fontSize:"1rem",width:20,textAlign:"center",flexShrink:0}},"🚪"),
         !collapsed&&"Sign out",
       ]),
@@ -1122,18 +1124,18 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
     savedModal&&e(Modal,{key:"sm",msg:"Claim saved successfully!",onClose:()=>setSavedModal(false)}),
     draftModal&&e(Modal,{key:"dm",msg:"Draft saved! Continue from Claims list.",onClose:()=>{setDraftModal(false);onBack();},onConfirm:()=>{setDraftModal(false);onBack();}}),
     div({key:"hdr",style:{...S.fb,marginBottom:isMobile?14:22,flexWrap:"wrap",gap:8}},[
-      div({key:"l",style:{...S.fr,flex:1,minWidth:0}},[btn({key:"back",style:S.btnS,onClick:onBack},"<- Back"),div({key:"t",style:{fontWeight:700,fontSize:"0.95rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},claim.patientName||"New Claim")]),
+      div({key:"l",style:{...S.fr,flex:1,minWidth:0}},[btn({key:"back",style:S.btnS,onClick:onBack,"aria-label":"Back to dashboard"},"← Back"),div({key:"t",style:{fontWeight:700,fontSize:"0.95rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},claim.patientName||"New Claim")]),
       div({key:"r",style:{display:"flex",gap:8,flexShrink:0}},[btn({key:"draft",style:S.btnS,onClick:saveDraft},"Save draft"),btn({key:"save",style:S.btnP,onClick:save},"Save claim")]),
     ]),
     activeEpId&&(()=>{
       const ep=(claim.episodes||[]).find(e=>e.id===activeEpId);
       return ep&&div({key:"ep-banner",style:{background:"rgba(0,201,167,0.08)",border:"1px solid rgba(0,201,167,0.2)",borderRadius:10,padding:"10px 16px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}},[
         div({key:"l",style:{display:"flex",alignItems:"center",gap:10}},[span({key:"ic"},"\uD83D\uDCCB"),div({key:"t"},[div({key:"n",style:{fontWeight:600,fontSize:"0.88rem",color:"#00C9A7"}},"Editing: "+ep.label),div({key:"d",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:1}},new Date(ep.date).toLocaleDateString("en-AU")+(ep.practitionerName?" \u00b7 "+ep.practitionerName:""))])]),
-        btn({key:"close",style:{...S.btnS,fontSize:"0.78rem",padding:"5px 12px"},onClick:()=>{setActiveEpId(null);setTab(0);}},"\u2190 Back to claim overview"),
+        btn({key:"close","aria-label":"Back to claim overview",style:{...S.btnS,fontSize:"0.78rem",padding:"5px 12px"},onClick:()=>{setActiveEpId(null);setTab(0);}},"← Back to claim overview"),
       ]);
     })(),
     div({key:"tabs",className:"cb-tabs",style:{marginBottom:28}},
-      TABS.map((t,i)=>btn({key:t,className:"tab-btn",onClick:()=>{if(activeEpId)setEpTab(i);else setTab(i);window.scrollTo(0,0);},style:{padding:"10px 16px",borderRadius:"8px 8px 0 0",border:"none",background:(activeEpId?epTab:tab)===i?"rgba(0,201,167,0.1)":"transparent",color:(activeEpId?epTab:tab)===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:tab===i?"2px solid #00C9A7":"none"}},(i+1)+". "+t))
+      TABS.map((t,i)=>btn({key:t,className:"tab-btn","aria-label":t,"aria-selected":(activeEpId?epTab:tab)===i,role:"tab",onClick:()=>{if(activeEpId)setEpTab(i);else setTab(i);window.scrollTo(0,0);},style:{padding:"10px 16px",borderRadius:"8px 8px 0 0",border:"none",background:(activeEpId?epTab:tab)===i?"rgba(0,201,167,0.1)":"transparent",color:(activeEpId?epTab:tab)===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:tab===i?"2px solid #00C9A7":"none"}},(i+1)+". "+t))
     ),
     (()=>{
       const activeEp=(claim.episodes||[]).find(ep=>ep.id===activeEpId);
@@ -2387,7 +2389,7 @@ function Tab5({claim,up,clinic,practitioners}){
           div({key:"ctrl",style:{display:"flex",alignItems:"center",gap:10,marginBottom:8}},[
             btn({key:"m",style:{...S.btnS,padding:"8px 14px"},onClick:()=>up("cocCount",Math.max(1,(claim.cocCount||1)-1))},"-"),
             span({key:"n",style:{fontFamily:"monospace",fontSize:"1.2rem",fontWeight:700,color:"#00C9A7",minWidth:28,textAlign:"center"}},cocNum),
-            btn({key:"p",style:{...S.btnS,padding:"8px 14px"},onClick:()=>up("cocCount",(claim.cocCount||1)+1)},"+"),
+            btn({key:"p","aria-label":"Increase certificate count",style:{...S.btnS,padding:"8px 14px"},onClick:()=>up("cocCount",(claim.cocCount||1)+1)},"+"),
           ]),
         ]),
       ]),
@@ -5503,7 +5505,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
               e(Inp,{key:"desc",label:"Description *",value:item.description,onChange:v=>updLine(item.id,"description",v),placeholder:"Service description",mb:0}),
               e(Inp,{key:"qty",label:"Qty",value:String(item.qty||1),onChange:v=>updLine(item.id,"qty",parseInt(v)||1),placeholder:"1",mb:0}),
               e(Inp,{key:"amt",label:"Unit price ($)",value:item.amount,onChange:v=>updLine(item.id,"amount",v),placeholder:"0.00",mb:0}),
-              lineItems.length>1&&btn({key:"rm",style:{background:"transparent",border:"none",color:"#FF4D6D",cursor:"pointer",fontSize:"1rem",alignSelf:"flex-end",paddingBottom:4},onClick:()=>remLine(item.id)},"✕"),
+              lineItems.length>1&&btn({key:"rm","aria-label":"Remove line item",style:{background:"transparent",border:"none",color:"#FF4D6D",cursor:"pointer",fontSize:"1rem",alignSelf:"flex-end",paddingBottom:4},onClick:()=>remLine(item.id)},"✕"),
             ]),
           ])),
           subTotal>0&&div({key:"prev",style:{...S.ok,marginTop:8,marginBottom:16,justifyContent:"space-between"}},[
@@ -5527,9 +5529,9 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
             const pgSize=3,totalPg=Math.max(1,Math.ceil(thisMonthInvoices.length/pgSize)),paged=thisMonthInvoices.slice((invPage-1)*pgSize,invPage*pgSize);
             return div({key:"tm-pg"},[...paged.map(inv=>e(InvCard,{key:inv.id,inv})),
               totalPg>1&&div({key:"pg",style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
-                btn({key:"p",style:{...S.btnS,padding:"4px 10px",fontSize:"0.78rem",opacity:invPage===1?0.3:1,pointerEvents:invPage===1?"none":"auto"},onClick:()=>setInvPage(p=>Math.max(1,p-1))},"\u2190"),
+                btn({key:"p","aria-label":"Previous page",style:{...S.btnS,padding:"4px 10px",fontSize:"0.78rem",opacity:invPage===1?0.3:1,pointerEvents:invPage===1?"none":"auto"},onClick:()=>setInvPage(p=>Math.max(1,p-1))},"←"),
                 span({key:"i",style:{fontSize:"0.76rem",color:"#5B7A99"}},invPage+" / "+totalPg),
-                btn({key:"n",style:{...S.btnS,padding:"4px 10px",fontSize:"0.78rem",opacity:invPage>=totalPg?0.3:1,pointerEvents:invPage>=totalPg?"none":"auto"},onClick:()=>setInvPage(p=>Math.min(totalPg,p+1))},"\u2192"),
+                btn({key:"n","aria-label":"Next page",style:{...S.btnS,padding:"4px 10px",fontSize:"0.78rem",opacity:invPage>=totalPg?0.3:1,pointerEvents:invPage>=totalPg?"none":"auto"},onClick:()=>setInvPage(p=>Math.min(totalPg,p+1))},"→"),
               ]),
             ]);
           })(),
@@ -5603,9 +5605,9 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
         ]);
       }),
       histTotalPages>1&&div({key:"pg-ctrl",style:{display:"flex",justifyContent:"center",alignItems:"center",gap:10,marginTop:16,paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
-        btn({key:"prev",style:{...S.btnS,padding:"6px 14px",fontSize:"0.82rem",opacity:histPage===1?0.3:1,pointerEvents:histPage===1?"none":"auto"},onClick:()=>setHistPage(p=>Math.max(1,p-1))},"\u2190 Prev"),
+        btn({key:"prev","aria-label":"Previous page",style:{...S.btnS,padding:"6px 14px",fontSize:"0.82rem",opacity:histPage===1?0.3:1,pointerEvents:histPage===1?"none":"auto"},onClick:()=>setHistPage(p=>Math.max(1,p-1))},"← Prev"),
         span({key:"info",style:{fontSize:"0.82rem",color:"#5B7A99"}},histPage+" / "+histTotalPages),
-        btn({key:"next",style:{...S.btnS,padding:"6px 14px",fontSize:"0.82rem",opacity:histPage>=histTotalPages?0.3:1,pointerEvents:histPage>=histTotalPages?"none":"auto"},onClick:()=>setHistPage(p=>Math.min(histTotalPages,p+1))},"Next \u2192"),
+        btn({key:"next","aria-label":"Next page",style:{...S.btnS,padding:"6px 14px",fontSize:"0.82rem",opacity:histPage>=histTotalPages?0.3:1,pointerEvents:histPage>=histTotalPages?"none":"auto"},onClick:()=>setHistPage(p=>Math.min(histTotalPages,p+1))},"Next →"),
       ]),
     ]),
 
@@ -5768,9 +5770,10 @@ function App(){
   const saveInsurerEmails=async em=>{setInsurerEmails(em);await sset("insurerEmails:"+clinic.id,em);};
   const isMobile=useIsMobile();
   if(!clinic)return e(LoginScreen,{onLogin:handleLogin});
-  return div({style:{display:"flex",minHeight:"100vh"}},[
+  return div({role:"application","aria-label":"ClaimBridge",style:{display:"flex",minHeight:"100vh"}},[
+    e("a",{key:"skip",href:"#main-content",className:"skip-link"},"Skip to main content"),
     e(Sidebar,{key:"sb",nav,onNav:handleNav,clinic,onLogout:handleLogout,collapsed,onToggle:()=>setCollapsed(!collapsed)}),
-    div({key:"main",style:{flex:1,overflow:"auto",paddingBottom:isMobile?"70px":0}},[
+    div({key:"main",id:"main-content",role:"main",style:{flex:1,overflow:"auto",paddingBottom:isMobile?"70px":0}},[
       e(TopBar,{key:"tb",clinic,nav,claim:activeClaim}),
       nav==="dashboard"&&e(Dashboard,{key:"d",clinic,claims,onNew:()=>{setActiveClaim(null);setNav("claim");},onOpen:handleOpen}),
       nav==="claims"&&e(ClaimsPage,{key:"cl",claims,onOpen:handleOpen,onNew:()=>{setActiveClaim(null);setNav("claim");}}),
@@ -5826,9 +5829,23 @@ function App(){
     @media (min-width: 768px) {
       input, select, textarea { font-size: 0.95rem !important; }
     }
+    /* Focus styles for keyboard nav */
+    :focus-visible { outline: 2px solid #00C9A7 !important; outline-offset: 2px !important; }
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 2px solid #00C9A7 !important; outline-offset: 2px !important; box-shadow: 0 0 0 4px rgba(0,201,167,0.15) !important;
+    }
+    /* Screen reader only utility */
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    /* Skip to main content link */
+    .skip-link { position: absolute; top: -100%; left: 0; background: #00C9A7; color: #07101E; padding: 8px 16px; z-index: 9999; font-weight: 700; border-radius: 0 0 8px 0; }
+    .skip-link:focus { top: 0; }
   `;
   document.head.appendChild(style);
 
+  // Ensure lang attribute
+  if(!document.documentElement.lang){
+    document.documentElement.lang = "en-AU";
+  }
   // Ensure viewport meta exists
   if(!document.querySelector("meta[name=viewport]")){
     const meta=document.createElement("meta");
