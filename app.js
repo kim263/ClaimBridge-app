@@ -1032,12 +1032,13 @@ function PractitionersPage({clinic}){
     setF({name:"",profession:"",providerNo:"",email:"",phone:""});
     setSaved(true);setTimeout(()=>setSaved(false),2000);
   };
+  const isMobile=useIsMobile();
   const rem=async(id)=>{const up=list.filter(p=>p.id!==id);setList(up);await sset("practitioners:"+clinic.id,up);};
-  return div({style:{padding:"28px",maxWidth:960,margin:"0 auto"}},[
+  return div({style:{padding:isMobile?"16px":"28px",maxWidth:960,margin:"0 auto"}},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.2rem",marginBottom:4}},"Practitioners"),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:24}},"Provider numbers auto-populate when selected on a claim."),
     saved&&e(OK,{key:"ok"},"Practitioner saved successfully"),
-    div({key:"grid",style:{...S.g2,alignItems:"start"}},[
+    div({key:"grid",className:"cb-grid-2",style:{alignItems:"start"}},[
       div({key:"form",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:18}},"Add practitioner"),
         e(Inp,{key:"n",label:"Full name",value:f.name,onChange:v=>setF({...f,name:v}),placeholder:"Dr. Jane Smith",required:true}),
@@ -1116,12 +1117,13 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
   };
   const save=async()=>{const now=new Date().toISOString();const prac=practitioners.find(p=>p.id===claim.practitionerId);const updated={...claim,lastEditedAt:now,lastEditedBy:prac?prac.name:clinic.name,createdAt:claim.createdAt||now,createdBy:claim.createdBy||(prac?prac.name:clinic.name)};setClaim(updated);await onSave(updated);setSavedModal(true);};
   const saveDraft=async()=>{const now=new Date().toISOString();const prac=practitioners.find(p=>p.id===claim.practitionerId);const updated={...claim,status:"Draft",lastEditedAt:now,lastEditedBy:prac?prac.name:clinic.name,createdAt:claim.createdAt||now,createdBy:claim.createdBy||(prac?prac.name:clinic.name)};setClaim(updated);await onSave(updated);setDraftModal(true);};
-  return div({style:{padding:"28px",maxWidth:960,margin:"0 auto"}},[
+  const isMobile=useIsMobile();
+  return div({style:{padding:isMobile?"12px":"28px",maxWidth:960,margin:"0 auto"}},[
     savedModal&&e(Modal,{key:"sm",msg:"Claim saved successfully!",onClose:()=>setSavedModal(false)}),
     draftModal&&e(Modal,{key:"dm",msg:"Draft saved! Continue from Claims list.",onClose:()=>{setDraftModal(false);onBack();},onConfirm:()=>{setDraftModal(false);onBack();}}),
-    div({key:"hdr",style:{...S.fb,marginBottom:22}},[
-      div({key:"l",style:S.fr},[btn({key:"back",style:S.btnS,onClick:onBack},"<- Back"),div({key:"t",style:{fontWeight:700,fontSize:"0.95rem"}},claim.patientName||"New Claim")]),
-      div({key:"r",style:{display:"flex",gap:10}},[btn({key:"draft",style:S.btnS,onClick:saveDraft},"Save draft"),btn({key:"save",style:S.btnP,onClick:save},"Save claim")]),
+    div({key:"hdr",style:{...S.fb,marginBottom:isMobile?14:22,flexWrap:"wrap",gap:8}},[
+      div({key:"l",style:{...S.fr,flex:1,minWidth:0}},[btn({key:"back",style:S.btnS,onClick:onBack},"<- Back"),div({key:"t",style:{fontWeight:700,fontSize:"0.95rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},claim.patientName||"New Claim")]),
+      div({key:"r",style:{display:"flex",gap:8,flexShrink:0}},[btn({key:"draft",style:S.btnS,onClick:saveDraft},"Save draft"),btn({key:"save",style:S.btnP,onClick:save},"Save claim")]),
     ]),
     activeEpId&&(()=>{
       const ep=(claim.episodes||[]).find(e=>e.id===activeEpId);
@@ -1130,7 +1132,7 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
         btn({key:"close",style:{...S.btnS,fontSize:"0.78rem",padding:"5px 12px"},onClick:()=>{setActiveEpId(null);setTab(0);}},"\u2190 Back to claim overview"),
       ]);
     })(),
-    div({key:"tabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:28,flexWrap:"wrap"}},
+    div({key:"tabs",className:"cb-tabs",style:{marginBottom:28}},
       TABS.map((t,i)=>btn({key:t,className:"tab-btn",onClick:()=>{if(activeEpId)setEpTab(i);else setTab(i);window.scrollTo(0,0);},style:{padding:"10px 16px",borderRadius:"8px 8px 0 0",border:"none",background:(activeEpId?epTab:tab)===i?"rgba(0,201,167,0.1)":"transparent",color:(activeEpId?epTab:tab)===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:tab===i?"2px solid #00C9A7":"none"}},(i+1)+". "+t))
     ),
     (()=>{
@@ -1187,7 +1189,7 @@ function Tab1({claim,up,practitioners}){
         e(Inp,{key:"e",label:"Accounts payable email",value:claim.insurerEmail,onChange:v=>up("insurerEmail",v),type:"email",placeholder:"ap@insurer.com.au"}),
       ]),
     ]),
-    div({key:"pat-prac",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},[
+    div({key:"pat-prac",className:"cb-grid-2",style:{}},[
       div({key:"pat",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:14}},"Patient information"),
         e(Inp,{key:"fn",label:"First name",value:claim.patientFirstName,onChange:v=>{up("patientFirstName",v);up("patientName",(v||"")+" "+(claim.patientLastName||"").trim());},placeholder:"Jane",required:true}),
@@ -1215,25 +1217,25 @@ function Tab1({claim,up,practitioners}){
     ]),
     div({key:"claim",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:14}},"Claim information"),
-      div({key:"g",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}},[
+      div({key:"g",className:"cb-grid-3",style:{}},[
         e(Inp,{key:"cn",label:"Claim number",value:claim.claimNumber,onChange:v=>up("claimNumber",v),placeholder:"WC-2025-XXXXX",mb:0}),
         e(Inp,{key:"doi",label:"Date of injury",value:claim.dateOfInjury,onChange:v=>up("dateOfInjury",v),type:"date",required:true,mb:0}),
         e(Sel,{key:"st",label:"Claim status",value:claim.status,onChange:v=>up("status",v),options:["Active","Closed","Disputed"],mb:0}),
       ]),
-      claim.scheme==="WorkCover"&&div({key:"emp",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginTop:16}},[
+      claim.scheme==="WorkCover"&&div({key:"emp",className:"cb-grid-2",style:{marginTop:16}},[
         e(Inp,{key:"en",label:"Employer name",value:claim.employerName,onChange:v=>up("employerName",v),placeholder:"ABC Company Pty Ltd",mb:0}),
         e(Inp,{key:"ec",label:"Employer contact",value:claim.employerContact,onChange:v=>up("employerContact",v),placeholder:"HR Manager - 03 XXXX XXXX",mb:0}),
       ]),
     ]),
     div({key:"inj",style:S.card},[
       div({key:"h",style:{fontWeight:700,marginBottom:14}},"Injury details"),
-      div({key:"g1",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},[
+      div({key:"g1",className:"cb-grid-2",style:{}},[
         e(Sel,{key:"moi",label:"Mechanism of injury",value:claim.injuryMechanism,onChange:v=>up("injuryMechanism",v),options:["Lifting / manual handling","Repetitive strain / overuse","Fall from height","Fall on same level / slip / trip","Struck by object","Motor vehicle accident","Psychological - workplace stress","Psychological - workplace bullying / harassment","Psychological - traumatic event witnessed","Noise exposure","Other - see notes"],mb:0}),
         e(Sel,{key:"bp",label:"Body part (primary)",value:claim.injuryBodyPart,onChange:v=>up("injuryBodyPart",v),options:["Head / skull","Neck / cervical spine","Shoulder - left","Shoulder - right","Elbow - left","Elbow - right","Wrist - left","Wrist - right","Hand - left","Hand - right","Thoracic spine","Lumbar spine / lower back","Hip - left","Hip - right","Knee - left","Knee - right","Ankle - left","Ankle - right","Foot - left","Foot - right","Multiple body parts","Psychological / mental health","Other"],mb:0}),
         e(Sel,{key:"it",label:"Injury type",value:claim.injuryType,onChange:v=>up("injuryType",v),options:["Sprain / strain","Fracture","Dislocation","Soft tissue tear","Contusion / bruising","Nerve injury","Disc injury","Concussion / head injury","Psychological / psychiatric","Cumulative / gradual onset","Aggravation of pre-existing condition","Other"],mb:0}),
         e(Sel,{key:"io",label:"Onset type",value:claim.injuryOnset,onChange:v=>up("injuryOnset",v),options:["Sudden / acute - single incident","Gradual onset - over days","Gradual onset - over weeks","Gradual onset - over months","Aggravation of pre-existing condition","Recurrence of previous injury"],mb:0}),
       ]),
-      div({key:"g2",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginTop:16}},[
+      div({key:"g2",className:"cb-grid-2",style:{marginTop:16}},[
         e(Ta,{key:"desc",label:"Mechanism description",value:claim.injuryDescription,onChange:v=>up("injuryDescription",v),placeholder:"Describe exactly how the injury occurred...",rows:3,mb:0}),
         e(Ta,{key:"caus",label:"Causation / pathophysiology",value:claim.injuryCausation,onChange:v=>up("injuryCausation",v),placeholder:"Clinical opinion on causation and sequelae...",rows:3,mb:0}),
       ]),
@@ -1262,7 +1264,7 @@ function Tab2({claim,up}){
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Diagnosis"),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Search and add conditions. Capacity limitations auto-populate the Certificate of Capacity."),
-    div({key:"dsubtabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:24}},
+    div({key:"dsubtabs",className:"cb-tabs",style:{marginBottom:24}},
       DSUB.map((t,i)=>e("button",{key:t,onClick:()=>setDSubTab(i),style:{padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:dSubTab===i?"rgba(0,201,167,0.1)":"transparent",color:dSubTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:dSubTab===i?"2px solid #00C9A7":"none"}},(i+1)+". "+t))
     ),
     dSubTab===0&&div({key:"tab0"},[
@@ -1302,11 +1304,11 @@ function Tab2({claim,up}){
       div({key:"cap",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:6}},"Physical capacity assessment"),
         div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:16}},"Select capacity for each function. Auto-populates the Certificate of Capacity."),
-        div({key:"hdr",style:{display:"grid",gridTemplateColumns:"1fr 90px 90px 90px",gap:6,marginBottom:8}},[
+        div({key:"hdr",className:"cb-cap-table",style:{marginBottom:8}},[
           div({key:"f",style:{fontSize:"0.7rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#5B7A99"}},"Function"),
           ...["Can","Modified","Cannot"].map(o=>div({key:o,style:{fontSize:"0.7rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#5B7A99",textAlign:"center"}},o)),
         ]),
-        ...PHYSICAL_FUNCTIONS.map(f=>div({key:f.id,style:{display:"grid",gridTemplateColumns:"1fr 90px 90px 90px",gap:6,alignItems:"center",marginBottom:5}},[
+        ...PHYSICAL_FUNCTIONS.map(f=>div({key:f.id,className:"cb-cap-table",style:{alignItems:"center",marginBottom:5}},[
           div({key:"l",style:{fontSize:"0.87rem"}},f.label),
           ...["Can","Modified","Cannot"].map(o=>{const active=(claim.capacity||{})[f.id]===o;return div({key:o,onClick:()=>setCap(f.id,o),style:{padding:"7px 8px",borderRadius:7,border:"1px solid "+(active?capBorders[o]:"rgba(255,255,255,0.07)"),background:active?capColors[o]:"rgba(255,255,255,0.02)",cursor:"pointer",fontSize:"0.75rem",fontWeight:600,textAlign:"center",color:active?capText[o]:"rgba(255,255,255,0.35)",userSelect:"none"}},o);}),
         ])),
@@ -1417,7 +1419,7 @@ function Tab2({claim,up}){
           ]);
         })(),
           
-          div({key:"rom-grid",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}},[
+          div({key:"rom-grid",className:"cb-grid-2",style:{}},[
           e(Ta,{key:"af",label:"Active ROM findings",value:claim.arom,onChange:v=>up("arom",v),placeholder:"Flexion 40 degrees, Extension 15 degrees...",mb:0}),
           e(Ta,{key:"pf",label:"Passive ROM findings",value:claim.prom,onChange:v=>up("prom",v),placeholder:"Passive ROM findings...",mb:0}),
           ]),
@@ -1661,7 +1663,7 @@ function Tab4({claim,up,clinic,practitioners}){
                   })
                 ),
               ]),
-      div({key:"goals-om-layout",style:{display:"grid",gridTemplateColumns:"1fr 340px",gap:16,alignItems:"start"}},[
+      div({key:"goals-om-layout",className:"cb-grid-2",style:{alignItems:"start"}},[
       div({key:"card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:14}},"Goals & management"),
         div({key:"nrd",style:{marginBottom:20}},[div({key:"g",style:S.g2},[e(Inp,{key:"nrd",label:"Next review date",value:claim.nextReviewDate,onChange:v=>up("nextReviewDate",v),type:"date",mb:0}),div({key:"sp"})])]),
@@ -1677,12 +1679,12 @@ function Tab4({claim,up,clinic,practitioners}){
             e(Inp,{key:"goal",label:n===1?"Related SMART goal":"",value:(claim["ahGoalTarget"+n]||""),onChange:v=>up("ahGoalTarget"+n,v),placeholder:"e.g. Walk 500m by discharge",mb:0}),
             e(Inp,{key:"date",label:n===1?"Est. date":"",value:(claim["ahGoalDate"+n]||""),onChange:v=>up("ahGoalDate"+n,v),type:"date",mb:0}),
           ])),
-          div({key:"tx-grid",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}},[
+          div({key:"tx-grid",className:"cb-grid-3",style:{marginBottom:14}},[
             e(Inp,{key:"ns",label:"No. of treatments",value:claim.txNum,onChange:v=>up("txNum",v),placeholder:"e.g. 12",mb:0}),
             e(Inp,{key:"wks",label:"Over (weeks)",value:claim.txWeeks,onChange:v=>up("txWeeks",v),placeholder:"e.g. 6",mb:0}),
             e(Inp,{key:"disc",label:"Anticipated discharge",value:claim.txDischarge,onChange:v=>up("txDischarge",v),type:"date",mb:0}),
           ]),
-          div({key:"dates",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}},[
+          div({key:"dates",className:"cb-grid-2",style:{marginBottom:14}},[
             e(Inp,{key:"from",label:"Treatment from",value:claim.txFrom,onChange:v=>up("txFrom",v),type:"date",mb:0}),
             e(Inp,{key:"to",label:"Treatment to",value:claim.txTo,onChange:v=>up("txTo",v),type:"date",mb:0}),
           ]),
@@ -2313,7 +2315,7 @@ function Tab5({claim,up,clinic,practitioners}){
             span({key:"cb3"},claim.fitnessForWork==="Unfit for all work"?"☑":"☐"),span({key:"t3"},["No capacity from ",span({key:"f",style:{fontWeight:600}},fmtDate(claim.cocFrom))," to ",span({key:"t"},fmtDate(claim.cocTo))]),
           ]),
           claim.fitnessForWork==="Fit with restrictions"&&claim.fitnessRestrictions&&div({key:"res",style:{marginBottom:8,fontSize:10}},[span({key:"l",style:{color:"#555"}},"Restrictions: "),claim.fitnessRestrictions]),
-          div({key:"rtw",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:10,marginBottom:6}},[
+          div({key:"rtw",className:"cb-grid-2",style:{fontSize:10,marginBottom:6}},[
             div({key:"nrd"},[span({key:"l",style:{color:"#555"}},"Next review date: "),span({key:"v",style:{fontWeight:600}},fmtDate(claim.nextReviewDate))]),
             div({key:"rtw2"},[span({key:"l",style:{color:"#555"}},"Estimated RTW (normal duties): "),span({key:"v",style:{fontWeight:600}},fmtDate(claim.rtwNormalDate)||"Not yet estimated")]),
           ]),
@@ -5497,7 +5499,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
                 ]),
               ]),
             ]),
-            div({key:"r2",style:{display:"grid",gridTemplateColumns:"2fr 60px 100px "+(lineItems.length>1?"32px":""),gap:8,alignItems:"end"}},[
+            div({key:"r2",className:"cb-line-item-row",style:{display:"grid",gridTemplateColumns:"2fr 60px 100px "+(lineItems.length>1?"32px":""),gap:8,alignItems:"end"}},[
               e(Inp,{key:"desc",label:"Description *",value:item.description,onChange:v=>updLine(item.id,"description",v),placeholder:"Service description",mb:0}),
               e(Inp,{key:"qty",label:"Qty",value:String(item.qty||1),onChange:v=>updLine(item.id,"qty",parseInt(v)||1),placeholder:"1",mb:0}),
               e(Inp,{key:"amt",label:"Unit price ($)",value:item.amount,onChange:v=>updLine(item.id,"amount",v),placeholder:"0.00",mb:0}),
@@ -5668,6 +5670,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
   ]);
 }
 function SettingsPage({clinic,bankSettings,onSaveBank,insurerEmails,onSaveInsurerEmails,onReset}){
+  const isMobile=useIsMobile();
   const[bank,setBank]=useState(bankSettings||{bsb:"",accountNo:"",accountName:""});
   const[emails,setEmails]=useState(insurerEmails||{});
   const[saved,setSaved]=useState(false);
@@ -5684,7 +5687,7 @@ function SettingsPage({clinic,bankSettings,onSaveBank,insurerEmails,onSaveInsure
     {id:"tac",name:"TAC"},
   ];
 
-  return div({style:{padding:"28px",maxWidth:960,margin:"0 auto"}},[
+  return div({style:{padding:isMobile?"16px":"28px",maxWidth:960,margin:"0 auto"}},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.2rem",marginBottom:4}},"Settings"),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:24}},"Configure your clinic details, bank account for invoicing, and insurer accounts payable contacts."),
 
@@ -5774,7 +5777,7 @@ function App(){
       nav==="claim"&&e(ClaimForm,{key:activeClaim?activeClaim.id:"new_"+newClaimKey,clinic,claimData:activeClaim,onSave:handleSave,onBack:handleBack,onInvoice:()=>{if(activeClaim)handleSave(activeClaim);setNav("invoicing");}}),
       nav==="practitioners"&&e(PractitionersPage,{key:"pr",clinic}),
       nav==="settings"&&e(SettingsPage,{key:"set",clinic,bankSettings,onSaveBank:saveBankSettings,insurerEmails,onSaveInsurerEmails:saveInsurerEmails,onReset:async()=>{await resetDemoData(clinic.id);const fresh=await sget("claims10:"+clinic.id)||[];setClaims(fresh);}}),
-      nav==="help"&&div({key:"help",style:{padding:"28px",maxWidth:960,margin:"0 auto"}},[
+      nav==="help"&&div({key:"help",style:{padding:isMobile?"16px":"28px",maxWidth:960,margin:"0 auto"}},[
         div({key:"h",style:{fontWeight:800,fontSize:"1.2rem",marginBottom:20}},"Help & Support"),
         div({key:"c",style:S.card},[
           div({key:"h",style:{fontWeight:700,marginBottom:14}},"Quick guide"),
@@ -5791,7 +5794,7 @@ function App(){
           ])),
         ]),
       ]),
-      nav==="invoicing"&&div({key:"inv",style:{padding:"28px",maxWidth:960,margin:"0 auto"}},[
+      nav==="invoicing"&&div({key:"inv",style:{padding:isMobile?"16px":"28px",maxWidth:960,margin:"0 auto"}},[
         e(InvoicingPage,{key:"invp",clinic,claims,onSaveClaim:handleSave}),
       ]),
     ]),
@@ -5805,11 +5808,20 @@ function App(){
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body { -webkit-text-size-adjust: 100%; }
     input, select, textarea, button { font-size: 16px !important; }
+    .cb-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .cb-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .cb-tabs { display: flex; gap: 4px; border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 24px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .cb-tabs::-webkit-scrollbar { display: none; }
+    .cb-cap-table { display: grid; grid-template-columns: 1fr 90px 90px 90px; gap: 6px; }
     @media (max-width: 767px) {
       input, select, textarea { font-size: 16px !important; padding: 12px 14px !important; }
       button { min-height: 44px; }
-      .tab-btn { padding: 10px 10px !important; font-size: 0.75rem !important; }
+      .tab-btn { padding: 8px 12px !important; font-size: 0.75rem !important; white-space: nowrap; }
       ::-webkit-scrollbar { width: 4px; }
+      .cb-grid-2 { grid-template-columns: 1fr !important; }
+      .cb-grid-3 { grid-template-columns: 1fr !important; }
+      .cb-cap-table { grid-template-columns: 1fr 72px 72px 72px; gap: 4px; font-size: 0.78rem; }
+      .cb-line-item-row { grid-template-columns: 1fr !important; }
     }
     @media (min-width: 768px) {
       input, select, textarea { font-size: 0.95rem !important; }
