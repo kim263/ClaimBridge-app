@@ -737,7 +737,7 @@ async function seedDemoData(clinicId) {
   // Seed claims
   await sset("claims10:" + clinicId, DEMO_CLAIMS_DATA);
   // Seed bank settings
-  await sset("banksettings:" + clinicId, {
+  await sset("bankSettings:" + clinicId, {
     bsb: "063-164",
     accountNo: "10234567",
     accountName: "Bayside Medical Centre"
@@ -749,7 +749,7 @@ async function seedDemoData(clinicId) {
 async function resetDemoData(clinicId) {
   await sset("claims10:" + clinicId, DEMO_CLAIMS_DATA);
   await sset("practitioners:" + clinicId, DEMO_PRACTITIONERS[clinicId] || []);
-  await sset("banksettings:" + clinicId, {
+  await sset("bankSettings:" + clinicId, {
     bsb: "063-164",
     accountNo: "10234567",
     accountName: "Bayside Medical Centre"
@@ -5150,7 +5150,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
 
   useEffect(()=>{
     sget("practitioners:"+clinic.id).then(p=>setPractitioners(p||[]));
-    sget("banksettings:"+clinic.id).then(b=>{if(b)setBankSettings(b);});
+    sget("bankSettings:"+clinic.id).then(b=>{if(b)setBankSettings(b);});
     sget("paymentterms:"+clinic.id).then(t=>{if(t)setPaymentTerms(parseInt(t)||30);});
   },[clinic.id]);
 
