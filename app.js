@@ -24,6 +24,36 @@ function useIsMobile(){
   return isMobile;
 }
 
+// ── MOBILE TAB HELPER ────────────────────────────────────────────────────────
+// On mobile: renders a styled <select> dropdown instead of a tab bar
+// Usage: e(TabSelect, {tabs:[{id,label}], active, onChange})
+function TabSelect({tabs,active,onChange}){
+  const isMobile=useIsMobile();
+  if(isMobile){
+    return e("select",{
+      "aria-label":"Select section",
+      value:active,
+      onChange:ev=>onChange(ev.target.value),
+      style:{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(0,201,167,0.3)",
+        borderRadius:10,padding:"11px 14px",color:"#EFF6FF",fontSize:"1rem",cursor:"pointer",
+        marginBottom:20,appearance:"none",
+        backgroundImage:"url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2300C9A7' stroke-width='2' fill='none'/%3E%3C/svg%3E")",
+        backgroundRepeat:"no-repeat",backgroundPosition:"right 14px center",paddingRight:40}
+    }, tabs.map(t=>e("option",{key:t.id,value:t.id},t.label)));
+  }
+  // Desktop: normal scrollable tab bar
+  return div({className:"cb-tabs",style:{marginBottom:24}},
+    tabs.map(t=>btn({key:t.id,className:"tab-btn","aria-selected":active===t.id,
+      "aria-label":t.label,role:"tab",
+      onClick:()=>onChange(t.id),
+      style:{padding:"10px 16px",borderRadius:"8px 8px 0 0",border:"none",whiteSpace:"nowrap",
+        background:active===t.id?"rgba(0,201,167,0.1)":"transparent",
+        color:active===t.id?"#00C9A7":"rgba(255,255,255,0.45)",
+        fontSize:"0.82rem",fontWeight:500,cursor:"pointer",
+        borderBottom:active===t.id?"2px solid #00C9A7":"none"}},t.label))
+  );
+}
+
 // ── STYLES ───────────────────────────────────────────────────────────────────
 const S={
   inp:{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#EFF6FF",fontSize:"0.95rem"},
@@ -1134,9 +1164,11 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
         btn({key:"close","aria-label":"Back to claim overview",style:{...S.btnS,fontSize:"0.78rem",padding:"5px 12px"},onClick:()=>{setActiveEpId(null);setTab(0);}},"← Back to claim overview"),
       ]);
     })(),
-    div({key:"tabs",className:"cb-tabs",style:{marginBottom:28}},
-      TABS.map((t,i)=>btn({key:t,className:"tab-btn","aria-label":t,"aria-selected":(activeEpId?epTab:tab)===i,role:"tab",onClick:()=>{if(activeEpId)setEpTab(i);else setTab(i);window.scrollTo(0,0);},style:{padding:"10px 16px",borderRadius:"8px 8px 0 0",border:"none",background:(activeEpId?epTab:tab)===i?"rgba(0,201,167,0.1)":"transparent",color:(activeEpId?epTab:tab)===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:tab===i?"2px solid #00C9A7":"none"}},(i+1)+". "+t))
-    ),
+    e(TabSelect,{key:"tabs",
+      tabs:TABS.map((t,i)=>({id:String(i),label:(i+1)+". "+t})),
+      active:String(activeEpId?epTab:tab),
+      onChange:v=>{const i=parseInt(v);if(activeEpId)setEpTab(i);else setTab(i);window.scrollTo(0,0);}
+    }),
     (()=>{
       const activeEp=(claim.episodes||[]).find(ep=>ep.id===activeEpId);
       const viewClaim=activeEp?mergeEpisodeToClaim(claim,activeEp):claim;
@@ -1266,9 +1298,11 @@ function Tab2({claim,up}){
   return div({},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Diagnosis"),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Search and add conditions. Capacity limitations auto-populate the Certificate of Capacity."),
-    div({key:"dsubtabs",className:"cb-tabs",style:{marginBottom:24}},
-      DSUB.map((t,i)=>e("button",{key:t,onClick:()=>setDSubTab(i),style:{padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",background:dSubTab===i?"rgba(0,201,167,0.1)":"transparent",color:dSubTab===i?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.82rem",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap",borderBottom:dSubTab===i?"2px solid #00C9A7":"none"}},(i+1)+". "+t))
-    ),
+    e(TabSelect,{key:"dsubtabs",
+      tabs:DSUB.map((t,i)=>({id:String(i),label:(i+1)+". "+t})),
+      active:String(dSubTab),
+      onChange:v=>setDSubTab(parseInt(v))
+    }),
     dSubTab===0&&div({key:"tab0"},[
       div({key:"preexist",style:S.card},[
         e(Ta,{key:"pre",label:"Pre-existing conditions / relevant history",value:claim.preExisting,onChange:v=>up("preExisting",v),placeholder:"Relevant prior injuries, pre-existing conditions and their relationship to the current claim...",rows:3}),
@@ -4945,15 +4979,11 @@ function TabClaimLog({claim,up,clinic,practitioners,setActiveEpId,setEpTab}){
   const deleteLetter=(id)=>{const ltr=letters.find(l=>l.id===id);if(!ltr)return;const updated=letters.filter(l=>l.id!==id);const entry={event:"Letter deleted",detail:"'"+ltr.template+"' generated "+fmtDate(ltr.generatedAt)+" \u2014 removed from history",timestamp:new Date().toISOString(),by:"\u2014"};up("letterHistory",updated);up("auditTrail",[...audit,entry]);};
   return div({style:{padding:"0"}},[
     // Tab switcher
-    div({key:"log-tabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:20}},
-      [["history","📋 History"],["coc","📄 COC"],["letters","✉️ Letters"],["referrals","🔗 Referrals"],["audit","🔍 Audit"]].map(([id,label])=>
-        btn({key:id,onClick:()=>setLogTab(id),style:{padding:"9px 16px",borderRadius:"8px 8px 0 0",border:"none",
-          background:logTab===id?"rgba(0,201,167,0.1)":"transparent",
-          color:logTab===id?"#00C9A7":"rgba(255,255,255,0.45)",
-          fontSize:"0.82rem",fontWeight:500,cursor:"pointer",
-          borderBottom:logTab===id?"2px solid #00C9A7":"none"}},label)
-      )
-    ),
+    e(TabSelect,{key:"log-tabs",
+      tabs:[{id:"history",label:"📋 History"},{id:"coc",label:"📄 COC"},{id:"letters",label:"✉️ Letters"},{id:"referrals",label:"🔗 Referrals"},{id:"audit",label:"🔍 Audit"}],
+      active:logTab,
+      onChange:setLogTab
+    }),
     logTab==="history"&&div({key:"ep-timeline",style:{...S.card,marginBottom:16}},[
       div({key:"h",style:{...S.fb,marginBottom:4}},[div({key:"t",style:{fontWeight:700}},"Claim history"),span({key:"c",style:{fontSize:"0.76rem",color:"#5B7A99"}},(claim.episodes||[]).length+" episode"+(((claim.episodes||[]).length)!==1?"s":""))]),
       div({key:"s",style:{fontSize:"0.78rem",color:"#5B7A99",marginBottom:14}},"Chronological record of all consultation episodes. Click to open and review."),
@@ -5154,6 +5184,7 @@ function generateInvoicePdf(inv,claim,clinic,practitioners,paymentTerms,bankSett
   return doc;
 }
 function InvoicingPage({clinic,claims,onSaveClaim}){
+  const isMobile=useIsMobile();
   const[invTab,setInvTab]=useState("overview");
   const[selClaim,setSelClaim]=useState("");
   const[selEpisode,setSelEpisode]=useState("");
@@ -5338,7 +5369,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
     ]);
   };
 
-  return div({style:{padding:"28px",maxWidth:1100,margin:"0 auto"}},[
+  return div({style:{padding:isMobile?"16px":"28px",maxWidth:1100,margin:"0 auto"}},[
     // Preview modal
     previewInv&&(()=>{
       const c=claims.find(x=>x.id===previewInv.claimId)||{};
@@ -5353,7 +5384,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
             div({key:"btns",style:{display:"flex",gap:8}},[
               btn({key:"dl",style:{...S.btnP,fontSize:"0.82rem",padding:"7px 14px"},onClick:()=>downloadInvoice(previewInv)},"⬇ Download PDF"),
               btn({key:"send",style:{...S.btnS,fontSize:"0.82rem",padding:"7px 14px"},onClick:()=>sendInvoice(previewInv)},"📨 Send to insurer"),
-              btn({key:"x",style:{...S.btnS,padding:"7px 12px"},onClick:()=>setPreviewInv(null)},"✕"),
+              btn({key:"x","aria-label":"Close preview",style:{...S.btnS,padding:"7px 12px"},onClick:()=>setPreviewInv(null)},"✕"),
             ]),
           ]),
           div({key:"preview",style:{background:"white",color:"#1a1a2e",margin:16,borderRadius:10,overflow:"hidden",fontFamily:"Arial,sans-serif",fontSize:10}},[
@@ -5410,15 +5441,11 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
     ]))),
 
     // Tab switcher
-    div({key:"tabs",style:{display:"flex",gap:4,borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:28}},[
-      ...["overview","history","reporting"].map(t=>btn({key:t,onClick:()=>setInvTab(t),style:{
-        padding:"10px 20px",borderRadius:"8px 8px 0 0",border:"none",
-        background:invTab===t?"rgba(0,201,167,0.1)":"transparent",
-        color:invTab===t?"#00C9A7":"rgba(255,255,255,0.45)",
-        fontSize:"0.85rem",fontWeight:500,cursor:"pointer",
-        borderBottom:invTab===t?"2px solid #00C9A7":"none",
-      }},t==="overview"?"Overview":t==="history"?"Invoice History":"Reporting")),
-    ]),
+    e(TabSelect,{key:"tabs",
+      tabs:[{id:"overview",label:"Overview"},{id:"history",label:"Invoice History"},{id:"reporting",label:"Reporting"}],
+      active:invTab,
+      onChange:setInvTab
+    }),
 
     // ── OVERVIEW TAB ──────────────────────────────────────────────────────────
     invTab==="overview"&&div({key:"overview"},[
@@ -5486,7 +5513,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
             btn({key:"add",style:{...S.btnS,fontSize:"0.78rem",padding:"4px 12px"},onClick:addLineItem},"+ Add item"),
           ]),
           ...lineItems.map((item)=>div({key:item.id,style:{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,padding:"10px 12px",marginBottom:8}},[
-            div({key:"r1",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}},[
+            div({key:"r1",className:"cb-grid-2",style:{marginBottom:8}},[
               div({key:"td"},[
                 e("label",{key:"l",style:{...S.label,marginBottom:4}},"Treatment date *"),
                 inp({key:"i",className:"cb-input",style:{...S.inp,fontSize:"0.84rem",padding:"7px 10px"},type:"date",value:item.treatmentDate||invoiceDate,onChange:ev=>updLine(item.id,"treatmentDate",ev.target.value)}),
@@ -5617,7 +5644,8 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
       div({key:"prac-card",style:{...S.card,marginBottom:20}},[
         div({key:"h",style:{fontWeight:700,marginBottom:20}},"Per-practitioner summary"),
         pracTotals.length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",textAlign:"center",padding:"20px 0"}},"No invoice data yet"):
-        e("table",{key:"tbl",style:{width:"100%",borderCollapse:"collapse",fontSize:"0.87rem"}},[
+        div({key:"tbl-wrap",style:{overflowX:"auto",WebkitOverflowScrolling:"touch"}},
+        e("table",{key:"tbl",style:{width:"100%",minWidth:480,borderCollapse:"collapse",fontSize:"0.87rem"}},[
           e("thead",{key:"th"},e("tr",{style:{borderBottom:"2px solid rgba(255,255,255,0.08)"}},
             ["Practitioner","Profession","Invoices","Total invoiced","Collected","Outstanding"].map(h=>e("th",{key:h,style:{padding:"8px 12px",textAlign:"left",fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#5B7A99"}},h))
           )),
@@ -5637,14 +5665,15 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
             e("td",{key:"co",style:{padding:"10px 12px",fontWeight:700,color:"#00C9A7"}},fmtAUD(totalColl)),
             e("td",{key:"o",style:{padding:"10px 12px",fontWeight:700,color:totalOut>0?"#FFB830":"#5B7A99"}},fmtAUD(totalOut)),
           ])),
-        ]),
+        ])),
       ]),
 
       // Monthly trend table
       div({key:"monthly-card",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:20}},"Monthly summary"),
         monthlyTotals.length===0?div({key:"empty",style:{color:"#5B7A99",fontSize:"0.84rem",textAlign:"center",padding:"20px 0"}},"No invoice data yet"):
-        e("table",{key:"tbl",style:{width:"100%",borderCollapse:"collapse",fontSize:"0.87rem"}},[
+        div({key:"tbl-wrap2",style:{overflowX:"auto",WebkitOverflowScrolling:"touch"}},
+        e("table",{key:"tbl",style:{width:"100%",minWidth:520,borderCollapse:"collapse",fontSize:"0.87rem"}},[
           e("thead",{key:"th"},e("tr",{style:{borderBottom:"2px solid rgba(255,255,255,0.08)"}},
             ["Month","Invoices","Total invoiced","Collected","Outstanding","Collection rate"].map(h=>e("th",{key:h,style:{padding:"8px 12px",textAlign:"left",fontSize:"0.72rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em",color:"#5B7A99"}},h))
           )),
@@ -5666,7 +5695,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
               ]),
             ]);
           })),
-        ]),
+        ])),
       ]),
     ]),
   ]);
