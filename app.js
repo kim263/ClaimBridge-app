@@ -13,6 +13,17 @@ async function sget(k){try{const r=localStorage.getItem("cb10_"+k);return r?JSON
 async function sset(k,v){try{localStorage.setItem("cb10_"+k,JSON.stringify(v));}catch{}}
 async function sdel(k){try{localStorage.removeItem("cb10_"+k);}catch{}}
 
+// ── MOBILE HOOK ──────────────────────────────────────────────────────────────
+function useIsMobile(){
+  const[isMobile,setIsMobile]=useState(()=>window.innerWidth<768);
+  useEffect(()=>{
+    const handler=()=>setIsMobile(window.innerWidth<768);
+    window.addEventListener("resize",handler);
+    return()=>window.removeEventListener("resize",handler);
+  },[]);
+  return isMobile;
+}
+
 // ── STYLES ───────────────────────────────────────────────────────────────────
 const S={
   inp:{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#EFF6FF",fontSize:"0.95rem"},
@@ -853,6 +864,7 @@ function LoginScreen({onLogin}){
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
 function Sidebar({nav,onNav,clinic,onLogout,collapsed,onToggle}){
+  const isMobile=useIsMobile();
   const items=[
     {id:"dashboard",icon:"🏠",label:"Dashboard"},
     {id:"claims",icon:"📋",label:"Claims"},
@@ -863,6 +875,15 @@ function Sidebar({nav,onNav,clinic,onLogout,collapsed,onToggle}){
     {id:"help",icon:"❓",label:"Help"},
   ];
   const active=n=>nav===n||nav==="claim"&&n==="claims";
+  if(isMobile){
+    const mobileItems=items.slice(0,5);
+    return div({style:{position:"fixed",bottom:0,left:0,right:0,background:"#0C1A2E",borderTop:"1px solid rgba(255,255,255,0.1)",display:"flex",zIndex:100,paddingBottom:"env(safe-area-inset-bottom)"}},
+      mobileItems.map(item=>btn({key:item.id,onClick:()=>onNav(item.id),style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px",border:"none",background:"transparent",color:active(item.id)?"#00C9A7":"rgba(255,255,255,0.45)",fontSize:"0.6rem",fontWeight:active(item.id)?700:400,cursor:"pointer",gap:3,minHeight:56}},[
+        span({key:"i",style:{fontSize:"1.3rem"}},item.icon),
+        span({key:"l"},item.label),
+      ]))
+    );
+  }
   return div({style:{width:collapsed?60:220,background:"#0C1A2E",borderRight:"1px solid rgba(255,255,255,0.07)",display:"flex",flexDirection:"column",transition:"width 0.25s",flexShrink:0}},[
     div({key:"hdr",style:{padding:"18px 14px",borderBottom:"1px solid rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"space-between"}},[
       !collapsed&&div({key:"logo",style:{fontWeight:800,fontSize:"1.05rem",letterSpacing:"-0.02em"}},["Claim",span({key:"s",style:{color:"#00C9A7"}},"Bridge")]),
@@ -895,11 +916,12 @@ function Sidebar({nav,onNav,clinic,onLogout,collapsed,onToggle}){
 }
 
 function TopBar({clinic,nav,claim}){
+  const isMobile=useIsMobile();
   const titles={dashboard:"Dashboard",claims:"Claims",new_claim:"New Claim",practitioners:"Practitioners",invoicing:"Invoicing",settings:"Settings",help:"Help & Support",claim:"Claim"};
-  return div({style:{background:"rgba(12,26,46,0.97)",borderBottom:"1px solid rgba(255,255,255,0.07)",padding:"0 28px",height:60,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}},[
-    div({key:"t",style:{fontWeight:700,fontSize:"0.95rem"}},nav==="claim"?(claim&&claim.patientName||"New Claim"):titles[nav]||"ClaimBridge"),
-    div({key:"r",style:{display:"flex",alignItems:"center",gap:12}},[
-      div({key:"n",style:{fontSize:"0.78rem",color:"#5B7A99"}},clinic.name),
+  return div({style:{background:"rgba(12,26,46,0.97)",borderBottom:"1px solid rgba(255,255,255,0.07)",padding:isMobile?"0 16px":"0 28px",height:isMobile?52:60,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}},[
+    div({key:"t",style:{fontWeight:700,fontSize:isMobile?"0.9rem":"0.95rem"}},nav==="claim"?(claim&&claim.patientName||"New Claim"):titles[nav]||"ClaimBridge"),
+    div({key:"r",style:{display:"flex",alignItems:"center",gap:isMobile?8:12}},[
+      !isMobile&&div({key:"n",style:{fontSize:"0.78rem",color:"#5B7A99"}},clinic.name),
       span({key:"p",style:{...S.pill,...S.pillT,fontSize:"0.68rem",padding:"3px 10px",cursor:"default"}},clinic.plan),
     ]),
   ]);
@@ -907,20 +929,21 @@ function TopBar({clinic,nav,claim}){
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function Dashboard({clinic,claims,onNew,onOpen}){
+  const isMobile=useIsMobile();
   const active=claims.filter(c=>c.status==="Active").length;
   const pending=claims.filter(c=>c.status==="Pending Approval").length;
   const now=new Date();
   const thisMonth=claims.filter(c=>c.createdAt&&new Date(c.createdAt).getMonth()===now.getMonth()).length;
   const statusStyle=s=>s==="Active"?S.pillT:s==="Pending Approval"?S.pillA:S.pillM;
-  return div({style:{padding:"28px",maxWidth:960,margin:"0 auto"}},[
-    div({key:"hdr",style:{...S.fb,marginBottom:28}},[
+  return div({style:{padding:isMobile?"16px":"28px",maxWidth:960,margin:"0 auto"}},[
+    div({key:"hdr",style:{...S.fb,marginBottom:isMobile?16:28,flexWrap:"wrap",gap:12}},[
       div({key:"l"},[
         div({key:"sub",style:{fontSize:"0.7rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",color:"#00C9A7",marginBottom:4}},"Welcome back"),
-        div({key:"name",style:{fontWeight:800,fontSize:"1.55rem",letterSpacing:"-0.03em"}},clinic.name),
+        div({key:"name",style:{fontWeight:800,fontSize:isMobile?"1.25rem":"1.55rem",letterSpacing:"-0.03em"}},clinic.name),
       ]),
-      btn({key:"new",style:S.btnP,onClick:onNew},"+ New Claim"),
+      btn({key:"new",style:{...S.btnP,width:isMobile?"100%":"auto"},onClick:onNew},"+ New Claim"),
     ]),
-    div({key:"stats",style:{...S.g2,gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}},[
+    div({key:"stats",style:{...S.g2,gridTemplateColumns:"1fr 1fr 1fr",gap:isMobile?8:12,marginBottom:isMobile?14:20}},[
       {label:"Active Claims",val:active,c:"#00C9A7"},
       {label:"Pending Approval",val:pending,c:"#FFB830"},
       {label:"This Month",val:thisMonth,c:"#60A5FA"},
@@ -956,6 +979,7 @@ function Dashboard({clinic,claims,onNew,onOpen}){
 
 // ── CLAIMS LIST ───────────────────────────────────────────────────────────────
 function ClaimsPage({claims,onOpen,onNew}){
+  const isMobile=useIsMobile();
   const[q,setQ]=useState("");
   const[sf,setSf]=useState("All");
   const statusStyle=s=>s==="Active"?S.pillT:s==="Pending Approval"?S.pillA:S.pillM;
@@ -963,10 +987,10 @@ function ClaimsPage({claims,onOpen,onNew}){
     const ms=!q||(c.patientName||"").toLowerCase().includes(q.toLowerCase())||(c.claimNumber||"").toLowerCase().includes(q.toLowerCase());
     return ms&&(sf==="All"||c.status===sf);
   });
-  return div({style:{padding:"28px",maxWidth:960,margin:"0 auto"}},[
-    div({key:"h",style:{...S.fb,marginBottom:20}},[
+  return div({style:{padding:isMobile?"16px":"28px",maxWidth:960,margin:"0 auto"}},[
+    div({key:"h",style:{...S.fb,marginBottom:isMobile?14:20,flexWrap:"wrap",gap:10}},[
       div({key:"t",style:{fontWeight:700,fontSize:"1.1rem"}},["All Claims ",span({key:"c",style:{fontSize:"0.8rem",color:"#5B7A99",fontWeight:400}},"("+claims.length+")")]),
-      btn({key:"new",style:S.btnP,onClick:onNew},"+ New Claim"),
+      btn({key:"new",style:{...S.btnP,width:isMobile?"100%":"auto"},onClick:onNew},"+ New Claim"),
     ]),
     div({key:"filters",style:{display:"flex",gap:12,marginBottom:20}},[
       div({key:"s",style:{flex:1,position:"relative"}},[
@@ -5739,10 +5763,11 @@ function App(){
   const handleBack=()=>{setNav("dashboard");loadClaims(clinic.id);};
   const saveBankSettings=async b=>{setBankSettings(b);await sset("bankSettings:"+clinic.id,b);};
   const saveInsurerEmails=async em=>{setInsurerEmails(em);await sset("insurerEmails:"+clinic.id,em);};
+  const isMobile=useIsMobile();
   if(!clinic)return e(LoginScreen,{onLogin:handleLogin});
   return div({style:{display:"flex",minHeight:"100vh"}},[
     e(Sidebar,{key:"sb",nav,onNav:handleNav,clinic,onLogout:handleLogout,collapsed,onToggle:()=>setCollapsed(!collapsed)}),
-    div({key:"main",style:{flex:1,overflow:"auto"}},[
+    div({key:"main",style:{flex:1,overflow:"auto",paddingBottom:isMobile?"70px":0}},[
       e(TopBar,{key:"tb",clinic,nav,claim:activeClaim}),
       nav==="dashboard"&&e(Dashboard,{key:"d",clinic,claims,onNew:()=>{setActiveClaim(null);setNav("claim");},onOpen:handleOpen}),
       nav==="claims"&&e(ClaimsPage,{key:"cl",claims,onOpen:handleOpen,onNew:()=>{setActiveClaim(null);setNav("claim");}}),
@@ -5772,6 +5797,34 @@ function App(){
     ]),
   ]);
 }
+
+// ── INJECT MOBILE CSS ────────────────────────────────────────────────────────
+(function(){
+  const style=document.createElement("style");
+  style.textContent=`
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { -webkit-text-size-adjust: 100%; }
+    input, select, textarea, button { font-size: 16px !important; }
+    @media (max-width: 767px) {
+      input, select, textarea { font-size: 16px !important; padding: 12px 14px !important; }
+      button { min-height: 44px; }
+      .tab-btn { padding: 10px 10px !important; font-size: 0.75rem !important; }
+      ::-webkit-scrollbar { width: 4px; }
+    }
+    @media (min-width: 768px) {
+      input, select, textarea { font-size: 0.95rem !important; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Ensure viewport meta exists
+  if(!document.querySelector("meta[name=viewport]")){
+    const meta=document.createElement("meta");
+    meta.name="viewport";
+    meta.content="width=device-width, initial-scale=1, maximum-scale=1";
+    document.head.appendChild(meta);
+  }
+})();
 
 try{
   ReactDOM.createRoot(document.getElementById("root")).render(e(App,null));
