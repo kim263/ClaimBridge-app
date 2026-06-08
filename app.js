@@ -36,9 +36,7 @@ function TabSelect({tabs,active,onChange}){
       onChange:ev=>onChange(ev.target.value),
       style:{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(0,201,167,0.3)",
         borderRadius:10,padding:"11px 14px",color:"#EFF6FF",fontSize:"1rem",cursor:"pointer",
-        marginBottom:20,appearance:"none",
-        backgroundImage:"url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2300C9A7' stroke-width='2' fill='none'/%3E%3C/svg%3E")",
-        backgroundRepeat:"no-repeat",backgroundPosition:"right 14px center",paddingRight:40}
+        marginBottom:20}
     }, tabs.map(t=>e("option",{key:t.id,value:t.id},t.label)));
   }
   // Desktop: normal scrollable tab bar
