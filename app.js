@@ -1024,7 +1024,7 @@ function ClaimsPage({claims,onOpen,onNew}){
     ]),
     div({key:"filters",style:{display:"flex",gap:12,marginBottom:20}},[
       div({key:"s",style:{flex:1,position:"relative"}},[
-        inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:40},placeholder:"Search patient or claim number...",value:q,onChange:ev=>setQ(ev.target.value)}),
+        inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:30},placeholder:"Search patient or claim number...",value:q,onChange:ev=>setQ(ev.target.value)}),
         span({key:"ic",style:{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}},"🔍"),
       ]),
       e("select",{key:"f",className:"cb-sel",style:{...S.sel,width:"auto",minWidth:160},value:sf,onChange:ev=>setSf(ev.target.value)},
@@ -1125,6 +1125,7 @@ function saveEpisodeToClaim(claim,ep,epData){const updatedEp={...ep,...epData};c
 function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
   const ALL_TABS=["Overview","Patient & Claim","Diagnosis","Treatment Plan","Certificate of Capacity","Allied Health Forms","Letters & Approvals","Claim Log"];
   const[tab,setTab]=useState(0);
+  const[dSubTab,setDSubTab]=useState(0);
   const[claim,setClaim]=useState(()=>ensureEpisodes(claimData||{id:"claim_"+Date.now(),scheme:"WorkCover",status:"Active",createdAt:new Date().toISOString(),clinicId:clinic.id}));
   const[activeEpId,setActiveEpId]=useState(null);
   const[epTab,setEpTab]=useState(1);
@@ -1179,7 +1180,7 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
       return [
         curTab===0&&e(TabOverview,{key:"t0",claim:viewClaim,up,clinic,practitioners,activeEpId,setActiveEpId,createEpisode,setEpTab}),
         curTab===1&&e(Tab1,{key:"t1",claim:viewClaim,up,practitioners,readOnly:!!activeEp}),
-        curTab===2&&e(Tab2,{key:"t2",claim:viewClaim,up,readOnly:!!activeEp,onNextMainTab:()=>{if(activeEpId)setEpTab(3);else setTab(3);window.scrollTo(0,0);}}),
+        curTab===2&&e(Tab2,{key:"t2",claim:viewClaim,up,readOnly:!!activeEp,dSubTab,setDSubTab}),
         curTab===3&&e(Tab4,{key:"t3",claim:viewClaim,up,clinic,practitioners}),
         curTab===4&&e(Tab5,{key:"t4",claim:viewClaim,up,clinic,practitioners}),
         curTab===5&&e(Tab6,{key:"t5",claim:viewClaim,up,clinic,practitioners}),
@@ -1189,9 +1190,27 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
     })(),
     div({key:"nav",style:{...S.fb,marginTop:28,paddingTop:20,borderTop:"1px solid rgba(255,255,255,0.07)",display:(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId?"none":"flex"}},
     [
-      btn({key:"prev",style:{...S.btnS,...((activeEpId?epTab:tab)===0?{opacity:0.3,pointerEvents:"none"}:{})},onClick:()=>{if(activeEpId)setEpTab(t=>Math.max(0,t-1));else setTab(t=>Math.max(0,t-1));window.scrollTo(0,0);}},"<- Previous"),
-      span({key:"pg",style:{fontSize:"0.76rem",color:"#5B7A99"}},((activeEpId?epTab:tab)+1)+" / "+TABS.length),
-      btn({key:"next",style:S.btnP,onClick:()=>{const _cur=activeEpId?epTab:tab;const _isRefTab=_cur===TABS.length-2&&!activeEpId;const _isLogTab=_cur===TABS.length-1&&!activeEpId;if(_isRefTab||_isLogTab){if(onInvoice)onInvoice();}else{if(activeEpId)setEpTab(t=>Math.min(TABS.length-1,t+1));else setTab(t=>Math.min(TABS.length-1,t+1));window.scrollTo(0,0);}}},(activeEpId?epTab:tab)>=TABS.length-2&&!activeEpId?"Next & Invoice ->":"Next ->"),
+      btn({key:"prev",style:{...S.btnS,...((activeEpId?epTab:tab)===0&&(activeEpId?epTab:tab!==2||dSubTab===0)?{opacity:0.3,pointerEvents:"none"}:{opacity:(activeEpId?epTab:tab)===0&&dSubTab===0?0.3:1,pointerEvents:(activeEpId?epTab:tab)===0&&dSubTab===0?"none":"auto"})},onClick:()=>{
+      if(activeEpId){setEpTab(t=>Math.max(0,t-1));}
+      else if(tab===2&&dSubTab>0){setDSubTab(d=>d-1);}
+      else{setTab(t=>Math.max(0,t-1));setDSubTab(0);}
+      window.scrollTo(0,0);
+    }},"<- Previous"),
+      span({key:"pg",style:{fontSize:"0.76rem",color:"#5B7A99"}},
+      !activeEpId&&tab===2
+        ?"Diagnosis "+(dSubTab+1)+" / 4"
+        :((activeEpId?epTab:tab)+1)+" / "+TABS.length
+    ),
+      btn({key:"next",style:S.btnP,onClick:()=>{
+      const _cur=activeEpId?epTab:tab;
+      const _isRefTab=_cur===TABS.length-2&&!activeEpId;
+      const _isLogTab=_cur===TABS.length-1&&!activeEpId;
+      if(_isRefTab||_isLogTab){if(onInvoice)onInvoice();}
+      else if(!activeEpId&&tab===2&&dSubTab<3){setDSubTab(d=>d+1);window.scrollTo(0,0);}
+      else{if(activeEpId)setEpTab(t=>Math.min(TABS.length-1,t+1));else{setTab(t=>Math.min(TABS.length-1,t+1));setDSubTab(0);}window.scrollTo(0,0);}
+    }},
+    !activeEpId&&tab===2&&dSubTab<3?["Next: ",e("span",{key:"s",style:{opacity:0.8}},["Diagnosis & Capacity","Clinical Assessment","Psychosocial Barriers","Imaging"][dSubTab+1]+" →")]:
+    (activeEpId?epTab:tab)>=TABS.length-2&&!activeEpId?"Next & Invoice ->":"Next ->"),
     ]),
   ]);
 }
@@ -1281,11 +1300,13 @@ function Tab1({claim,up,practitioners}){
 }
 
 // ── TAB 2: DIAGNOSIS ──────────────────────────────────────────────────────────
-function Tab2({claim,up,onNextMainTab}){
+function Tab2({claim,up,dSubTab:_dSubTabProp,setDSubTab:_setDSubTabProp}){
   const[q,setQ]=useState("");
   const[show,setShow]=useState(false);
   const[diags,setDiags]=useState(claim.diagnoses||[]);
-  const[dSubTab,setDSubTab]=useState(0);
+  const[_dSubTabLocal,_setDSubTabLocal]=useState(0);
+  const dSubTab=_dSubTabProp!==undefined?_dSubTabProp:_dSubTabLocal;
+  const setDSubTab=_setDSubTabProp||_setDSubTabLocal;
   const[hiIdx,setHiIdx]=useState(-1);
   const[orthoQ,setOrthoQ]=useState("");
   const[showOrthoDD,setShowOrthoDD]=useState(false);
@@ -1304,7 +1325,7 @@ function Tab2({claim,up,onNextMainTab}){
     e(TabSelect,{key:"dsubtabs",
       tabs:DSUB.map((t,i)=>({id:String(i),label:(i+1)+". "+t})),
       active:String(dSubTab),
-      onChange:v=>setDSubTab(parseInt(v))
+      onChange:v=>{const i=parseInt(v);(setDSubTab||_setDSub)(i);}
     }),
     dSubTab===0&&div({key:"tab0"},[
       div({key:"preexist",style:S.card},[
@@ -1313,7 +1334,7 @@ function Tab2({claim,up,onNextMainTab}){
       div({key:"diag",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:14}},"Conditions / Diagnosis"),
         div({key:"sw",style:{position:"relative"}},[
-          inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:42},placeholder:"Search conditions (e.g. low back pain, PTSD)...",value:q,
+          inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:30},placeholder:"Search conditions (e.g. low back pain, PTSD)...",value:q,
             onChange:ev=>{setQ(ev.target.value);setShow(true);setHiIdx(-1);},
             onFocus:()=>setShow(true),onBlur:()=>setTimeout(()=>setShow(false),200),
             onKeyDown:ev=>{
@@ -1471,13 +1492,6 @@ function Tab2({claim,up,onNextMainTab}){
       ),
     ]),
     dSubTab===3&&e(Tab3,{key:"img",claim,up}),
-    div({key:"dsub-nav",style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:20,paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
-      dSubTab>0?btn({key:"prev",style:{...S.btnS,padding:"10px 20px"},onClick:()=>{setDSubTab(d=>Math.max(0,d-1));window.scrollTo(0,0);}},"← Previous"):div({key:"sp"}),
-      span({key:"pg",style:{fontSize:"0.78rem",color:"#5B7A99"}},(dSubTab+1)+" / "+DSUB.length),
-      dSubTab<DSUB.length-1
-        ?btn({key:"next",style:S.btnP,onClick:()=>{setDSubTab(d=>d+1);window.scrollTo(0,0);}},DSUB[dSubTab+1]+" →")
-        :btn({key:"next-main",style:S.btnP,onClick:()=>{if(onNextMainTab)onNextMainTab();}},"Treatment Plan →"),
-    ]),
   ]);
 }
 
@@ -5602,8 +5616,8 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
       div({key:"filters",style:{...S.card,marginBottom:20,padding:"16px 20px"}},[
         div({key:"top",style:{display:"flex",gap:12,alignItems:"flex-end",flexWrap:"wrap",marginBottom:8}},[ 
           div({key:"s",style:{position:"relative",flex:"1 1 180px"}},[
-            inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:40},placeholder:"Search patient, claim number, invoice number...",value:histSearch,onChange:ev=>{setHistSearch(ev.target.value);setHistPage(1);}}),
-            span({key:"ic",style:{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#5B7A99",fontSize:"14px",lineHeight:1}},"⌕"),
+            inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:30},placeholder:"Search patient, claim number, invoice number...",value:histSearch,onChange:ev=>{setHistSearch(ev.target.value);setHistPage(1);}}),
+            span({key:"ic",style:{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"rgba(91,122,153,0.7)",fontSize:"12px",lineHeight:1,userSelect:"none"}},"⌕"),
           ]),
           div({key:"status"},[
             e("label",{key:"l",style:{...S.label,marginBottom:4}},"Status"),
@@ -5832,7 +5846,7 @@ function App(){
   return div({role:"application","aria-label":"ClaimBridge",style:{display:"flex",minHeight:"100vh"}},[
     e("a",{key:"skip",href:"#main-content",className:"skip-link"},"Skip to main content"),
     e(Sidebar,{key:"sb",nav,onNav:handleNav,clinic,onLogout:handleLogout,collapsed,onToggle:()=>setCollapsed(!collapsed)}),
-    div({key:"main",id:"main-content",role:"main",style:{flex:1,overflow:"auto",paddingBottom:isMobile?"96px":0}},[
+    div({key:"main",id:"main-content",role:"main",style:{flex:1,overflowX:"hidden",overflowY:"auto",paddingBottom:isMobile?"96px":0}},[
       e(TopBar,{key:"tb",clinic,nav,claim:activeClaim}),
       nav==="dashboard"&&e(Dashboard,{key:"d",clinic,claims,onNew:()=>{setActiveClaim(null);setNav("claim");},onOpen:handleOpen}),
       nav==="claims"&&e(ClaimsPage,{key:"cl",claims,onOpen:handleOpen,onNew:()=>{setActiveClaim(null);setNav("claim");}}),
