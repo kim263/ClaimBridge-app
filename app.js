@@ -54,8 +54,8 @@ function TabSelect({tabs,active,onChange}){
 
 // ── STYLES ───────────────────────────────────────────────────────────────────
 const S={
-  inp:{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#EFF6FF",fontSize:"0.95rem"},
-  sel:{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#EFF6FF",fontSize:"0.95rem",cursor:"pointer"},
+  inp:{width:"100%",minWidth:0,boxSizing:"border-box",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#EFF6FF",fontSize:"0.95rem"},
+  sel:{width:"100%",minWidth:0,boxSizing:"border-box",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#EFF6FF",fontSize:"0.95rem",cursor:"pointer"},
   ta:{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#EFF6FF",fontSize:"0.95rem",resize:"vertical",lineHeight:1.6},
   card:{background:"#0C1A2E",border:"1px solid rgba(255,255,255,0.08)",borderRadius:16,padding:"24px",marginBottom:20},
   cardSm:{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"14px 18px"},
@@ -811,7 +811,7 @@ function fmtDate2(d){if(!d)return"";try{return new Date(d).toLocaleDateString("e
 
 function Inp({label:l,value,onChange,placeholder,type="text",required,mb=16,id:idProp}){
   const id=idProp||(l?("inp_"+l.toLowerCase().replace(/[^a-z0-9]/g,"_")):undefined);
-  return div({style:{marginBottom:mb}},[
+  return div({style:{marginBottom:mb,minWidth:0,overflow:"hidden"}},[
     l&&e("label",{key:"l",htmlFor:id,style:S.label},l,required&&span({key:"r",style:{color:"#FF4D6D",marginLeft:3}},"*")),
     inp({key:"i",id,className:"cb-input",style:S.inp,type,value:value||"",onChange:ev=>onChange(ev.target.value),placeholder:placeholder||""}),
   ]);
@@ -5894,6 +5894,22 @@ function App(){
     .cb-cap-table { display: grid; grid-template-columns: 1fr 90px 90px 90px; gap: 6px; }
     @media (max-width: 767px) {
       input, select, textarea { font-size: 16px !important; padding: 12px 14px !important; }
+      /* Date inputs: force full width, prevent iOS intrinsic min-width overflow */
+      input[type="date"] {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        padding: 12px 10px !important;
+      }
+      /* All inputs inside cards must not overflow */
+      .cb-input, input, select { 
+        max-width: 100% !important; 
+        min-width: 0 !important; 
+        box-sizing: border-box !important;
+      }
       button { min-height: 44px; }
       .tab-btn { padding: 8px 12px !important; font-size: 0.75rem !important; white-space: nowrap; }
       ::-webkit-scrollbar { width: 4px; }
@@ -5901,14 +5917,14 @@ function App(){
       .cb-grid-3 { grid-template-columns: 1fr !important; }
       .cb-cap-table { grid-template-columns: 1fr 72px 72px 72px; gap: 4px; font-size: 0.78rem; }
       .cb-line-item-row { grid-template-columns: 1fr !important; }
+      /* Prevent any grid/flex child from overflowing its container */
+      .cb-grid-2 > *, .cb-grid-3 > *, [class*="cb-"] > * { min-width: 0; }
       /* Claim overview stat cards - let them scroll rather than squeeze */
       .cb-stat-row { display: grid; grid-template-columns: repeat(5, minmax(80px, 1fr)); gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
-      /* Any direct S.g2 usage also collapses */
-      @media (max-width: 767px) {
-        [style*="gridTemplateColumns: 1fr 1fr"], [style*="gridTemplateColumns:1fr 1fr"],
-        [style*="grid-template-columns: 1fr 1fr"], [style*="grid-template-columns:1fr 1fr"] { 
-          grid-template-columns: 1fr !important; 
-        }
+      /* Collapse inline 2-col grids */
+      [style*="gridTemplateColumns: 1fr 1fr"], [style*="gridTemplateColumns:1fr 1fr"],
+      [style*="grid-template-columns: 1fr 1fr"], [style*="grid-template-columns:1fr 1fr"] { 
+        grid-template-columns: 1fr !important; 
       }
     }
     @media (min-width: 768px) {
