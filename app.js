@@ -5846,7 +5846,7 @@ function App(){
   return div({role:"application","aria-label":"ClaimBridge",style:{display:"flex",minHeight:"100vh"}},[
     e("a",{key:"skip",href:"#main-content",className:"skip-link"},"Skip to main content"),
     e(Sidebar,{key:"sb",nav,onNav:handleNav,clinic,onLogout:handleLogout,collapsed,onToggle:()=>setCollapsed(!collapsed)}),
-    div({key:"main",id:"main-content",role:"main",style:{flex:1,overflowX:"hidden",overflowY:"auto",paddingBottom:isMobile?"96px":0}},[
+    div({key:"main",id:"main-content",role:"main",style:{flex:1,overflowX:"hidden",overflowY:"auto",paddingBottom:isMobile?"160px":0}},[
       e(TopBar,{key:"tb",clinic,nav,claim:activeClaim}),
       nav==="dashboard"&&e(Dashboard,{key:"d",clinic,claims,onNew:()=>{setActiveClaim(null);setNav("claim");},onOpen:handleOpen}),
       nav==="claims"&&e(ClaimsPage,{key:"cl",claims,onOpen:handleOpen,onNew:()=>{setActiveClaim(null);setNav("claim");}}),
