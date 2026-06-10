@@ -1179,7 +1179,7 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
       return [
         curTab===0&&e(TabOverview,{key:"t0",claim:viewClaim,up,clinic,practitioners,activeEpId,setActiveEpId,createEpisode,setEpTab}),
         curTab===1&&e(Tab1,{key:"t1",claim:viewClaim,up,practitioners,readOnly:!!activeEp}),
-        curTab===2&&e(Tab2,{key:"t2",claim:viewClaim,up,readOnly:!!activeEp}),
+        curTab===2&&e(Tab2,{key:"t2",claim:viewClaim,up,readOnly:!!activeEp,onNextMainTab:()=>{if(activeEpId)setEpTab(3);else setTab(3);window.scrollTo(0,0);}}),
         curTab===3&&e(Tab4,{key:"t3",claim:viewClaim,up,clinic,practitioners}),
         curTab===4&&e(Tab5,{key:"t4",claim:viewClaim,up,clinic,practitioners}),
         curTab===5&&e(Tab6,{key:"t5",claim:viewClaim,up,clinic,practitioners}),
@@ -1281,7 +1281,7 @@ function Tab1({claim,up,practitioners}){
 }
 
 // ── TAB 2: DIAGNOSIS ──────────────────────────────────────────────────────────
-function Tab2({claim,up}){
+function Tab2({claim,up,onNextMainTab}){
   const[q,setQ]=useState("");
   const[show,setShow]=useState(false);
   const[diags,setDiags]=useState(claim.diagnoses||[]);
@@ -1324,7 +1324,7 @@ function Tab2({claim,up}){
               else if(ev.key==="Escape"){setShow(false);setHiIdx(-1);}
             }
           }),
-          e("div",{key:"ic",style:{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#5B7A99",fontSize:"13px"}},"[S]"),
+          e("div",{key:"ic",style:{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#5B7A99",fontSize:"14px",lineHeight:1}},"⌕"),
           show&&sugg.length>0&&div({key:"dd",style:{position:"absolute",top:"100%",left:0,right:0,background:"#112240",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,zIndex:100,marginTop:4,maxHeight:280,overflow:"auto",boxShadow:"0 8px 30px rgba(0,0,0,0.3)"}},
             sugg.map((d,si)=>div({key:d.icd10,onClick:()=>addD(d),onMouseEnter:()=>setHiIdx(si),style:{padding:"11px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.05)",background:hiIdx===si?"rgba(0,201,167,0.12)":"transparent"}},[
               div({key:"l"},[div({key:"n",style:{fontSize:"0.88rem",fontWeight:500}},d.label),div({key:"c",style:{fontSize:"0.73rem",color:"#5B7A99",marginTop:1}},d.cat)]),
@@ -1471,6 +1471,13 @@ function Tab2({claim,up}){
       ),
     ]),
     dSubTab===3&&e(Tab3,{key:"img",claim,up}),
+    div({key:"dsub-nav",style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:20,paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
+      dSubTab>0?btn({key:"prev",style:{...S.btnS,padding:"10px 20px"},onClick:()=>{setDSubTab(d=>Math.max(0,d-1));window.scrollTo(0,0);}},"← Previous"):div({key:"sp"}),
+      span({key:"pg",style:{fontSize:"0.78rem",color:"#5B7A99"}},(dSubTab+1)+" / "+DSUB.length),
+      dSubTab<DSUB.length-1
+        ?btn({key:"next",style:S.btnP,onClick:()=>{setDSubTab(d=>d+1);window.scrollTo(0,0);}},DSUB[dSubTab+1]+" →")
+        :btn({key:"next-main",style:S.btnP,onClick:()=>{if(onNextMainTab)onNextMainTab();}},"Treatment Plan →"),
+    ]),
   ]);
 }
 
@@ -1677,9 +1684,10 @@ function Tab4({claim,up,clinic,practitioners}){
                   adjustments.length>0&&span({key:"adj",style:{...S.pill,...S.pillA,fontSize:"0.68rem",cursor:"default"}},adjustments.length+" psychosocial barrier"+(adjustments.length>1?"s":"")),
                 ]),
                 div({key:"diags",style:{display:"flex",flexWrap:"wrap",gap:8}},
-                  diags.map((d,i)=>{
+                  [
+                    ...diags.map((d,i)=>{
                     const r=calcRTW(d.label);const ov=overrides[d.label]||{};
-                    if(!r)return null;
+                    if(!r)return div({key:d.icd10||d.label||String(i),style:{...S.cardSm,flex:"1 0 200px",padding:"10px 14px"}},[                      div({key:"n",style:{fontSize:"0.78rem",fontWeight:600,marginBottom:6,color:"rgba(239,246,255,0.7)"}},d.label),                      div({key:"no-db",style:{fontSize:"0.76rem",color:"#5B7A99",fontStyle:"italic"}},"No guideline data — enter estimate below"),                    ]);
                     return div({key:d.icd10||d.label||String(i),style:{...S.cardSm,flex:"1 0 200px",padding:"10px 14px"}},[
                       div({key:"n",style:{fontSize:"0.78rem",fontWeight:600,marginBottom:6,color:"rgba(239,246,255,0.7)"}},d.label),
                       div({key:"times",style:{display:"flex",gap:8}},[
@@ -1709,6 +1717,7 @@ function Tab4({claim,up,clinic,practitioners}){
                       ]),
                     ]);
                   })
+                  ]
                 ),
               ]),
       div({key:"goals-om-layout",className:"cb-grid-2",style:{alignItems:"start"}},[
@@ -1722,7 +1731,7 @@ function Tab4({claim,up,clinic,practitioners}){
             const hasData=!!(claim["ahGoalLim"+n]||claim["ahGoalTarget"+n]||claim["ahGoalDate"+n]);
             const prevHasData=n===1||!!(claim["ahGoalLim"+(n-1)]||claim["ahGoalTarget"+(n-1)]);
             return hasData||prevHasData;
-          }).map(n=>div({key:"row"+n,style:{display:"grid",gridTemplateColumns:"1fr 1fr 140px",gap:10,marginBottom:10}},[
+          }).map(n=>div({key:"row"+n,className:"cb-goal-row",style:{marginBottom:10}},[
             e(Inp,{key:"lim",label:n===1?"Current limitation":"",value:(claim["ahGoalLim"+n]||""),onChange:v=>up("ahGoalLim"+n,v),placeholder:"e.g. Unable to walk 100m",mb:0}),
             e(Inp,{key:"goal",label:n===1?"Related SMART goal":"",value:(claim["ahGoalTarget"+n]||""),onChange:v=>up("ahGoalTarget"+n,v),placeholder:"e.g. Walk 500m by discharge",mb:0}),
             e(Inp,{key:"date",label:n===1?"Est. date":"",value:(claim["ahGoalDate"+n]||""),onChange:v=>up("ahGoalDate"+n,v),type:"date",mb:0}),
@@ -5451,7 +5460,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Generate tax invoices per episode and track collection."),
 
     // Summary cards
-    div({key:"totals",style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}},[
+    div({key:"totals",className:"cb-inv-totals",style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:24}},[
       {label:"Total invoiced (inc. GST)",val:totalInv,col:"#60A5FA"},
       {label:"Total collected",val:totalColl,col:"#00C9A7"},
       {label:"Outstanding",val:totalOut,col:totalOut>0?"#FFB830":"#5B7A99"},
@@ -5470,23 +5479,23 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
 
     // ── OVERVIEW TAB ──────────────────────────────────────────────────────────
     invTab==="overview"&&div({key:"overview"},[
-      // Overdue alert
-      overdueInvoices.length>0&&div({key:"overdue-alert",style:{...S.card,borderColor:"rgba(255,77,109,0.3)",marginBottom:20}},[
-        div({key:"h",style:{...S.fb,marginBottom:12}},[
-          div({key:"t",style:{display:"flex",alignItems:"center",gap:8}},[
-            span({key:"ic",style:{fontSize:"1.1rem"}},"⚠️"),
-            div({key:"l"},[
-              div({key:"h",style:{fontWeight:700,color:"#FF4D6D"}},"Overdue invoices"),
-              div({key:"s",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:1}},overdueInvoices.length+" invoice"+(overdueInvoices.length!==1?"s":"")+" past payment terms"),
-            ]),
-          ]),
-          btn({key:"view",style:{...S.btnS,fontSize:"0.78rem",padding:"5px 12px",color:"#FF4D6D",borderColor:"rgba(255,77,109,0.3)"},onClick:()=>{setInvTab("history");setHistStatus("Overdue");}},"View all →"),
-        ]),
-        ...overdueInvoices.slice(0,3).map(inv=>e(InvCard,{key:inv.id,inv})),
-        overdueInvoices.length>3&&div({key:"more",style:{fontSize:"0.75rem",color:"#5B7A99",textAlign:"center",paddingTop:8}},overdueInvoices.length-3+" more overdue"),
-      ]),
-
       div({key:"cols",className:"cb-grid-2 cb-inv-cols",style:{alignItems:"start"}},[
+        // Overdue alert - sits between form and this-month on mobile (order:0)
+        overdueInvoices.length>0&&div({key:"overdue-alert",className:"cb-inv-overdue",style:{...S.card,borderColor:"rgba(255,77,109,0.3)",marginBottom:0,gridColumn:"1 / -1"}},[
+          div({key:"h",style:{...S.fb,marginBottom:12}},[
+            div({key:"t",style:{display:"flex",alignItems:"center",gap:8}},[
+              span({key:"ic",style:{fontSize:"1.1rem"}},"⚠️"),
+              div({key:"l"},[
+                div({key:"h",style:{fontWeight:700,color:"#FF4D6D"}},"Overdue invoices"),
+                div({key:"s",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:1}},overdueInvoices.length+" invoice"+(overdueInvoices.length!==1?"s":"")+" past payment terms"),
+              ]),
+            ]),
+            btn({key:"view",style:{...S.btnS,fontSize:"0.78rem",padding:"5px 12px",color:"#FF4D6D",borderColor:"rgba(255,77,109,0.3)"},onClick:()=>{setInvTab("history");setHistStatus("Overdue");}},"View all →"),
+          ]),
+          ...overdueInvoices.slice(0,3).map(inv=>e(InvCard,{key:inv.id,inv})),
+          overdueInvoices.length>3&&div({key:"more",style:{fontSize:"0.75rem",color:"#5B7A99",textAlign:"center",paddingTop:8}},overdueInvoices.length-3+" more overdue"),
+        ]),
+
         // Create invoice form
         div({key:"form",className:"cb-inv-form",style:S.card},[
           div({key:"h",style:{fontWeight:700,marginBottom:20}},"Create invoice"),
@@ -5594,7 +5603,7 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
         div({key:"top",style:{display:"flex",gap:12,alignItems:"flex-end",flexWrap:"wrap",marginBottom:8}},[ 
           div({key:"s",style:{position:"relative",flex:"1 1 180px"}},[
             inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:40},placeholder:"Search patient, claim number, invoice number...",value:histSearch,onChange:ev=>{setHistSearch(ev.target.value);setHistPage(1);}}),
-            span({key:"ic",style:{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#5B7A99"}},"🔍"),
+            span({key:"ic",style:{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#5B7A99",fontSize:"14px",lineHeight:1}},"⌕"),
           ]),
           div({key:"status"},[
             e("label",{key:"l",style:{...S.label,marginBottom:4}},"Status"),
@@ -5893,10 +5902,20 @@ function App(){
     button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
       outline: 2px solid #00C9A7 !important; outline-offset: 2px !important; box-shadow: 0 0 0 4px rgba(0,201,167,0.15) !important;
     }
+    /* Invoice summary cards: 2x2 on mobile */
+    @media (max-width: 767px) {
+      .cb-inv-totals { grid-template-columns: repeat(2, 1fr) !important; }
+    }
+    /* AHRMP goal row: stack vertically on mobile */
+    .cb-goal-row { display: grid; grid-template-columns: 1fr 1fr 140px; gap: 10px; }
+    @media (max-width: 767px) {
+      .cb-goal-row { grid-template-columns: 1fr !important; gap: 8px !important; }
+    }
     /* Invoice mobile - create form appears above overdue list */
     @media (max-width: 767px) {
       .cb-inv-cols { display: flex !important; flex-direction: column !important; }
       .cb-inv-form { order: -1 !important; }
+      .cb-inv-overdue { order: 1 !important; margin-bottom: 16px !important; }
     }
     /* Screen reader only utility */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
