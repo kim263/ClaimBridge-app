@@ -1188,7 +1188,7 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
         curTab===7&&e(TabClaimLog,{key:"t7",claim,up,clinic,practitioners,setActiveEpId,setEpTab}),
       ];
     })(),
-    div({key:"nav",style:{...S.fb,marginTop:28,paddingTop:20,borderTop:"1px solid rgba(255,255,255,0.07)",display:(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId?"none":"flex"}},
+    div({key:"nav",style:{...S.fb,marginTop:28,paddingTop:16,paddingBottom:isMobile?20:8,borderTop:"1px solid rgba(255,255,255,0.07)",display:(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId?"none":"flex",position:"sticky",bottom:isMobile?62:0,background:"#07101E",zIndex:10,marginLeft:isMobile?-12:-28,marginRight:isMobile?-12:-28,paddingLeft:isMobile?12:28,paddingRight:isMobile?12:28}},
     [
       btn({key:"prev",style:{...S.btnS,...((activeEpId?epTab:tab)===0&&(activeEpId?epTab:tab!==2||dSubTab===0)?{opacity:0.3,pointerEvents:"none"}:{opacity:(activeEpId?epTab:tab)===0&&dSubTab===0?0.3:1,pointerEvents:(activeEpId?epTab:tab)===0&&dSubTab===0?"none":"auto"})},onClick:()=>{
       if(activeEpId){setEpTab(t=>Math.max(0,t-1));}
@@ -4935,7 +4935,7 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
         ]),
         div({key:"r",style:{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8,flexShrink:0}},[
           div({key:"row1",style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}},[
-            btn({key:"handover",style:{...S.btnS,fontSize:"0.74rem",padding:"6px 12px",display:"flex",alignItems:"center",gap:5},onClick:()=>generateHandoverPdf(claim,practitioners,clinic)},"📄 Handover"),
+            btn({key:"handover",style:{...S.btnP,fontSize:"0.74rem",padding:"7px 14px",display:"flex",alignItems:"center",gap:5},onClick:()=>generateHandoverPdf(claim,practitioners,clinic)},"📄 Handover"),
             span({key:"status",style:{...S.pill,...statusStyle(claim.status||"Active"),cursor:"default",fontSize:"0.72rem",padding:"3px 10px"}},claim.status||"Active"),
           ]),
           claim.nextReviewDate&&div({key:"rev",style:{fontSize:"0.74rem",color:"#5B7A99",textAlign:"right"}},"Review: "+fmtD(claim.nextReviewDate)),
