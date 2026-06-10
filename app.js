@@ -44,10 +44,10 @@ function TabSelect({tabs,active,onChange}){
     tabs.map(t=>btn({key:t.id,className:"tab-btn","aria-selected":active===t.id,
       "aria-label":t.label,role:"tab",
       onClick:()=>onChange(t.id),
-      style:{padding:"10px 16px",borderRadius:"8px 8px 0 0",border:"none",whiteSpace:"nowrap",
+      style:{padding:"9px 14px",borderRadius:"8px 8px 0 0",border:"none",whiteSpace:"nowrap",
         background:active===t.id?"rgba(0,201,167,0.1)":"transparent",
         color:active===t.id?"#00C9A7":"rgba(255,255,255,0.45)",
-        fontSize:"0.82rem",fontWeight:500,cursor:"pointer",
+        fontSize:"0.8rem",fontWeight:500,cursor:"pointer",
         borderBottom:active===t.id?"2px solid #00C9A7":"none"}},t.label))
   );
 }
@@ -1188,20 +1188,20 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
         curTab===7&&e(TabClaimLog,{key:"t7",claim,up,clinic,practitioners,setActiveEpId,setEpTab}),
       ];
     })(),
-    div({key:"nav",style:{...S.fb,marginTop:28,paddingTop:16,paddingBottom:isMobile?20:8,borderTop:"1px solid rgba(255,255,255,0.07)",display:(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId?"none":"flex",position:"sticky",bottom:isMobile?62:0,background:"#07101E",zIndex:10,marginLeft:isMobile?-12:-28,marginRight:isMobile?-12:-28,paddingLeft:isMobile?12:28,paddingRight:isMobile?12:28}},
+    div({key:"nav",style:{...S.fb,marginTop:16,paddingTop:isMobile?10:16,paddingBottom:isMobile?12:8,borderTop:"1px solid rgba(255,255,255,0.07)",display:(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId?"none":"flex",position:"sticky",bottom:isMobile?62:0,background:"#07101E",zIndex:10,marginLeft:isMobile?-12:-28,marginRight:isMobile?-12:-28,paddingLeft:isMobile?12:28,paddingRight:isMobile?12:28}},
     [
-      btn({key:"prev",style:{...S.btnS,...((activeEpId?epTab:tab)===0&&(activeEpId?epTab:tab!==2||dSubTab===0)?{opacity:0.3,pointerEvents:"none"}:{opacity:(activeEpId?epTab:tab)===0&&dSubTab===0?0.3:1,pointerEvents:(activeEpId?epTab:tab)===0&&dSubTab===0?"none":"auto"})},onClick:()=>{
+      btn({key:"prev",style:{...S.btnS,...((activeEpId?epTab:tab)===0&&(activeEpId?epTab:tab!==2||dSubTab===0)?{opacity:0.3,pointerEvents:"none"}:{opacity:(activeEpId?epTab:tab)===0&&dSubTab===0?0.3:1,pointerEvents:(activeEpId?epTab:tab)===0&&dSubTab===0?"none":"auto"}),...(isMobile?{padding:"8px 14px",fontSize:"0.82rem"}:{})},onClick:()=>{
       if(activeEpId){setEpTab(t=>Math.max(0,t-1));}
       else if(tab===2&&dSubTab>0){setDSubTab(d=>d-1);}
       else{setTab(t=>Math.max(0,t-1));setDSubTab(0);}
       window.scrollTo(0,0);
     }},"<- Previous"),
-      span({key:"pg",style:{fontSize:"0.76rem",color:"#5B7A99"}},
+      span({key:"pg",style:{fontSize:isMobile?"0.7rem":"0.76rem",color:"#5B7A99",whiteSpace:"nowrap"}},
       !activeEpId&&tab===2
         ?"Diagnosis "+(dSubTab+1)+" / 4"
         :((activeEpId?epTab:tab)+1)+" / "+TABS.length
     ),
-      btn({key:"next",style:S.btnP,onClick:()=>{
+      btn({key:"next",style:{...S.btnP,...(isMobile?{padding:"8px 16px",fontSize:"0.82rem"}:{})},onClick:()=>{
       const _cur=activeEpId?epTab:tab;
       const _isRefTab=_cur===TABS.length-2&&!activeEpId;
       const _isLogTab=_cur===TABS.length-1&&!activeEpId;
@@ -1209,7 +1209,7 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
       else if(!activeEpId&&tab===2&&dSubTab<3){setDSubTab(d=>d+1);window.scrollTo(0,0);}
       else{if(activeEpId)setEpTab(t=>Math.min(TABS.length-1,t+1));else{setTab(t=>Math.min(TABS.length-1,t+1));setDSubTab(0);}window.scrollTo(0,0);}
     }},
-    !activeEpId&&tab===2&&dSubTab<3?["Next: ",e("span",{key:"s",style:{opacity:0.8}},["Diagnosis & Capacity","Clinical Assessment","Psychosocial Barriers","Imaging"][dSubTab+1]+" →")]:
+    !activeEpId&&tab===2&&dSubTab<3?(isMobile?["Next →"]:["Next: ",e("span",{key:"s",style:{opacity:0.8}},["Diagnosis & Capacity","Clinical Assessment","Psychosocial Barriers","Imaging"][dSubTab+1]+" →")]):
     (activeEpId?epTab:tab)>=TABS.length-2&&!activeEpId?"Next & Invoice ->":"Next ->"),
     ]),
   ]);
@@ -5886,8 +5886,11 @@ function App(){
     input, select, textarea, button { font-size: 16px !important; }
     .cb-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .cb-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
-    .cb-tabs { display: flex; gap: 4px; border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 24px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .cb-tabs { display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 24px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-wrap: wrap; }
     .cb-tabs::-webkit-scrollbar { display: none; }
+    @media (min-width: 768px) {
+      .cb-tabs { overflow-x: visible; flex-wrap: wrap; }
+    }
     .cb-cap-table { display: grid; grid-template-columns: 1fr 90px 90px 90px; gap: 6px; }
     @media (max-width: 767px) {
       input, select, textarea { font-size: 16px !important; padding: 12px 14px !important; }
