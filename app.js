@@ -1188,7 +1188,7 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
         curTab===7&&e(TabClaimLog,{key:"t7",claim,up,clinic,practitioners,setActiveEpId,setEpTab}),
       ];
     })(),
-    isMobile&&div({key:"nav-spacer",style:{height:24}}),
+    isMobile&&div({key:"nav-spacer",style:{height:36}}),
     div({key:"nav",style:{...S.fb,marginTop:0,paddingTop:isMobile?14:16,paddingBottom:isMobile?14:8,borderTop:"1px solid rgba(255,255,255,0.07)",boxShadow:isMobile?"0 -8px 24px rgba(7,16,30,0.95)":"none",display:(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId?"none":"flex",position:"sticky",bottom:isMobile?62:0,background:"#07101E",zIndex:10,marginLeft:isMobile?-12:-28,marginRight:isMobile?-12:-28,paddingLeft:isMobile?12:28,paddingRight:isMobile?12:28}},
     [
       btn({key:"prev",style:{...S.btnS,...((activeEpId?epTab:tab)===0&&(activeEpId?epTab:tab!==2||dSubTab===0)?{opacity:0.3,pointerEvents:"none"}:{opacity:(activeEpId?epTab:tab)===0&&dSubTab===0?0.3:1,pointerEvents:(activeEpId?epTab:tab)===0&&dSubTab===0?"none":"auto"}),...(isMobile?{padding:"8px 14px",fontSize:"0.82rem"}:{})},onClick:()=>{
@@ -1524,7 +1524,7 @@ function Tab3({claim,up}){
     const summary={dateOfImaging:today,requestingPractitioner:claim.practitionerName||"Treating practitioner",reportingRadiologist:"Dr. [Radiologist Name]",facility:"[Radiology Facility]",clinicalSummary:s.findings,keyFindings:"Findings consistent with "+diags+". Clinical correlation recommended. See full report for complete details.",modality:s.modality};
     up("imagingReports",reports.map(r=>r.id===rid?{...r,summary}:r));setGenerating(false);
   };
-  return div({},[
+  return div({style:{paddingBottom:24}},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Imaging Reports"),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Upload reports - AI extracts key details and generates a clinical summary."),
     div({key:"upload",style:{...S.card,textAlign:"center",padding:"32px"}},[
