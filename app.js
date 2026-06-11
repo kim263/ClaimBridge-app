@@ -1740,11 +1740,12 @@ Be accurate to what is actually written in the report. Do not fabricate findings
         inp({key:"file-"+reports.length,type:"file",accept:".pdf,.jpg,.jpeg,.png",onChange:upload,style:{display:"none"},value:""}),
       ]),
     ]),
-    ...reports.map(r=>div({key:r.id,style:S.card},[
+    ...[...reports].sort((a,b)=>{const da=a.summary&&a.summary.dateOfImaging?new Date(a.summary.dateOfImaging):new Date(a.uploadedAt);const db=b.summary&&b.summary.dateOfImaging?new Date(b.summary.dateOfImaging):new Date(b.uploadedAt);return da-db;}).map((r,idx,arr)=>div({key:r.id,style:{...S.card,borderLeft:r.summary?"3px solid #00C9A7":"3px solid rgba(255,255,255,0.1)"}},[
+      div({key:"idx",style:{fontSize:"0.7rem",color:"#5B7A99",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}},"Report "+(idx+1)+" of "+arr.length+(arr.length>1?" — imaging history":"")),
       div({key:"hdr",style:{...S.fb,marginBottom:r.summary?14:0}},[
         div({key:"l",style:S.fr},[
           span({key:"i",style:{fontSize:"1.4rem"}},"📋"),
-          div({key:"d"},[div({key:"n",style:{fontWeight:600,fontSize:"0.9rem"}},r.name),div({key:"s",style:{fontSize:"0.74rem",color:"#5B7A99",marginTop:2}},r.size+" - "+new Date(r.uploadedAt).toLocaleDateString("en-AU"))]),
+          div({key:"d"},[div({key:"n",style:{fontWeight:600,fontSize:"0.9rem"}},(r.summary&&r.summary.modality?r.summary.modality:"Report")+(r.summary&&r.summary.bodyRegion?" — "+r.summary.bodyRegion:"")+(r.summary&&r.summary.dateOfImaging?" ("+r.summary.dateOfImaging+")":"")),div({key:"s",style:{fontSize:"0.74rem",color:"#5B7A99",marginTop:2}},r.name+" · "+r.size)]),
         ]),
         div({key:"btns",style:{display:"flex",gap:8}},[
           !r.summary&&btn({key:"gen",style:S.btnP,onClick:()=>genSummary(r.id),disabled:generating===r.id},generating===r.id?"Reading report...":"Generate AI Summary"),
