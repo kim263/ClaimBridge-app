@@ -1655,29 +1655,67 @@ function Tab2({claim,up,dSubTab:_dSubTabProp,setDSubTab:_setDSubTabProp}){
 function Tab3({claim,up}){
   const[uploading,setUploading]=useState(false);
   const[generating,setGenerating]=useState(false);
+  const[genError,setGenError]=useState({});
   const reports=claim.imagingReports||[];
   const upload=async ev=>{
     const f=ev.target.files[0];if(!f)return;
-    setUploading(true);await new Promise(r=>setTimeout(r,700));
-    const nr={id:"img_"+Date.now(),name:f.name,size:(f.size/1024).toFixed(0)+"KB",uploadedAt:new Date().toISOString(),summary:null};
+    setUploading(true);
+    const toBase64=file=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
+    const b64=await toBase64(f).catch(()=>null);
+    const mediaType=f.type||"application/pdf";
+    const nr={id:"img_"+Date.now(),name:f.name,size:(f.size/1024).toFixed(0)+"KB",uploadedAt:new Date().toISOString(),summary:null,fileData:b64,mediaType};
     up("imagingReports",[...reports,nr]);setUploading(false);
   };
   const genSummary=async rid=>{
-    setGenerating(rid);await new Promise(r=>setTimeout(r,1200));
-    const report=reports.find(r=>r.id===rid);const fname=(report&&report.name)||"";
-    const today=new Date().toLocaleDateString("en-AU");
-    const diags=(claim.diagnoses||[]).map(d=>d.label).join(", ")||"musculoskeletal injury";
-    const bodyPart=claim.injuryBodyPart||"region of interest";
-    const summaries={
-      mri:{modality:"MRI",findings:"MRI demonstrates findings consistent with the reported mechanism of injury. There is evidence of soft tissue oedema and altered signal intensity in the affected region. No acute fracture identified. Findings are consistent with the clinical diagnosis of "+diags+"."},
-      ct:{modality:"CT",findings:"CT imaging of the "+bodyPart+" demonstrates bony alignment is maintained. No acute fracture or dislocation identified. Soft tissue swelling noted in the periarticular region. Clinical correlation recommended with the reported diagnosis of "+diags+"."},
-      xray:{modality:"X-Ray",findings:"Plain radiographs of the "+bodyPart+" demonstrate normal bony alignment. No acute fracture, dislocation or significant joint space narrowing identified. Soft tissue findings are within normal limits for the clinical context of "+diags+"."},
-      ultrasound:{modality:"Ultrasound",findings:"Ultrasound assessment demonstrates altered echogenicity and texture in the region of interest consistent with the reported injury. Findings support the clinical diagnosis of "+diags+". No significant fluid collection identified."},
-    };
-    const fl=fname.toLowerCase();const type=fl.includes("mri")?"mri":fl.includes("ct")?"ct":fl.includes("xr")||fl.includes("xray")?"xray":"ultrasound";
-    const s=summaries[type]||summaries.mri;
-    const summary={dateOfImaging:today,requestingPractitioner:claim.practitionerName||"Treating practitioner",reportingRadiologist:"Dr. [Radiologist Name]",facility:"[Radiology Facility]",clinicalSummary:s.findings,keyFindings:"Findings consistent with "+diags+". Clinical correlation recommended. See full report for complete details.",modality:s.modality};
-    up("imagingReports",reports.map(r=>r.id===rid?{...r,summary}:r));setGenerating(false);
+    const apiKey=localStorage.getItem("cb_apikey")||"";
+    if(!apiKey){setGenError(e=>({...e,[rid]:"No API key set. Go to Settings → Anthropic API Key first."}));return;}
+    setGenerating(rid);setGenError(e=>({...e,[rid]:""}));
+    const report=reports.find(r=>r.id===rid);
+    if(!report||!report.fileData){setGenError(e=>({...e,[rid]:"File data not available. Please remove and re-upload the report."}));setGenerating(false);return;}
+    try{
+      const isPdf=report.mediaType==="application/pdf"||report.name.toLowerCase().endsWith(".pdf");
+      const contentBlock=isPdf
+        ?{type:"document",source:{type:"base64",media_type:"application/pdf",data:report.fileData}}
+        :{type:"image",source:{type:"base64",media_type:report.mediaType,data:report.fileData}};
+      const prompt=`You are a medical imaging summariser for WorkCover and TAC claims in Australia.
+Extract the following fields from this radiology report and return ONLY valid JSON, no preamble, no markdown:
+{
+  "modality": "MRI|CT|X-Ray|Ultrasound|Bone Scan|other",
+  "dateOfImaging": "date as written in report or null",
+  "reportingRadiologist": "radiologist name as written or null",
+  "facility": "imaging facility name or null",
+  "bodyRegion": "body region imaged",
+  "clinicalSummary": "2-3 sentence plain English summary of findings suitable for a GP or insurer",
+  "keyFindings": "most clinically significant finding in one sentence",
+  "normalOrAbnormal": "Normal|Abnormal|Incidental finding"
+}
+Be accurate to what is actually written in the report. Do not fabricate findings.`;
+      const resp=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:800,messages:[{role:"user",content:[contentBlock,{type:"text",text:prompt}]}]})
+      });
+      if(!resp.ok){const ed=await resp.json().catch(()=>({}));throw new Error("API error "+resp.status+": "+(ed.error&&ed.error.message||resp.statusText));}
+      const data=await resp.json();
+      const text=(data.content||[]).map(b=>b.text||"").join("").trim();
+      const clean=text.replace(/```json|```/g,"").trim();
+      const parsed=JSON.parse(clean);
+      const summary={
+        dateOfImaging:parsed.dateOfImaging||new Date().toLocaleDateString("en-AU"),
+        requestingPractitioner:claim.practitionerName||"Treating practitioner",
+        reportingRadiologist:parsed.reportingRadiologist||"See report",
+        facility:parsed.facility||"See report",
+        modality:parsed.modality||"Imaging",
+        bodyRegion:parsed.bodyRegion||"",
+        clinicalSummary:parsed.clinicalSummary||"",
+        keyFindings:parsed.keyFindings||"",
+        normalOrAbnormal:parsed.normalOrAbnormal||"",
+      };
+      up("imagingReports",reports.map(r=>r.id===rid?{...r,summary}:r));
+    }catch(err){
+      setGenError(e=>({...e,[rid]:"Could not generate summary: "+err.message}));
+    }
+    setGenerating(false);
   };
   return div({style:{paddingBottom:24}},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Imaging Reports"),
@@ -1698,13 +1736,26 @@ function Tab3({claim,up}){
           div({key:"d"},[div({key:"n",style:{fontWeight:600,fontSize:"0.9rem"}},r.name),div({key:"s",style:{fontSize:"0.74rem",color:"#5B7A99",marginTop:2}},r.size+" - "+new Date(r.uploadedAt).toLocaleDateString("en-AU"))]),
         ]),
         div({key:"btns",style:{display:"flex",gap:8}},[
-          !r.summary&&btn({key:"gen",style:S.btnP,onClick:()=>genSummary(r.id),disabled:generating===r.id},generating===r.id?"Generating...":"Generate AI Summary"),
+          !r.summary&&btn({key:"gen",style:S.btnP,onClick:()=>genSummary(r.id),disabled:generating===r.id},generating===r.id?"Reading report...":"Generate AI Summary"),
           btn({key:"rem",style:S.btnD,onClick:()=>up("imagingReports",reports.filter(x=>x.id!==r.id))},"Remove"),
         ]),
       ]),
+      genError[r.id]&&div({key:"err",style:{color:"#ff6b6b",fontSize:"0.82rem",marginTop:8}},genError[r.id]),
       r.summary&&div({key:"sum",style:{background:"rgba(0,201,167,0.06)",border:"1px solid rgba(0,201,167,0.2)",borderRadius:10,padding:"16px"}},[
-        div({key:"h",style:{fontWeight:700,color:"#00C9A7",marginBottom:12,fontSize:"0.82rem",textTransform:"uppercase",letterSpacing:"0.08em"}},"AI Radiology Summary"),
-        ...[["Date of imaging",r.summary.dateOfImaging],["Requesting practitioner",r.summary.requestingPractitioner],["Reporting radiologist",r.summary.reportingRadiologist],["Facility",r.summary.facility],["Clinical summary",r.summary.clinicalSummary],["Key findings",r.summary.keyFindings]].filter(([,v])=>v).map(([l,v])=>div({key:l,style:{fontSize:"0.84rem",marginBottom:6}},[span({key:"l",style:{color:"#5B7A99"}},l+": "),v])),
+        div({key:"h",style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}},[
+          div({key:"t",style:{fontWeight:700,color:"#00C9A7",fontSize:"0.82rem",textTransform:"uppercase",letterSpacing:"0.08em"}},"AI Radiology Summary"),
+          r.summary.normalOrAbnormal&&div({key:"s",style:{fontSize:"0.75rem",padding:"2px 10px",borderRadius:20,background:r.summary.normalOrAbnormal==="Normal"?"rgba(0,201,167,0.15)":"rgba(255,107,107,0.15)",color:r.summary.normalOrAbnormal==="Normal"?"#00C9A7":"#ff6b6b",fontWeight:600}},r.summary.normalOrAbnormal),
+        ]),
+        ...[
+          ["Modality",r.summary.modality],
+          ["Body region",r.summary.bodyRegion],
+          ["Date of imaging",r.summary.dateOfImaging],
+          ["Reporting radiologist",r.summary.reportingRadiologist],
+          ["Facility",r.summary.facility],
+          ["Key findings",r.summary.keyFindings],
+          ["Clinical summary",r.summary.clinicalSummary],
+          ["Requesting practitioner",r.summary.requestingPractitioner],
+        ].filter(([,v])=>v).map(([l,v])=>div({key:l,style:{fontSize:"0.84rem",marginBottom:8}},[div({key:"l",style:{color:"#5B7A99",fontSize:"0.75rem",marginBottom:2}},l),div({key:"v"},v)])),
       ]),
     ])),
     reports.length===0&&div({key:"empty",style:{textAlign:"center",color:"#5B7A99",fontSize:"0.84rem",padding:"16px 0"}},"No reports uploaded yet"),
