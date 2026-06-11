@@ -846,6 +846,106 @@ function Collapsible({title,children,icon,defaultOpen=false}){
   ]);
 }
 
+function ImportNotesModal({onImport,onSkip}){
+  const[notes,setNotes]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[error,setError]=useState("");
+  const[preview,setPreview]=useState(null);
+
+  const extract=async()=>{
+    if(!notes.trim())return;
+    setLoading(true);setError("");setPreview(null);
+    try{
+      const diagLabels=DIAGNOSES_DB.map(d=>d.icd10+" "+d.label).join(", ");
+      const prompt=`You are a WorkCover claims assistant. Extract structured clinical information from the following consultation notes.
+
+Return ONLY valid JSON with these fields (use null if not found):
+{
+  "diagnoses": [{"icd10": "code", "label": "description"}],
+  "clinicalPresentation": "string",
+  "treatmentPlan": "string",
+  "imagingReferral": "MRI|CT Scan|X-Ray|Ultrasound|Bone Scan|DEXA Scan|PET Scan or null",
+  "imagingIndication": "string or null",
+  "otherInvestigations": "string or null",
+  "medications": [{"name": "string", "dosage": "string", "frequency": "string", "duration": "string"}],
+  "injuryDescription": "string or null"
+}
+
+For diagnoses, match to ICD-10 codes from this list where possible: ${diagLabels}
+If no match, use best clinical ICD-10 code and label from your knowledge.
+Return only JSON, no preamble, no markdown.
+
+Consultation notes:
+${notes}`;
+
+      const resp=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
+      });
+      const data=await resp.json();
+      const text=(data.content||[]).map(b=>b.text||"").join("").trim();
+      const clean=text.replace(/```json|```/g,"").trim();
+      const parsed=JSON.parse(clean);
+      setPreview(parsed);
+    }catch(err){
+      setError("Could not extract fields. Check your notes and try again.");
+    }
+    setLoading(false);
+  };
+
+  const confirm=()=>{
+    if(!preview)return;
+    onImport(preview);
+  };
+
+  return div({style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}},
+    div({style:{...S.card,maxWidth:600,width:"100%",marginBottom:0,maxHeight:"90vh",overflowY:"auto"}},[ 
+      div({key:"hdr",style:{marginBottom:16}},[
+        div({key:"t",style:{fontWeight:700,fontSize:"1.1rem",marginBottom:4}},"📋 Import Clinical Notes"),
+        div({key:"s",style:{fontSize:"0.8rem",color:"#5B7A99"}},"Paste your consultation notes to pre-fill this episode. You can review and edit all fields before saving."),
+      ]),
+      !preview&&e("textarea",{key:"ta",value:notes,onChange:ev=>setNotes(ev.target.value),placeholder:"Paste your SOAP notes or consultation summary here...",style:{width:"100%",minHeight:160,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,color:"#fff",padding:12,fontSize:"0.85rem",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}),
+      error&&div({key:"err",style:{color:"#ff6b6b",fontSize:"0.82rem",marginTop:8}},error),
+      preview&&div({key:"prev",style:{background:"rgba(0,201,167,0.06)",border:"1px solid rgba(0,201,167,0.2)",borderRadius:8,padding:14,marginTop:8}},[
+        div({key:"ph",style:{fontWeight:600,fontSize:"0.88rem",color:"#00C9A7",marginBottom:10}},"✓ Extracted — review before confirming"),
+        preview.diagnoses&&preview.diagnoses.length>0&&div({key:"d",style:{marginBottom:8}},[
+          div({key:"l",style:{fontSize:"0.75rem",color:"#5B7A99",marginBottom:4}},"DIAGNOSES"),
+          ...preview.diagnoses.map((d,i)=>div({key:i,style:{fontSize:"0.82rem",marginBottom:2}},d.icd10+" — "+d.label)),
+        ]),
+        preview.clinicalPresentation&&div({key:"cp",style:{marginBottom:8}},[
+          div({key:"l",style:{fontSize:"0.75rem",color:"#5B7A99",marginBottom:4}},"CLINICAL PRESENTATION"),
+          div({key:"v",style:{fontSize:"0.82rem",whiteSpace:"pre-wrap"}},preview.clinicalPresentation),
+        ]),
+        preview.treatmentPlan&&div({key:"tp",style:{marginBottom:8}},[
+          div({key:"l",style:{fontSize:"0.75rem",color:"#5B7A99",marginBottom:4}},"TREATMENT PLAN"),
+          div({key:"v",style:{fontSize:"0.82rem",whiteSpace:"pre-wrap"}},preview.treatmentPlan),
+        ]),
+        (preview.imagingReferral||preview.otherInvestigations)&&div({key:"inv",style:{marginBottom:8}},[
+          div({key:"l",style:{fontSize:"0.75rem",color:"#5B7A99",marginBottom:4}},"INVESTIGATIONS"),
+          preview.imagingReferral&&div({key:"img",style:{fontSize:"0.82rem",marginBottom:2}},preview.imagingReferral+(preview.imagingIndication?" — "+preview.imagingIndication:"")),
+          preview.otherInvestigations&&div({key:"oth",style:{fontSize:"0.82rem"}},preview.otherInvestigations),
+        ]),
+        preview.medications&&preview.medications.length>0&&div({key:"meds",style:{marginBottom:8}},[
+          div({key:"l",style:{fontSize:"0.75rem",color:"#5B7A99",marginBottom:4}},"MEDICATIONS"),
+          ...preview.medications.map((m,i)=>div({key:i,style:{fontSize:"0.82rem",marginBottom:2}},m.name+(m.dosage?" "+m.dosage:"")+(m.frequency?" — "+m.frequency:"")+(m.duration?" ("+m.duration+")":""))),
+        ]),
+        preview.injuryDescription&&div({key:"inj",style:{marginBottom:4}},[
+          div({key:"l",style:{fontSize:"0.75rem",color:"#5B7A99",marginBottom:4}},"MECHANISM / INJURY DESCRIPTION"),
+          div({key:"v",style:{fontSize:"0.82rem",whiteSpace:"pre-wrap"}},preview.injuryDescription),
+        ]),
+      ]),
+      div({key:"note",style:{fontSize:"0.75rem",color:"#5B7A99",marginTop:10,marginBottom:14}},"⚠️ Note text is sent to Claude AI for extraction and is not stored."),
+      div({key:"btns",style:{display:"flex",gap:10,justifyContent:"flex-end",flexWrap:"wrap"}},[
+        btn({key:"skip",style:S.btnS,onClick:onSkip},"Skip — enter manually"),
+        !preview&&btn({key:"ext",style:{...S.btnP,opacity:loading||!notes.trim()?0.5:1,pointerEvents:loading||!notes.trim()?"none":"auto"},onClick:extract},loading?"Extracting...":"Extract fields"),
+        preview&&btn({key:"re",style:S.btnS,onClick:()=>setPreview(null)},"← Re-paste"),
+        preview&&btn({key:"conf",style:S.btnP,onClick:confirm},"Confirm & continue →"),
+      ]),
+    ])
+  );
+}
+
 function Modal({msg,onClose,onConfirm}){
   return div({style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}},
     div({style:{...S.card,maxWidth:360,width:"90%",textAlign:"center",marginBottom:0}},[
@@ -1136,6 +1236,8 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
   const[practitioners,setPractitioners]=useState([]);
   const[savedModal,setSavedModal]=useState(false);
   const[draftModal,setDraftModal]=useState(false);
+  const[showImportModal,setShowImportModal]=useState(false);
+  const[pendingEpId,setPendingEpId]=useState(null);
   useEffect(()=>{sget("practitioners:"+clinic.id).then(p=>setPractitioners(p||[]));},[clinic.id]);
   const up=(field,value)=>{
     if(activeEpId&&EPISODE_FIELDS.includes(field)){setClaim(prev=>{const episodes=(prev.episodes||[]).map(ep=>ep.id===activeEpId?{...ep,[field]:value}:ep);return {...prev,episodes};});}
@@ -1146,7 +1248,7 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
     const cocCount=Math.max(...(claim.episodes||[]).map(e=>e.cocCount||0),0)+1;
     const newEp={id:"ep_"+claim.id+"_"+Date.now(),episodeNo:epNo,date:new Date().toISOString(),practitionerId:claim.practitionerId,practitionerName:claim.practitionerName,practitionerProfession:claim.practitionerProfession,label:"Request "+epNo,createdAt:new Date().toISOString(),cocCount,cocType:"Subsequent",referrals:[],letterHistory:[],medications:[]};
     setClaim(prev=>({...prev,episodes:[...(prev.episodes||[]),newEp]}));
-    setActiveEpId(newEp.id);setEpTab(2);
+    setActiveEpId(newEp.id);setPendingEpId(newEp.id);setShowImportModal(true);
   };
   const save=async()=>{const now=new Date().toISOString();const prac=practitioners.find(p=>p.id===claim.practitionerId);const updated={...claim,lastEditedAt:now,lastEditedBy:prac?prac.name:clinic.name,createdAt:claim.createdAt||now,createdBy:claim.createdBy||(prac?prac.name:clinic.name)};setClaim(updated);await onSave(updated);setSavedModal(true);};
   const saveDraft=async()=>{const now=new Date().toISOString();const prac=practitioners.find(p=>p.id===claim.practitionerId);const updated={...claim,status:"Draft",lastEditedAt:now,lastEditedBy:prac?prac.name:clinic.name,createdAt:claim.createdAt||now,createdBy:claim.createdBy||(prac?prac.name:clinic.name)};setClaim(updated);await onSave(updated);setDraftModal(true);};
@@ -1154,6 +1256,29 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
   return div({style:{padding:isMobile?"12px":"28px",maxWidth:960,margin:"0 auto"}},[
     savedModal&&e(Modal,{key:"sm",msg:"Claim saved successfully!",onClose:()=>setSavedModal(false)}),
     draftModal&&e(Modal,{key:"dm",msg:"Draft saved! Continue from Claims list.",onClose:()=>{setDraftModal(false);onBack();},onConfirm:()=>{setDraftModal(false);onBack();}}),
+    showImportModal&&e(ImportNotesModal,{key:"imp",
+      onSkip:()=>{setShowImportModal(false);setPendingEpId(null);setEpTab(2);},
+      onImport:(extracted)=>{
+        if(extracted.diagnoses&&extracted.diagnoses.length>0){
+          const validDiags=extracted.diagnoses.map(d=>{
+            const match=DIAGNOSES_DB.find(x=>x.icd10===d.icd10);
+            return match||{icd10:d.icd10,label:d.label,cat:"Other"};
+          });
+          up("diagnoses",validDiags);
+        }
+        if(extracted.clinicalPresentation)up("clinicalPresentation",extracted.clinicalPresentation);
+        if(extracted.treatmentPlan)up("treatmentPlan",extracted.treatmentPlan);
+        if(extracted.imagingReferral)up("imagingReferral",extracted.imagingReferral);
+        if(extracted.imagingIndication)up("imagingIndication",extracted.imagingIndication);
+        if(extracted.otherInvestigations)up("otherInvestigations",extracted.otherInvestigations);
+        if(extracted.injuryDescription)up("injuryDescription",extracted.injuryDescription);
+        if(extracted.medications&&extracted.medications.length>0){
+          const meds=extracted.medications.map(m=>({...m,id:"med_"+Date.now()+"_"+Math.random().toString(36).slice(2)}));
+          up("medications",meds);
+        }
+        setShowImportModal(false);setPendingEpId(null);setEpTab(2);
+      }
+    }),
     div({key:"hdr",style:{marginBottom:isMobile?14:22}},[
       div({key:"top",style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:isMobile?8:0}},[
         div({key:"l",style:{...S.fr,flex:1,minWidth:0,overflow:"hidden"}},[btn({key:"back",style:{...S.btnS,flexShrink:0,padding:"10px 14px"},onClick:onBack,"aria-label":"Back to dashboard"},"← Back"),div({key:"t",style:{fontWeight:700,fontSize:"0.9rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,paddingLeft:8}},claim.patientName||"New Claim")]),
