@@ -1694,8 +1694,6 @@ CRITICAL RULES:
 
 MODALITY: The modality is stated in the report title or heading at the top of the document (e.g. "MRI LEFT SHOULDER", "CT LUMBAR SPINE"). Use that. Ignore any text at the bottom of the page such as "CT - Highest resolution" or equipment/technical footnotes — these are not the modality. If the heading says MRI, the modality is MRI.
 
-FINDINGS — QUOTE DIRECTLY: For keyFindings, copy or closely paraphrase the exact language the radiologist used. Do not invert, negate, or reinterpret findings. If the report says "extensive labral tearing of the posterior half", write that. Do not write "no posterior labral tear". If the report says "abnormal acromioclavicular joint", write that. Extract every finding — both abnormal findings AND relevant normal structures (intact tendons, no fracture etc).
-
 NORMAL/ABNORMAL: If ANY tear, effusion, oedema, thickening, injury, or pathology is described anywhere in the report, classify as Abnormal. Only Normal if the radiologist explicitly states all structures are normal.
 
 CLINICAL SUMMARY: 2-3 sentences summarising the key pathology in plain clinical English suitable for a GP or insurer letter. Do not mention WorkCover or TAC specifically.
@@ -1708,7 +1706,7 @@ Return ONLY valid JSON, no preamble, no markdown:
   "facility": "imaging facility or clinic name as written or null",
   "bodyRegion": "specific body region e.g. Left Shoulder, Lumbar Spine",
   "clinicalSummary": "2-3 sentence plain clinical summary of key pathology",
-  "keyFindings": ["finding 1 — quoted from report", "finding 2", "finding 3"],
+  "additionalNotes": null
   "normalOrAbnormal": "Normal|Abnormal|Incidental finding"
 }`;
       const resp=await fetch("https://api.anthropic.com/v1/messages",{
@@ -1729,7 +1727,7 @@ Return ONLY valid JSON, no preamble, no markdown:
         modality:parsed.modality||"Imaging",
         bodyRegion:parsed.bodyRegion||"",
         clinicalSummary:parsed.clinicalSummary||"",
-        keyFindings:Array.isArray(parsed.keyFindings)?parsed.keyFindings.join("\n• "):(parsed.keyFindings||""),
+
         normalOrAbnormal:parsed.normalOrAbnormal||"",
       };
       up("imagingReports",reports.map(r=>r.id===rid?{...r,summary}:r));
@@ -1777,13 +1775,13 @@ Return ONLY valid JSON, no preamble, no markdown:
           ["Clinical summary",r.summary.clinicalSummary],
           ["Requesting practitioner",r.summary.requestingPractitioner],
         ].filter(([,v])=>v).map(([l,v])=>div({key:l,style:{fontSize:"0.84rem",marginBottom:8}},[div({key:"l",style:{color:"#5B7A99",fontSize:"0.75rem",marginBottom:2}},l),div({key:"v"},v)])),
-        r.summary.keyFindings&&div({key:"kf",style:{fontSize:"0.84rem",marginBottom:8}},[
-          div({key:"l",style:{color:"#5B7A99",fontSize:"0.75rem",marginBottom:6}},"Key findings"),
-          ...r.summary.keyFindings.split("\n• ").map((f,i)=>div({key:i,style:{display:"flex",gap:8,marginBottom:4,alignItems:"flex-start"}},[
-            span({key:"b",style:{color:"#00C9A7",flexShrink:0,marginTop:2}},"•"),
-            span({key:"t"},f.replace(/^• /,"")),
-          ])),
+        div({key:"notes",style:{marginTop:12}},[
+          div({key:"l",style:{color:"#5B7A99",fontSize:"0.75rem",marginBottom:4}},"Additional clinical notes (add any findings missing from AI summary)"),
+          e("textarea",{key:"ta",value:r.additionalNotes||"",onChange:ev=>{const updated=(reports||[]).map(x=>x.id===r.id?{...x,additionalNotes:ev.target.value}:x);up("imagingReports",updated);},placeholder:"e.g. Extensive posterior labral tearing, paralabral cysts, bone marrow oedema — add any details the AI summary missed...",style:{width:"100%",minHeight:72,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,color:"#fff",padding:10,fontSize:"0.82rem",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}),
         ]),
+        div({key:"disc",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:10,padding:"8px 10px",background:"rgba(255,255,255,0.03)",borderRadius:6,borderLeft:"3px solid rgba(91,122,153,0.4)"}},
+          "⚠️ AI-generated summary — review against original report before use in clinical correspondence. Add any missing findings in the field above."
+        ),
       ]),
     ])),
     reports.length===0&&div({key:"empty",style:{textAlign:"center",color:"#5B7A99",fontSize:"0.84rem",padding:"16px 0"}},"No reports uploaded yet"),
@@ -1885,7 +1883,7 @@ I am satisfied that the requested travel assistance is reasonable and necessary 
   const workRes=claim.workRestrictions||"As per Certificate of Capacity.";
   const fitness=claim.fitnessForWork||"";
   const rtwMod=fD(claim.rtwModifiedDate);const rtwNorm=fD(claim.rtwNormalDate);
-  const imgSummary=(claim.imagingReports||[]).filter(r=>r.summary).map(r=>(r.summary.modality||"Imaging")+(r.summary.bodyRegion?" — "+r.summary.bodyRegion:"")+(r.summary.dateOfImaging?" ("+r.summary.dateOfImaging+")":"")+": "+r.summary.clinicalSummary).join("\n")||"";
+  const imgSummary=(claim.imagingReports||[]).filter(r=>r.summary).map(r=>(r.summary.modality||"Imaging")+(r.summary.bodyRegion?" — "+r.summary.bodyRegion:"")+(r.summary.dateOfImaging?" ("+r.summary.dateOfImaging+")":"")+": "+r.summary.clinicalSummary+(r.additionalNotes?" "+r.additionalNotes:"")).join("\n")||"";
   const recipient=firstRef.name?(firstRef.name+(firstRef.specialty?" ("+firstRef.specialty+")":"")):(cm||ins);
   const salutation=firstRef.name?"Dear "+firstRef.name+",":`Dear ${cm?"Case Manager "+cm:"Sir / Madam"},`;
   const sig=`\n\nYours sincerely,\n\n${pracName}\n${pracProf}\nProvider No: ${pracProv}\n${clinicName}\n${clinicAddr}\nPh: ${pracPhone}\nDate: ${today}\n\n---\nGenerated by ClaimBridge`;
@@ -3738,7 +3736,7 @@ function Tab8({claim,up,clinic,practitioners,onInvoice}){
   const cocFrom=fmtD(claim.cocFrom||claim.fitNormalFrom||claim.fitRestrictFrom||claim.unfitFrom);
   const cocTo=fmtD(claim.cocTo||claim.fitRestrictTo||claim.unfitTo);
   const reviewDate=fmtD(claim.nextReviewDate);
-  const imagingSummary=(claim.imagingReports||[]).filter(r=>r.summary).map(r=>(r.summary.modality||"Imaging")+(r.summary.bodyRegion?" — "+r.summary.bodyRegion:"")+(r.summary.dateOfImaging?" ("+r.summary.dateOfImaging+")":"")+": "+r.summary.clinicalSummary).join("\n")||"";
+  const imagingSummary=(claim.imagingReports||[]).filter(r=>r.summary).map(r=>(r.summary.modality||"Imaging")+(r.summary.bodyRegion?" — "+r.summary.bodyRegion:"")+(r.summary.dateOfImaging?" ("+r.summary.dateOfImaging+")":"")+": "+r.summary.clinicalSummary+(r.additionalNotes?" "+r.additionalNotes:"")).join("\n")||"";
   const referralList=(claim.referrals||[]).map(r=>r.specialty+(r.name?" — "+r.name:"")).join(", ")||"";
   const proposedProcedure=claim.proposedProcedure||"";
 
