@@ -1656,16 +1656,25 @@ function Tab3({claim,up}){
   const[uploading,setUploading]=useState(false);
   const[generating,setGenerating]=useState(false);
   const[genError,setGenError]=useState({});
+  const[dragOver,setDragOver]=useState(false);
   const reports=claim.imagingReports||[];
-  const upload=async ev=>{
-    const f=ev.target.files[0];if(!f)return;
+  const processFile=async f=>{
+    if(!f)return;
+    const allowed=["application/pdf","image/jpeg","image/png","image/tiff","image/tif"];
+    const ext=f.name.toLowerCase().split(".").pop();
+    const allowedExt=["pdf","jpg","jpeg","png","tif","tiff"];
+    if(!allowed.includes(f.type)&&!allowedExt.includes(ext)){return;}
     setUploading(true);
     const toBase64=file=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
     const b64=await toBase64(f).catch(()=>null);
-    const mediaType=f.type||"application/pdf";
+    const mediaType=f.type||(ext==="pdf"?"application/pdf":ext==="tif"||ext==="tiff"?"image/tiff":"image/jpeg");
     const nr={id:"img_"+Date.now(),name:f.name,size:(f.size/1024).toFixed(0)+"KB",uploadedAt:new Date().toISOString(),summary:null,fileData:b64,mediaType};
     up("imagingReports",[...reports,nr]);setUploading(false);
   };
+  const upload=async ev=>{const f=ev.target.files[0];await processFile(f);};
+  const onDrop=async ev=>{ev.preventDefault();setDragOver(false);const f=ev.dataTransfer.files[0];await processFile(f);};
+  const onDragOver=ev=>{ev.preventDefault();setDragOver(true);};
+  const onDragLeave=()=>setDragOver(false);
   const genSummary=async rid=>{
     const apiKey=localStorage.getItem("cb_apikey")||"";
     if(!apiKey){setGenError(e=>({...e,[rid]:"No API key set. Go to Settings → Anthropic API Key first."}));return;}
@@ -1720,13 +1729,13 @@ Be accurate to what is actually written in the report. Do not fabricate findings
   return div({style:{paddingBottom:24}},[
     div({key:"h",style:{fontWeight:800,fontSize:"1.1rem",marginBottom:4}},"Imaging Reports"),
     div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:20}},"Upload reports - AI extracts key details and generates a clinical summary."),
-    div({key:"upload",style:{...S.card,textAlign:"center",padding:"32px"}},[
-      div({key:"i",style:{fontSize:"2.5rem",marginBottom:10}},"📄"),
-      div({key:"t",style:{fontWeight:600,marginBottom:6}},"Upload radiology report"),
-      div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:18}},"PDF or image - AI summary generated automatically"),
-      e("label",{key:"l",style:{...S.btnP,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:8}},[
+    div({key:"upload",onDrop,onDragOver,onDragLeave,style:{...S.card,textAlign:"center",padding:"32px",border:dragOver?"2px dashed #00C9A7":"2px dashed rgba(255,255,255,0.1)",transition:"border 0.2s, background 0.2s",background:dragOver?"rgba(0,201,167,0.08)":"transparent",cursor:"pointer"}},[
+      div({key:"i",style:{fontSize:"2.5rem",marginBottom:10}},dragOver?"📂":"📄"),
+      div({key:"t",style:{fontWeight:600,marginBottom:6}},dragOver?"Drop to upload":"Drag & drop or choose file"),
+      div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:18}},"PDF, JPG, PNG or TIFF — AI summary generated from report contents"),
+      !dragOver&&e("label",{key:"l",style:{...S.btnP,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:8}},[
         uploading?"Uploading...":"Choose file",
-        inp({key:"file-"+reports.length,type:"file",accept:".pdf,.jpg,.jpeg,.png",onChange:upload,style:{display:"none"},value:""}),
+        inp({key:"file-"+reports.length,type:"file",accept:".pdf,.jpg,.jpeg,.png,.tif,.tiff",onChange:upload,style:{display:"none"},value:""}),
       ]),
     ]),
     ...reports.map(r=>div({key:r.id,style:S.card},[
