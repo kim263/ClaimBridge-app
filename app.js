@@ -1025,7 +1025,7 @@ function ClaimsPage({claims,onOpen,onNew}){
     div({key:"filters",style:{display:"flex",gap:12,marginBottom:20}},[
       div({key:"s",style:{flex:1,position:"relative"}},[
         inp({key:"i",className:"cb-input",style:{...S.inp,paddingLeft:30},placeholder:"Search patient or claim number...",value:q,onChange:ev=>setQ(ev.target.value)}),
-        span({key:"ic",style:{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}},"🔍"),
+        span({key:"ic",style:{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"rgba(91,122,153,0.7)",fontSize:"12px",lineHeight:1,userSelect:"none"}},"⌕"),
       ]),
       e("select",{key:"f",className:"cb-sel",style:{...S.sel,width:"auto",minWidth:160},value:sf,onChange:ev=>setSf(ev.target.value)},
         ["All","Active","Pending Approval","Approved","Closed","Disputed"].map(s=>e("option",{key:s},s))
@@ -5588,9 +5588,9 @@ function InvoicingPage({clinic,claims,onSaveClaim}){
 
         // This month's invoices
         div({key:"this-month"},[
-          div({key:"h",style:{fontWeight:600,marginBottom:14,fontSize:"0.88rem",display:"flex",justifyContent:"space-between",alignItems:"center"}},[
-            div({key:"l"},thisMonthKey+" — "+thisMonthInvoices.length+" invoice"+(thisMonthInvoices.length!==1?"s":"")),
-            btn({key:"hist",style:{...S.btnS,fontSize:"0.76rem",padding:"4px 12px"},onClick:()=>setInvTab("history")},"View all →"),
+          div({key:"h",style:{fontWeight:600,marginBottom:14,fontSize:"0.88rem",display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}},[
+            div({key:"l",style:{flex:1}},thisMonthKey+" — "+thisMonthInvoices.length+" invoice"+(thisMonthInvoices.length!==1?"s":"")),
+            btn({key:"hist",style:{...S.btnS,fontSize:"0.76rem",padding:"4px 16px",flexShrink:0},onClick:()=>setInvTab("history")},"View all →"),
           ]),
           thisMonthInvoices.length===0?div({key:"empty",style:{...S.cardSm,textAlign:"center",padding:"28px",color:"#5B7A99"}},[
             div({key:"i",style:{fontSize:"1.8rem",marginBottom:8}},"🧾"),
@@ -5846,7 +5846,7 @@ function App(){
   return div({role:"application","aria-label":"ClaimBridge",style:{display:"flex",minHeight:"100vh"}},[
     e("a",{key:"skip",href:"#main-content",className:"skip-link"},"Skip to main content"),
     e(Sidebar,{key:"sb",nav,onNav:handleNav,clinic,onLogout:handleLogout,collapsed,onToggle:()=>setCollapsed(!collapsed)}),
-    div({key:"main",id:"main-content",role:"main",style:{flex:1,overflowX:"hidden",overflowY:"auto",paddingBottom:isMobile?"160px":0}},[
+    div({key:"main",id:"main-content",role:"main",style:{flex:1,overflowX:"hidden",overflowY:"auto",paddingBottom:isMobile?"180px":0}},[
       e(TopBar,{key:"tb",clinic,nav,claim:activeClaim}),
       nav==="dashboard"&&e(Dashboard,{key:"d",clinic,claims,onNew:()=>{setActiveClaim(null);setNav("claim");},onOpen:handleOpen}),
       nav==="claims"&&e(ClaimsPage,{key:"cl",claims,onOpen:handleOpen,onNew:()=>{setActiveClaim(null);setNav("claim");}}),
