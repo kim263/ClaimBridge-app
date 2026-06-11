@@ -1689,22 +1689,29 @@ function Tab3({claim,up}){
         ?{type:"document",source:{type:"base64",media_type:"application/pdf",data:report.fileData}}
         :{type:"image",source:{type:"base64",media_type:report.mediaType,data:report.fileData}};
       const prompt=`You are a medical imaging summariser for WorkCover and TAC claims in Australia.
-Extract the following fields from this radiology report and return ONLY valid JSON, no preamble, no markdown:
+Read the entire radiology report carefully — every section including Findings, Opinion, and Clinical Notes.
+
+CRITICAL RULES:
+- modality: Read the report title and header carefully. MRI and CT are different — do not confuse them. Look for "MRI", "Magnetic Resonance", "CT", "Computed Tomography", "X-Ray", "Ultrasound" explicitly stated.
+- normalOrAbnormal: If ANY pathology, abnormality, tear, effusion, oedema, thickening, or injury is described anywhere in the report, classify as "Abnormal". Only "Normal" if the radiologist explicitly states all structures are normal.
+- keyFindings: Extract EVERY clinically significant finding as a separate array item. Include both abnormal AND relevant normal findings (e.g. intact tendons, no fracture). Each item should be one clear statement. Do not summarise into one sentence — list them all.
+- clinicalSummary: 2-3 sentence overview of the most important pathology and its clinical significance for a WorkCover/TAC claim.
+
+Return ONLY valid JSON, no preamble, no markdown:
 {
   "modality": "MRI|CT|X-Ray|Ultrasound|Bone Scan|other",
   "dateOfImaging": "date as written in report or null",
   "reportingRadiologist": "radiologist name as written or null",
-  "facility": "imaging facility name or null",
-  "bodyRegion": "body region imaged",
-  "clinicalSummary": "2-3 sentence plain English summary of findings suitable for a GP or insurer",
-  "keyFindings": "most clinically significant finding in one sentence",
+  "facility": "imaging facility or clinic name as written or null",
+  "bodyRegion": "specific body region e.g. Left Shoulder, Lumbar Spine",
+  "clinicalSummary": "2-3 sentence overview of key pathology and clinical significance",
+  "keyFindings": ["finding 1", "finding 2", "finding 3"],
   "normalOrAbnormal": "Normal|Abnormal|Incidental finding"
-}
-Be accurate to what is actually written in the report. Do not fabricate findings.`;
+}`;
       const resp=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
         headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-        body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:800,messages:[{role:"user",content:[contentBlock,{type:"text",text:prompt}]}]})
+        body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1200,messages:[{role:"user",content:[contentBlock,{type:"text",text:prompt}]}]})
       });
       if(!resp.ok){const ed=await resp.json().catch(()=>({}));throw new Error("API error "+resp.status+": "+(ed.error&&ed.error.message||resp.statusText));}
       const data=await resp.json();
@@ -1719,7 +1726,7 @@ Be accurate to what is actually written in the report. Do not fabricate findings
         modality:parsed.modality||"Imaging",
         bodyRegion:parsed.bodyRegion||"",
         clinicalSummary:parsed.clinicalSummary||"",
-        keyFindings:parsed.keyFindings||"",
+        keyFindings:Array.isArray(parsed.keyFindings)?parsed.keyFindings.join("\n• "):(parsed.keyFindings||""),
         normalOrAbnormal:parsed.normalOrAbnormal||"",
       };
       up("imagingReports",reports.map(r=>r.id===rid?{...r,summary}:r));
@@ -1764,10 +1771,16 @@ Be accurate to what is actually written in the report. Do not fabricate findings
           ["Date of imaging",r.summary.dateOfImaging],
           ["Reporting radiologist",r.summary.reportingRadiologist],
           ["Facility",r.summary.facility],
-          ["Key findings",r.summary.keyFindings],
           ["Clinical summary",r.summary.clinicalSummary],
           ["Requesting practitioner",r.summary.requestingPractitioner],
         ].filter(([,v])=>v).map(([l,v])=>div({key:l,style:{fontSize:"0.84rem",marginBottom:8}},[div({key:"l",style:{color:"#5B7A99",fontSize:"0.75rem",marginBottom:2}},l),div({key:"v"},v)])),
+        r.summary.keyFindings&&div({key:"kf",style:{fontSize:"0.84rem",marginBottom:8}},[
+          div({key:"l",style:{color:"#5B7A99",fontSize:"0.75rem",marginBottom:6}},"Key findings"),
+          ...r.summary.keyFindings.split("\n• ").map((f,i)=>div({key:i,style:{display:"flex",gap:8,marginBottom:4,alignItems:"flex-start"}},[
+            span({key:"b",style:{color:"#00C9A7",flexShrink:0,marginTop:2}},"•"),
+            span({key:"t"},f.replace(/^• /,"")),
+          ])),
+        ]),
       ]),
     ])),
     reports.length===0&&div({key:"empty",style:{textAlign:"center",color:"#5B7A99",fontSize:"0.84rem",padding:"16px 0"}},"No reports uploaded yet"),
@@ -1869,7 +1882,7 @@ I am satisfied that the requested travel assistance is reasonable and necessary 
   const workRes=claim.workRestrictions||"As per Certificate of Capacity.";
   const fitness=claim.fitnessForWork||"";
   const rtwMod=fD(claim.rtwModifiedDate);const rtwNorm=fD(claim.rtwNormalDate);
-  const imgSummary=(claim.imagingReports||[]).filter(r=>r.summary).map(r=>(r.summary.modality||"Imaging")+(r.summary.bodyRegion?" — "+r.summary.bodyRegion:"")+": "+r.summary.keyFindings).join("\n")||"";
+  const imgSummary=(claim.imagingReports||[]).filter(r=>r.summary).map(r=>(r.summary.modality||"Imaging")+(r.summary.bodyRegion?" — "+r.summary.bodyRegion:"")+(r.summary.dateOfImaging?" ("+r.summary.dateOfImaging+")":"")+": "+r.summary.clinicalSummary).join("\n")||"";
   const recipient=firstRef.name?(firstRef.name+(firstRef.specialty?" ("+firstRef.specialty+")":"")):(cm||ins);
   const salutation=firstRef.name?"Dear "+firstRef.name+",":`Dear ${cm?"Case Manager "+cm:"Sir / Madam"},`;
   const sig=`\n\nYours sincerely,\n\n${pracName}\n${pracProf}\nProvider No: ${pracProv}\n${clinicName}\n${clinicAddr}\nPh: ${pracPhone}\nDate: ${today}\n\n---\nGenerated by ClaimBridge`;
@@ -3722,7 +3735,7 @@ function Tab8({claim,up,clinic,practitioners,onInvoice}){
   const cocFrom=fmtD(claim.cocFrom||claim.fitNormalFrom||claim.fitRestrictFrom||claim.unfitFrom);
   const cocTo=fmtD(claim.cocTo||claim.fitRestrictTo||claim.unfitTo);
   const reviewDate=fmtD(claim.nextReviewDate);
-  const imagingSummary=(claim.imagingReports||[]).filter(r=>r.summary).map(r=>(r.summary.modality||"Imaging")+(r.summary.bodyRegion?" — "+r.summary.bodyRegion:"")+": "+r.summary.keyFindings).join("\n")||"";
+  const imagingSummary=(claim.imagingReports||[]).filter(r=>r.summary).map(r=>(r.summary.modality||"Imaging")+(r.summary.bodyRegion?" — "+r.summary.bodyRegion:"")+(r.summary.dateOfImaging?" ("+r.summary.dateOfImaging+")":"")+": "+r.summary.clinicalSummary).join("\n")||"";
   const referralList=(claim.referrals||[]).map(r=>r.specialty+(r.name?" — "+r.name:"")).join(", ")||"";
   const proposedProcedure=claim.proposedProcedure||"";
 
