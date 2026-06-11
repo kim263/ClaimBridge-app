@@ -888,7 +888,7 @@ ${notes}`;
           "anthropic-version":"2023-06-01",
           "anthropic-dangerous-direct-browser-access":"true"
         },
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
+        body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1000,messages:[{role:"user",content:prompt}]})
       });
       if(!resp.ok){const errData=await resp.json().catch(()=>({}));throw new Error("API error "+resp.status+": "+(errData.error&&errData.error.message||resp.statusText));}
       const data=await resp.json();
