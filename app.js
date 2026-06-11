@@ -1688,14 +1688,17 @@ function Tab3({claim,up}){
       const contentBlock=isPdf
         ?{type:"document",source:{type:"base64",media_type:"application/pdf",data:report.fileData}}
         :{type:"image",source:{type:"base64",media_type:report.mediaType,data:report.fileData}};
-      const prompt=`You are a medical imaging summariser for WorkCover and TAC claims in Australia.
-Read the entire radiology report carefully — every section including Findings, Opinion, and Clinical Notes.
+      const prompt=`You are a medical imaging summariser. Read the entire radiology report carefully — every section including the report title, heading, Findings, Opinion, and Clinical Notes.
 
 CRITICAL RULES:
-- modality: Read the report title and header carefully. MRI and CT are different — do not confuse them. Look for "MRI", "Magnetic Resonance", "CT", "Computed Tomography", "X-Ray", "Ultrasound" explicitly stated.
-- normalOrAbnormal: If ANY pathology, abnormality, tear, effusion, oedema, thickening, or injury is described anywhere in the report, classify as "Abnormal". Only "Normal" if the radiologist explicitly states all structures are normal.
-- keyFindings: Extract EVERY clinically significant finding as a separate array item. Include both abnormal AND relevant normal findings (e.g. intact tendons, no fracture). Each item should be one clear statement. Do not summarise into one sentence — list them all.
-- clinicalSummary: 2-3 sentence overview of the most important pathology and its clinical significance for a WorkCover/TAC claim.
+
+MODALITY: The modality is stated in the report title or heading at the top of the document (e.g. "MRI LEFT SHOULDER", "CT LUMBAR SPINE"). Use that. Ignore any text at the bottom of the page such as "CT - Highest resolution" or equipment/technical footnotes — these are not the modality. If the heading says MRI, the modality is MRI.
+
+FINDINGS — QUOTE DIRECTLY: For keyFindings, copy or closely paraphrase the exact language the radiologist used. Do not invert, negate, or reinterpret findings. If the report says "extensive labral tearing of the posterior half", write that. Do not write "no posterior labral tear". If the report says "abnormal acromioclavicular joint", write that. Extract every finding — both abnormal findings AND relevant normal structures (intact tendons, no fracture etc).
+
+NORMAL/ABNORMAL: If ANY tear, effusion, oedema, thickening, injury, or pathology is described anywhere in the report, classify as Abnormal. Only Normal if the radiologist explicitly states all structures are normal.
+
+CLINICAL SUMMARY: 2-3 sentences summarising the key pathology in plain clinical English suitable for a GP or insurer letter. Do not mention WorkCover or TAC specifically.
 
 Return ONLY valid JSON, no preamble, no markdown:
 {
@@ -1704,8 +1707,8 @@ Return ONLY valid JSON, no preamble, no markdown:
   "reportingRadiologist": "radiologist name as written or null",
   "facility": "imaging facility or clinic name as written or null",
   "bodyRegion": "specific body region e.g. Left Shoulder, Lumbar Spine",
-  "clinicalSummary": "2-3 sentence overview of key pathology and clinical significance",
-  "keyFindings": ["finding 1", "finding 2", "finding 3"],
+  "clinicalSummary": "2-3 sentence plain clinical summary of key pathology",
+  "keyFindings": ["finding 1 — quoted from report", "finding 2", "finding 3"],
   "normalOrAbnormal": "Normal|Abnormal|Incidental finding"
 }`;
       const resp=await fetch("https://api.anthropic.com/v1/messages",{
