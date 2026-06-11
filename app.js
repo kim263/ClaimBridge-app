@@ -854,6 +854,8 @@ function ImportNotesModal({onImport,onSkip}){
 
   const extract=async()=>{
     if(!notes.trim())return;
+    const apiKey=localStorage.getItem("cb_apikey")||"";
+    if(!apiKey){setError("No API key set. Go to Settings → Anthropic API Key and paste your key first.");return;}
     setLoading(true);setError("");setPreview(null);
     try{
       const diagLabels=DIAGNOSES_DB.map(d=>d.icd10+" "+d.label).join(", ");
@@ -882,6 +884,7 @@ ${notes}`;
         method:"POST",
         headers:{
           "Content-Type":"application/json",
+          "x-api-key":apiKey,
           "anthropic-version":"2023-06-01",
           "anthropic-dangerous-direct-browser-access":"true"
         },
