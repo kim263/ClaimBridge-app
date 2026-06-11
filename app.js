@@ -909,9 +909,12 @@ ${notes}`;
 
   return div({style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}},
     div({style:{...S.card,maxWidth:600,width:"100%",marginBottom:0,maxHeight:"90vh",overflowY:"auto"}},[ 
-      div({key:"hdr",style:{marginBottom:16}},[
-        div({key:"t",style:{fontWeight:700,fontSize:"1.1rem",marginBottom:4}},"📋 Import Clinical Notes"),
-        div({key:"s",style:{fontSize:"0.8rem",color:"#5B7A99"}},"Paste your consultation notes to pre-fill this episode. You can review and edit all fields before saving."),
+      div({key:"hdr",style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}},[
+        div({key:"txt"},[  
+          div({key:"t",style:{fontWeight:700,fontSize:"1.1rem",marginBottom:4}},"📋 Import Clinical Notes"),
+          div({key:"s",style:{fontSize:"0.8rem",color:"#5B7A99"}},"Paste your consultation notes to pre-fill this episode. You can review and edit all fields before saving."),
+        ]),
+        btn({key:"x",style:{background:"none",border:"none",color:"#5B7A99",fontSize:"1.3rem",cursor:"pointer",padding:"0 4px",lineHeight:1,"aria-label":"Close"},onClick:onSkip},"×"),
       ]),
       !preview&&e("textarea",{key:"ta",value:notes,onChange:ev=>setNotes(ev.target.value),placeholder:"Paste your SOAP notes or consultation summary here...",style:{width:"100%",minHeight:160,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,color:"#fff",padding:12,fontSize:"0.85rem",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}),
       error&&div({key:"err",style:{color:"#ff6b6b",fontSize:"0.82rem",marginTop:8}},error),
