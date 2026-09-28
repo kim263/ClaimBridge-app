@@ -1440,6 +1440,78 @@ function Tab1({claim,up,practitioners}){
 }
 
 // ── TAB 2: DIAGNOSIS ──────────────────────────────────────────────────────────
+// ── ROM JOINT TABLE (auto-populates movements from body part; writes arom/prom text used by letters) ──
+const ROM_REGIONS={
+  "Cervical spine":["Flexion","Extension","Lateral flexion (L)","Lateral flexion (R)","Rotation (L)","Rotation (R)"],
+  "Thoracic spine":["Flexion","Extension","Lateral flexion (L)","Lateral flexion (R)","Rotation (L)","Rotation (R)"],
+  "Lumbar spine":["Flexion","Extension","Lateral flexion (L)","Lateral flexion (R)","Rotation (L)","Rotation (R)"],
+  "Shoulder":["Flexion","Extension","Abduction","Adduction","Internal rotation","External rotation"],
+  "Elbow":["Flexion","Extension","Supination","Pronation"],
+  "Wrist":["Flexion","Extension","Radial deviation","Ulnar deviation"],
+  "Hip":["Flexion","Extension","Abduction","Adduction","Internal rotation","External rotation"],
+  "Knee":["Flexion","Extension"],
+  "Ankle":["Dorsiflexion","Plantarflexion","Inversion","Eversion"],
+};
+const ROM_KEYS=["Cervical spine","Thoracic spine","Lumbar spine","Shoulder - left","Shoulder - right","Elbow - left","Elbow - right","Wrist - left","Wrist - right","Hip - left","Hip - right","Knee - left","Knee - right","Ankle - left","Ankle - right"];
+function cbRomMovs(key){return ROM_REGIONS[String(key).split(" - ")[0]]||[];}
+function cbRomKey(bp){
+  if(!bp)return "";
+  if(/^Neck|cervical/i.test(bp))return "Cervical spine";
+  if(/^Thoracic/i.test(bp))return "Thoracic spine";
+  if(/^Lumbar/i.test(bp))return "Lumbar spine";
+  const m=String(bp).match(/^(Shoulder|Elbow|Wrist|Hip|Knee|Ankle) - (left|right)$/i);
+  return m?m[1]+" - "+m[2].toLowerCase():"";
+}
+function cbRomText(rd,which){
+  const fmt=v=>{const t=String(v).trim();return /^\d+(\.\d+)?$/.test(t)?t+"\u00b0":t;};
+  const out=Object.keys(rd||{}).map(k=>{
+    const txt=cbRomMovs(k).map(m=>{const v=rd[k]&&rd[k][m]&&rd[k][m][which];return v&&String(v).trim()?m+" "+fmt(v):"";}).filter(Boolean).join(", ");
+    return txt?{k,txt}:null;
+  }).filter(Boolean);
+  return out.length>1?out.map(o=>o.k+": "+o.txt).join("; "):(out[0]?out[0].txt:"");
+}
+function RomTable({claim,up}){
+  const rd=claim.romData||{};
+  const detected=cbRomKey(claim.injuryBodyPart);
+  const structuredUsed=Object.keys(rd).length>0;
+  const auto=detected&&(rd[detected]||structuredUsed||(!claim.arom&&!claim.prom))?detected:"FREE";
+  const[sel,setSel]=useState(null);
+  const cur=sel===null?auto:sel;
+  const setVal=(mov,which,v)=>{
+    const next={...rd,[cur]:{...(rd[cur]||{}),[mov]:{...((rd[cur]||{})[mov]||{}),[which]:v}}};
+    up("romData",next);up("arom",cbRomText(next,"a"));up("prom",cbRomText(next,"p"));
+  };
+  const picker=e("select",{key:"pick",className:"cb-sel",style:{...S.sel,marginBottom:12},value:cur,onChange:ev=>setSel(ev.target.value),"aria-label":"Range of motion joint"},[
+    e("option",{key:"FREE",value:"FREE"},"Free text (no joint table)"),
+    ...ROM_KEYS.map(k=>e("option",{key:k,value:k},k)),
+  ]);
+  if(cur==="FREE")return div({key:"rom-free"},[
+    e("label",{key:"l",style:S.label},"Range of motion"),
+    picker,
+    div({key:"rom-grid",className:"cb-grid-2",style:{}},[
+      e(Ta,{key:"af",label:"Active ROM findings",value:claim.arom,onChange:v=>up("arom",v),placeholder:"Flexion 40 degrees, Extension 15 degrees...",mb:0}),
+      e(Ta,{key:"pf",label:"Passive ROM findings",value:claim.prom,onChange:v=>up("prom",v),placeholder:"Passive ROM findings...",mb:0}),
+    ]),
+  ]);
+  const cell=(mov,which)=>inp({key:which,className:"cb-input",style:{...S.inp,fontSize:"0.82rem",padding:"7px 10px",textAlign:"center"},placeholder:"\u00b0",
+    value:((rd[cur]||{})[mov]||{})[which]||"",onChange:ev=>setVal(mov,which,ev.target.value),"aria-label":mov+(which==="a"?" active":" passive")});
+  const row={display:"grid",gridTemplateColumns:"minmax(110px,1.6fr) 1fr 1fr",gap:8,alignItems:"center",marginBottom:6};
+  return div({key:"rom-tbl"},[
+    e("label",{key:"l",style:S.label},"Range of motion"),
+    picker,
+    div({key:"hd",style:{...row,marginBottom:4}},[
+      div({key:"m",style:{...S.label,marginBottom:0}},"Movement"),
+      div({key:"a",style:{...S.label,marginBottom:0,textAlign:"center"}},"Active (\u00b0)"),
+      div({key:"p",style:{...S.label,marginBottom:0,textAlign:"center"}},"Passive (\u00b0)"),
+    ]),
+    ...cbRomMovs(cur).map(m=>div({key:m,style:row},[
+      div({key:"n",style:{fontSize:"0.84rem"}},m),
+      cell(m,"a"),cell(m,"p"),
+    ])),
+    div({key:"h",style:{fontSize:"0.72rem",color:"#5B7A99",marginTop:4}},"Enter degrees (or short text, e.g. \"90 painful\"). Results are added to the letters automatically."),
+  ]);
+}
+
 function Tab2({claim,up,dSubTab:_dSubTabProp,setDSubTab:_setDSubTabProp}){
   const[q,setQ]=useState("");
   const[show,setShow]=useState(false);
@@ -1641,10 +1713,7 @@ function Tab2({claim,up,dSubTab:_dSubTabProp,setDSubTab:_setDSubTabProp}){
           ]);
         })(),
           
-          div({key:"rom-grid",className:"cb-grid-2",style:{}},[
-          e(Ta,{key:"af",label:"Active ROM findings",value:claim.arom,onChange:v=>up("arom",v),placeholder:"Flexion 40 degrees, Extension 15 degrees...",mb:0}),
-          e(Ta,{key:"pf",label:"Passive ROM findings",value:claim.prom,onChange:v=>up("prom",v),placeholder:"Passive ROM findings...",mb:0}),
-          ]),
+          e(RomTable,{key:"rom-grid",claim,up}),
         ])
       ),
     ]),
