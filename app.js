@@ -1274,6 +1274,16 @@ const CB_TASKS=[
 ];
 // steps can be a tab name or {tab,label,focus}; returns normalised steps that exist for this profession
 function cbTaskSteps(task,TABS){return (task.steps||[]).map(x=>typeof x==="string"?{tab:x,label:x}:{label:x.tab,...x}).filter(x=>TABS.includes(x.tab));}
+// combine several ticked tasks into one ordered list of steps (each screen once; trimming only kept if every task agrees)
+function cbMergeTasks(tasks,TABS,order){
+  const by={};
+  tasks.forEach(t=>cbTaskSteps(t,TABS).forEach(st=>{(by[st.tab]=by[st.tab]||[]).push(st);}));
+  const steps=Object.keys(by).sort((a,b)=>order.indexOf(a)-order.indexOf(b)).map(tab=>{
+    const list=by[tab];const same=k=>list.every(x=>x[k]===list[0][k]);
+    return {tab,label:same("label")?list[0].label:tab,focus:same("focus")?list[0].focus:undefined};
+  });
+  return {id:"multi",label:tasks.map(t=>t.label).join(" + "),steps,newRequest:tasks.some(t=>t.newRequest),carry:tasks.some(t=>t.carry)};
+}
 // fields carried into a follow-up request (period-specific AHRMP fields are cleared so they are re-entered)
 const CB_CARRY_FIELDS=["treatmentPlan","goalsShort","goalsLong","selfManagement","ahGoalLim1","ahGoalLim2","ahGoalLim3","ahGoalTarget1","ahGoalTarget2","ahGoalTarget3","ahGoalDate1","ahGoalDate2","ahGoalDate3","barriers","workRestrictions","activityRestrictions","workEnvironment","outcomeScores"];
 function cbCarryFromEpisode(prev){
@@ -1282,16 +1292,34 @@ function cbCarryFromEpisode(prev){
   if(prev.ahrmData)out.ahrmData={...prev.ahrmData,sessions:"",duration:"",txFrom:"",txTo:""};
   return out;
 }
-function TaskPicker({isNew,onPick,tasks}){
-  return div({},[
-    div({key:"h",style:{fontWeight:800,fontSize:"1.15rem",marginBottom:6}},"What do you need to do?"),
-    div({key:"s",style:{fontSize:"0.86rem",color:"#5B7A99",marginBottom:20}},"Pick a task and we'll show only the steps you need. You can switch task at any time."),
-    div({key:"g",className:"cb-grid-2",style:{alignItems:"stretch"}},(tasks||CB_TASKS).map(t=>btn({key:t.id,className:"card-hover",onClick:()=>onPick(t.id),
-      style:{...S.card,marginBottom:0,textAlign:"left",cursor:"pointer",color:"#EFF6FF",display:"block",width:"100%"}},[
-      div({key:"t",style:{fontWeight:700,fontSize:"0.98rem",marginBottom:4}},t.label),
+function TaskPicker({isNew,onPick,onStart,preview,tasks}){
+  const[sel,setSel]=useState([]);
+  const all=tasks||CB_TASKS;
+  const stepTasks=all.filter(t=>!t.action),actionTasks=all.filter(t=>t.action);
+  const toggle=id=>setSel(x=>x.includes(id)?x.filter(i=>i!==id):[...x,id]);
+  const steps=sel.length>0&&preview?preview(sel):[];
+  const card=(t,selectable)=>{
+    const on=selectable&&sel.includes(t.id);
+    return btn({key:t.id,className:"card-hover",role:selectable?"checkbox":undefined,"aria-checked":selectable?on:undefined,onClick:()=>selectable?toggle(t.id):onPick(t.id),
+      style:{...S.card,marginBottom:0,textAlign:"left",cursor:"pointer",color:"#EFF6FF",display:"block",width:"100%",...(on?{borderColor:"rgba(0,201,167,0.6)",background:"rgba(0,201,167,0.08)"}:{})}},[
+      div({key:"t",style:{fontWeight:700,fontSize:"0.98rem",marginBottom:4}},(selectable?(on?"\u2611 ":"\u2610 "):"")+t.label),
       div({key:"d",style:{fontSize:"0.82rem",color:"#5B7A99",lineHeight:1.4}},t.desc),
       t.steps&&div({key:"st",style:{fontSize:"0.74rem",color:"rgba(0,201,167,0.85)",marginTop:8}},t.steps.map(x=>typeof x==="string"?x:(x.label||x.tab)).join("  \u2192  ")),
-    ]))),
+    ]);
+  };
+  return div({},[
+    div({key:"h",style:{fontWeight:800,fontSize:"1.15rem",marginBottom:6}},"What do you need to do?"),
+    div({key:"s",style:{fontSize:"0.86rem",color:"#5B7A99",marginBottom:20}},"Tick one or more tasks. We'll combine them so you only see each screen once."),
+    div({key:"g",className:"cb-grid-2",style:{alignItems:"stretch"}},stepTasks.map(t=>card(t,true))),
+    sel.length>0&&div({key:"go",style:{...S.card,marginTop:16,marginBottom:0,borderColor:"rgba(0,201,167,0.35)"}},[
+      div({key:"l",style:S.label},"Your steps"),
+      div({key:"p",style:{fontSize:"0.9rem",marginBottom:14,lineHeight:1.5}},steps.join("  \u2192  ")),
+      btn({key:"b",style:S.btnP,onClick:()=>onStart(sel)},"Start"),
+    ]),
+    actionTasks.length>0&&div({key:"other",style:{marginTop:24}},[
+      div({key:"l",style:S.label},"Or go straight to"),
+      div({key:"g",className:"cb-grid-2",style:{alignItems:"stretch"}},actionTasks.map(t=>card(t,false))),
+    ]),
   ]);
 }
 function TaskStepBar({task,steps,pos,onGo,onTasks,onAll,note}){
@@ -1328,6 +1356,8 @@ function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
   const[draftModal,setDraftModal]=useState(false);
   const[showImportModal,setShowImportModal]=useState(!claimData);
   const[pendingEpId,setPendingEpId]=useState(null);
+  const[logSub,setLogSub]=useState(null);   // starting sub-tab for the Claim Log (set by the Overview "certificate history" button)
+  const[taskCustom,setTaskCustom]=useState(null);   // merged definition when several tasks are ticked (taskId === "multi")
   const[taskId,setTaskId]=useState(claimData?null:"intake");   // null = show task picker, "all" = classic all-tabs view
   useEffect(()=>{sget("practitioners:"+clinic.id).then(p=>setPractitioners(p||[]));},[clinic.id]);
   const up=(field,value)=>{
@@ -1370,7 +1400,7 @@ function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
   const save=async()=>{const now=new Date().toISOString();const prac=practitioners.find(p=>p.id===claim.practitionerId);const updated={...claim,lastEditedAt:now,lastEditedBy:prac?prac.name:clinic.name,createdAt:claim.createdAt||now,createdBy:claim.createdBy||(prac?prac.name:clinic.name)};setClaim(updated);lastSavedRef.current=JSON.stringify(updated);manualSavedRef.current=true;await onSave(updated);setSavedModal(true);};
   const saveDraft=async()=>{const now=new Date().toISOString();const prac=practitioners.find(p=>p.id===claim.practitionerId);const updated={...claim,status:"Draft",lastEditedAt:now,lastEditedBy:prac?prac.name:clinic.name,createdAt:claim.createdAt||now,createdBy:claim.createdBy||(prac?prac.name:clinic.name)};setClaim(updated);lastSavedRef.current=JSON.stringify(updated);manualSavedRef.current=true;await onSave(updated);setDraftModal(true);};
   // -- task-first flow (steps map onto the existing tabs; ALL_TABS index = content index)
-  const taskDef=CB_TASKS.find(t=>t.id===taskId);
+  const taskDef=taskId==="multi"?taskCustom:CB_TASKS.find(t=>t.id===taskId);
   const taskStepDefs=taskDef?cbTaskSteps(taskDef,TABS):[];
   const taskSteps=taskStepDefs.map(x=>ALL_TABS.indexOf(x.tab));
   const taskMode=taskSteps.length>0;
@@ -1389,11 +1419,25 @@ function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
     if(t.action==="invoice"){if(onInvoice)onInvoice();return;}
     const steps=cbTaskSteps(t,TABS).map(x=>ALL_TABS.indexOf(x.tab));
     setTaskId(id);setDSubTab(0);
-    if(t.newRequest){startEpisode(!!t.carry);setEpTab(steps[0]);}else{setActiveEpId(null);setTab(steps[0]);}
+    const eps=claim.episodes||[];
+    if(t.newRequest){startEpisode(!!t.carry);setEpTab(steps[0]);}else if(eps.length>0){setActiveEpId(eps[eps.length-1].id);setEpTab(steps[0]);}else{setActiveEpId(null);setTab(steps[0]);}
     window.scrollTo(0,0);
   };
+  const previewTasks=ids=>cbMergeTasks(ids.map(i=>CB_TASKS.find(t=>t.id===i)).filter(Boolean),TABS,ALL_TABS).steps.map(x=>x.label);
+  const startTasks=ids=>{
+    if(ids.length===1){pickTask(ids[0]);return;}
+    const m=cbMergeTasks(ids.map(i=>CB_TASKS.find(t=>t.id===i)).filter(Boolean),TABS,ALL_TABS);
+    if(m.steps.length===0)return;
+    const first=ALL_TABS.indexOf(m.steps[0].tab);
+    setTaskCustom(m);setTaskId("multi");setDSubTab(0);
+    const eps=claim.episodes||[];
+    if(m.newRequest){startEpisode(!!m.carry);setEpTab(first);}else if(eps.length>0){setActiveEpId(eps[eps.length-1].id);setEpTab(first);}else{setActiveEpId(null);setTab(first);}
+    window.scrollTo(0,0);
+  };
+  const openCocHistory=()=>{setLogSub("coc");const i=ALL_TABS.indexOf("Claim Log");if(activeEpId)setEpTab(i);else setTab(i);setDSubTab(0);window.scrollTo(0,0);};
   // keep the visible section inside the task's steps (e.g. a new claim starts on its first step)
   React.useLayoutEffect(()=>{if(taskMode&&!taskSteps.includes(curIdx))goIdx(taskSteps[0]);},[taskId,curIdx,activeEpId]);
+  useEffect(()=>{if(curIdx!==ALL_TABS.indexOf("Claim Log"))setLogSub(null);},[curIdx]);
   const isMobile=useIsMobile();
   return div({style:{padding:isMobile?"12px":"28px",maxWidth:960,margin:"0 auto"}},[
     savedModal&&e(Modal,{key:"sm",msg:"Claim saved successfully!",onClose:()=>setSavedModal(false)}),
@@ -1439,7 +1483,7 @@ function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
         btn({key:"close","aria-label":"Back to claim overview",style:{...S.btnS,fontSize:"0.78rem",padding:"5px 12px"},onClick:()=>{setActiveEpId(null);setTab(0);setTaskId(t=>t==="all"?"all":null);}},"← Back to claim overview"),
       ]);
     })(),
-    showPicker&&e(TaskPicker,{key:"picker",isNew:!claimData,onPick:pickTask,tasks:pickerTasks}),
+    showPicker&&e(TaskPicker,{key:"picker",isNew:!claimData,onPick:pickTask,onStart:startTasks,preview:previewTasks,tasks:pickerTasks}),
     taskMode&&e(TaskStepBar,{key:"tsb",task:taskDef,steps:taskStepDefs.map(x=>x.label),pos:stepPos,note:carriedNote,onGo:p=>goIdx(taskSteps[p]),onTasks:toTasks,onAll:()=>setTaskId("all")}),
     taskId==="all"&&!activeEpId&&btn({key:"guided",style:{background:"transparent",border:"none",color:"#00C9A7",cursor:"pointer",fontSize:"0.8rem",textDecoration:"underline",padding:0,marginBottom:12},onClick:()=>setTaskId(null)},"\u2190 Back to guided tasks"),
     (taskMode||showPicker)?null:e(TabSelect,{key:"tabs",
@@ -1452,14 +1496,14 @@ function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
       const viewClaim=activeEp?mergeEpisodeToClaim(claim,activeEp):claim;
       const curTab=activeEp?epTab:tab;
       return [
-        curTab===0&&e(TabOverview,{key:"t0",claim:viewClaim,up,clinic,practitioners,activeEpId,setActiveEpId,createEpisode,setEpTab}),
+        curTab===0&&e(TabOverview,{key:"t0",claim:viewClaim,up,clinic,practitioners,activeEpId,setActiveEpId,createEpisode,setEpTab,onOpenCocHistory:openCocHistory}),
         curTab===1&&e(Tab1,{key:"t1",claim:viewClaim,up,practitioners,readOnly:!!activeEp}),
         curTab===2&&e(Tab2,{key:"t2",claim:viewClaim,up,readOnly:!!activeEp,dSubTab,setDSubTab}),
         curTab===3&&e(Tab4,{key:"t3",claim:viewClaim,up,clinic,practitioners,focus:stepFocus}),
         curTab===4&&e(Tab5,{key:"t4",claim:viewClaim,up,clinic,practitioners}),
         curTab===5&&e(Tab6,{key:"t5",claim:viewClaim,up,clinic,practitioners,focus:stepFocus}),
         curTab===6&&e(Tab8,{key:"t6",claim:viewClaim,up,clinic,practitioners,onInvoice}),
-        curTab===7&&e(TabClaimLog,{key:"t7",claim,up,clinic,practitioners,setActiveEpId,setEpTab}),
+        curTab===7&&e(TabClaimLog,{key:"t7",claim,up,clinic,practitioners,setActiveEpId,setEpTab,initialLogTab:logSub}),
       ];
     })(),
     isMobile&&div({key:"nav-spacer",style:{height:36}}),
@@ -5428,7 +5472,38 @@ ${meds.length>0 ? `
 }
 
 // ── TAB: OVERVIEW ─────────────────────────────────────────────────────────────
-function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,createEpisode,setEpTab}){
+// Certificates issued on each request, latest first. Falls back to the claim-level certificate when no request has one.
+function cbCertificates(claim){
+  const pick=o=>({fit:o.fitnessForWork||"",from:o.cocFrom||o.fitNormalFrom||o.fitRestrictFrom||o.unfitFrom||"",to:o.cocTo||o.fitRestrictTo||o.unfitTo||"",type:o.cocType||"",number:o.cocCount||""});
+  const eps=[...(claim.episodes||[])].reverse().map(ep=>({id:ep.id,label:ep.label||("Request "+(ep.episodeNo||"")),...pick(ep)})).filter(c=>c.fit||c.from||c.to);
+  if(eps.length>0)return eps;
+  const c=pick(claim);
+  return (c.fit||c.from||c.to)?[{id:"claim",label:"Current certificate",...c}]:[];
+}
+function CertRow({c}){
+  const fd=d=>{if(!d)return"\u2014";try{return new Date(d).toLocaleDateString("en-AU");}catch{return d;}};
+  const meta=[c.type,c.number?"#"+c.number:""].filter(Boolean).join(" ");
+  return div({style:{padding:"9px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}},[
+    div({key:"t",style:{display:"flex",justifyContent:"space-between",gap:8,marginBottom:3}},[
+      span({key:"l",style:{fontWeight:600,fontSize:"0.85rem"}},c.label),
+      meta&&span({key:"m",style:{fontSize:"0.72rem",color:"#5B7A99"}},meta),
+    ]),
+    c.fit&&div({key:"f",style:{fontSize:"0.8rem"}},[span({key:"a",style:{color:"#5B7A99"}},"Fitness for work: "),span({key:"b",style:{fontWeight:600}},c.fit)]),
+    (c.from||c.to)&&div({key:"d",style:{fontSize:"0.8rem"}},[span({key:"a",style:{color:"#5B7A99"}},"Valid: "),span({key:"b"},fd(c.from)+" \u2014 "+fd(c.to))]),
+  ]);
+}
+function OverviewCerts({claim,onHistory}){
+  const certs=cbCertificates(claim);const shown=certs.slice(0,3);
+  return div({style:{...S.card,marginBottom:16}},[
+    div({key:"h",style:{...S.fb,marginBottom:6}},[
+      div({key:"t",style:{fontWeight:700}},"Certificate of Capacity"),
+      certs.length>0&&span({key:"c",style:{fontSize:"0.74rem",color:"#5B7A99"}},"Latest "+shown.length+(certs.length>shown.length?" of "+certs.length:"")),
+    ]),
+    certs.length===0?div({key:"none",style:{fontSize:"0.84rem",color:"#5B7A99",paddingTop:6}},"No COC completed"):shown.map(c=>e(CertRow,{key:c.id,c})),
+    certs.length>0&&onHistory&&btn({key:"hist",style:{...S.btnS,fontSize:"0.78rem",padding:"6px 14px",marginTop:12},onClick:onHistory},certs.length>shown.length?"View all "+certs.length+" in certificate history":"View certificate history"),
+  ]);
+}
+function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,createEpisode,setEpTab,onOpenCocHistory}){
   const prac=practitioners.find(p=>p.id===claim.practitionerId);
   const refs=claim.referrals||[];const letters=claim.letterHistory||[];
   const total=refs.length;const approved=refs.filter(r=>r.status==="Approved").length;
@@ -5519,10 +5594,7 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
         timeline.length>TL_PAGE_SIZE&&div({key:"tl-nav",style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:12,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.07)"}},[div({key:"info",style:{fontSize:"0.76rem",color:"#5B7A99"}},(tlPage*TL_PAGE_SIZE+1)+"-"+Math.min((tlPage+1)*TL_PAGE_SIZE,timeline.length)+" of "+timeline.length),div({key:"btns",style:{display:"flex",gap:8}},[btn({key:"prev",style:{...S.btnS,padding:"5px 12px",fontSize:"0.78rem"},onClick:()=>setTlPage(p=>Math.max(0,p-1)),disabled:tlPage===0},"\u2190 Prev"),btn({key:"next",style:{...S.btnS,padding:"5px 12px",fontSize:"0.78rem"},onClick:()=>setTlPage(p=>Math.min(Math.ceil(timeline.length/TL_PAGE_SIZE)-1,p+1)),disabled:(tlPage+1)*TL_PAGE_SIZE>=timeline.length},"Next \u2192")])]),
       ]),
       div({key:"right"},[
-        div({key:"coc",style:{...S.card,marginBottom:16}},[
-          div({key:"h",style:{fontWeight:700,marginBottom:12}},"Certificate of Capacity"),
-          cocStatus?[div({key:"fit",style:{marginBottom:8}},[span({key:"l",style:{fontSize:"0.74rem",color:"#5B7A99"}},"Fitness for work: "),span({key:"v",style:{fontWeight:600,fontSize:"0.84rem"}},cocStatus)]),div({key:"dates"},[span({key:"l",style:{fontSize:"0.74rem",color:"#5B7A99"}},"Valid: "),span({key:"v",style:{fontSize:"0.84rem"}},cocFrom+" \u2014 "+cocTo)])]:div({key:"none",style:{fontSize:"0.84rem",color:"#5B7A99"}},"No COC completed"),
-        ]),
+        e(OverviewCerts,{key:"coc",claim,onHistory:onOpenCocHistory}),
         (claim.caseManagerName||claim.caseManagerEmail||claim.caseManagerPhone)&&div({key:"cm",style:{...S.card,marginBottom:16}},[
           div({key:"h",style:{fontWeight:700,marginBottom:10}},"Case manager"),
           claim.caseManagerName&&div({key:"n",style:{fontWeight:600,fontSize:"0.87rem",marginBottom:4}},claim.caseManagerName),
@@ -5550,9 +5622,9 @@ function TabOverview({claim,up,clinic,practitioners,activeEpId,setActiveEpId,cre
 }
 
 // ── TAB: CLAIM LOG ─────────────────────────────────────────────────────────────
-function TabClaimLog({claim,up,clinic,practitioners,setActiveEpId,setEpTab}){
+function TabClaimLog({claim,up,clinic,practitioners,setActiveEpId,setEpTab,initialLogTab}){
   const[expanded,setExpanded]=useState(null);
-  const[logTab,setLogTab]=useState("history");
+  const[logTab,setLogTab]=useState(initialLogTab||"history");
   const fmtD=d=>{if(!d)return"\u2014";try{return new Date(d).toLocaleString("en-AU",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});}catch{return d;}};
   const fmtDate=d=>{if(!d)return"\u2014";try{return new Date(d).toLocaleDateString("en-AU");}catch{return d;}};
   const statusStyle=s=>s==="Approved"?S.pillT:s==="Declined"||s==="Disputed"?S.pillR:s==="Further info required"?S.pillA:S.pillM;
@@ -5586,6 +5658,10 @@ function TabClaimLog({claim,up,clinic,practitioners,setActiveEpId,setEpTab}){
       }),
     ]),
     // COC history
+    logTab==="coc"&&cbCertificates(claim).length>0&&div({key:"coc-by-req",style:{...S.card,marginBottom:16}},[
+      div({key:"h",style:{...S.fb,marginBottom:6}},[div({key:"t",style:{fontWeight:700}},"Certificates by request"),span({key:"c",style:{fontSize:"0.76rem",color:"#5B7A99"}},cbCertificates(claim).length+" total")]),
+      ...cbCertificates(claim).map(c=>e(CertRow,{key:c.id,c})),
+    ]),
     logTab==="coc"&&(claim.cocHistory||[]).length===0&&div({key:"coc-empty",style:{...S.card,marginBottom:16,textAlign:"center",padding:"28px 20px"}},[
       div({key:"i",style:{fontSize:"1.8rem",marginBottom:8}},"\ud83d\udcc4"),
       div({key:"t",style:{fontWeight:700,marginBottom:6}},"No COC snapshots yet"),
