@@ -114,6 +114,25 @@ const PHYSICAL_FUNCTIONS=[
   {id:"overhead",label:"Reach overhead"},{id:"fine_motor",label:"Fine motor / keyboard use"},
   {id:"drive",label:"Drive"},{id:"heights",label:"Work at heights"},
 ];
+// Restrictions from the Physical capacity assessment -> "Work & activity restrictions" text.
+// One line per function ("<label> - cannot perform" / "<label> - modified capacity"); walk/stairs/drive go to Activity, the rest to Work.
+// Only a function's own line is added/changed/removed, so anything typed manually is preserved.
+const CAP_ACTIVITY_IDS=["walk","stairs","drive"];
+function cbCapLine(f,level){return level==="Cannot"?f.label+" - cannot perform":level==="Modified"?f.label+" - modified capacity":"";}
+function cbSyncRestrictions(cap,work,activity){
+  const out={work:work||"",activity:activity||""};
+  PHYSICAL_FUNCTIONS.forEach(f=>{
+    const k=CAP_ACTIVITY_IDS.includes(f.id)?"activity":"work";
+    const mine=[cbCapLine(f,"Cannot"),cbCapLine(f,"Modified")];
+    const want=cbCapLine(f,(cap||{})[f.id]);
+    let lines=out[k]?out[k].split("\n"):[];
+    const idx=lines.findIndex(l=>mine.some(m=>l.trim().startsWith(m)));
+    if(idx>=0){if(!want)lines.splice(idx,1);else if(!lines[idx].trim().startsWith(want))lines[idx]=want;}
+    else if(want){lines=lines.filter((l,i)=>!(i===lines.length-1&&l.trim()===""));lines.push(want);}
+    out[k]=lines.join("\n");
+  });
+  return out;
+}
 const MENTAL_FUNCTIONS=[
   {id:"concentration",label:"Concentration & attention"},{id:"memory",label:"Memory"},
   {id:"stress",label:"Stress tolerance"},{id:"social",label:"Social interaction"},
@@ -303,6 +322,13 @@ const OUTCOME_MEASURES={
   "DASS-21":{name:"Depression Anxiety Stress Scales (DASS-21)",min:0,max:63,higherBetter:false,desc:"Psychological distress. Depression+Anxiety+Stress (×2 for full score).",unit:"/ 63",interpretation:{good:14,moderate:28}},
   "Orebro Short":{name:"Örebro Musculoskeletal Pain Questionnaire - Short (ÖMSPQ-10)",min:10,max:100,higherBetter:false,desc:"Screening for risk of prolonged disability (10-item version).",unit:"/ 100",interpretation:{good:30,moderate:50}},
   "Orebro Long":{name:"Örebro Musculoskeletal Pain Questionnaire - Long",min:21,max:210,higherBetter:false,desc:"Full risk assessment for prolonged disability.",unit:"/ 210",interpretation:{good:63,moderate:105}},
+  "BPI Severity":{name:"Brief Pain Inventory - Pain Severity (ePPOC)",min:0,max:10,higherBetter:false,desc:"Mean of 4 BPI items (worst, least, average and current pain), each rated 0 (no pain) to 10 (pain as bad as you can imagine).",unit:"/ 10"},
+  "BPI Interference":{name:"Brief Pain Inventory - Pain Interference (ePPOC)",min:0,max:10,higherBetter:false,desc:"Mean of the 7 BPI interference items (general activity, mood, walking, work, relationships, sleep, enjoyment of life), each rated 0 (does not interfere) to 10 (completely interferes).",unit:"/ 10"},
+  "PSEQ":{name:"Pain Self-Efficacy Questionnaire (PSEQ) (ePPOC)",min:0,max:60,higherBetter:true,desc:"10 items rated 0-6: confidence in performing activities despite pain (0=not at all confident, 60=completely confident).",unit:"/ 60"},
+  "PCS":{name:"Pain Catastrophizing Scale (PCS) (ePPOC)",min:0,max:52,higherBetter:false,desc:"13 items rated 0-4 covering rumination, magnification and helplessness. Higher = more catastrophising.",unit:"/ 52"},
+  "DASS-21 Depression":{name:"DASS-21 Depression subscale (ePPOC)",min:0,max:42,higherBetter:false,desc:"7 items; subscale score multiplied by 2 (DASS-42 equivalent), as per ePPOC reporting. Normal 0-9, mild 10-13, moderate 14-20, severe 21-27, extremely severe 28+.",unit:"/ 42",interpretation:{good:9,moderate:20}},
+  "DASS-21 Anxiety":{name:"DASS-21 Anxiety subscale (ePPOC)",min:0,max:42,higherBetter:false,desc:"7 items; subscale score multiplied by 2 (DASS-42 equivalent), as per ePPOC reporting. Normal 0-7, mild 8-9, moderate 10-14, severe 15-19, extremely severe 20+.",unit:"/ 42",interpretation:{good:7,moderate:14}},
+  "DASS-21 Stress":{name:"DASS-21 Stress subscale (ePPOC)",min:0,max:42,higherBetter:false,desc:"7 items; subscale score multiplied by 2 (DASS-42 equivalent), as per ePPOC reporting. Normal 0-14, mild 15-18, moderate 19-25, severe 26-33, extremely severe 34+.",unit:"/ 42",interpretation:{good:14,moderate:25}},
 };
 const ORTHO_TESTS=[
   "Spurling's test (cervical radiculopathy)",
@@ -1235,7 +1261,7 @@ function ensureEpisodes(claim){
 function mergeEpisodeToClaim(claim,ep){return {...claim,...ep,practitionerId:ep.practitionerId||claim.practitionerId,practitionerName:ep.practitionerName||claim.practitionerName,practitionerProfession:ep.practitionerProfession||claim.practitionerProfession};}
 function saveEpisodeToClaim(claim,ep,epData){const updatedEp={...ep,...epData};const episodes=(claim.episodes||[]).map(e=>e.id===ep.id?updatedEp:e);return {...claim,episodes};}
 
-function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
+function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
   const ALL_TABS=["Overview","Patient & Claim","Diagnosis","Treatment Plan","Certificate of Capacity","Allied Health Forms","Letters & Approvals","Claim Log"];
   const[tab,setTab]=useState(0);
   const[dSubTab,setDSubTab]=useState(0);
@@ -1261,8 +1287,32 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
     setClaim(prev=>({...prev,episodes:[...(prev.episodes||[]),newEp]}));
     setActiveEpId(newEp.id);setPendingEpId(newEp.id);setShowImportModal(true);
   };
-  const save=async()=>{const now=new Date().toISOString();const prac=practitioners.find(p=>p.id===claim.practitionerId);const updated={...claim,lastEditedAt:now,lastEditedBy:prac?prac.name:clinic.name,createdAt:claim.createdAt||now,createdBy:claim.createdBy||(prac?prac.name:clinic.name)};setClaim(updated);await onSave(updated);setSavedModal(true);};
-  const saveDraft=async()=>{const now=new Date().toISOString();const prac=practitioners.find(p=>p.id===claim.practitionerId);const updated={...claim,status:"Draft",lastEditedAt:now,lastEditedBy:prac?prac.name:clinic.name,createdAt:claim.createdAt||now,createdBy:claim.createdBy||(prac?prac.name:clinic.name)};setClaim(updated);await onSave(updated);setDraftModal(true);};
+  // -- AUTOSAVE: quietly saves progress on tab change, after a short pause in editing, and when leaving the claim.
+  // Uses its own save path (onAutosave) so the form never remounts / jumps tab. New claims are stored as Draft until "Save claim".
+  const claimRef=useRef(claim);claimRef.current=claim;
+  const autosaveFnRef=useRef(onAutosave);autosaveFnRef.current=onAutosave;
+  const lastSavedRef=useRef(JSON.stringify(claim));
+  const manualSavedRef=useRef(false);
+  const[autoSavedAt,setAutoSavedAt]=useState(null);
+  const doAutosave=()=>{
+    const c=claimRef.current;const fn=autosaveFnRef.current;
+    if(!fn)return;
+    const snap=JSON.stringify(c);
+    if(snap===lastSavedRef.current)return;
+    const isNew=!claimData&&!manualSavedRef.current;
+    if(isNew&&!(c.patientName||c.claimNumber||c.clinicalPresentation||(c.diagnoses||[]).length))return;
+    lastSavedRef.current=snap;
+    const now=new Date().toISOString();
+    const prac=practitioners.find(p=>p.id===c.practitionerId);
+    fn({...c,status:isNew?"Draft":c.status,lastEditedAt:now,lastEditedBy:prac?prac.name:clinic.name,createdAt:c.createdAt||now,createdBy:c.createdBy||(prac?prac.name:clinic.name)});
+    setAutoSavedAt(now);
+  };
+  const doAutosaveRef=useRef(doAutosave);doAutosaveRef.current=doAutosave;
+  useEffect(()=>{const t=setTimeout(()=>doAutosaveRef.current(),2500);return()=>clearTimeout(t);},[claim]);
+  useEffect(()=>{doAutosaveRef.current();},[tab,dSubTab,epTab,activeEpId]);
+  useEffect(()=>()=>{doAutosaveRef.current();},[]);
+  const save=async()=>{const now=new Date().toISOString();const prac=practitioners.find(p=>p.id===claim.practitionerId);const updated={...claim,lastEditedAt:now,lastEditedBy:prac?prac.name:clinic.name,createdAt:claim.createdAt||now,createdBy:claim.createdBy||(prac?prac.name:clinic.name)};setClaim(updated);lastSavedRef.current=JSON.stringify(updated);manualSavedRef.current=true;await onSave(updated);setSavedModal(true);};
+  const saveDraft=async()=>{const now=new Date().toISOString();const prac=practitioners.find(p=>p.id===claim.practitionerId);const updated={...claim,status:"Draft",lastEditedAt:now,lastEditedBy:prac?prac.name:clinic.name,createdAt:claim.createdAt||now,createdBy:claim.createdBy||(prac?prac.name:clinic.name)};setClaim(updated);lastSavedRef.current=JSON.stringify(updated);manualSavedRef.current=true;await onSave(updated);setDraftModal(true);};
   const isMobile=useIsMobile();
   return div({style:{padding:isMobile?"12px":"28px",maxWidth:960,margin:"0 auto"}},[
     savedModal&&e(Modal,{key:"sm",msg:"Claim saved successfully!",onClose:()=>setSavedModal(false)}),
@@ -1293,10 +1343,11 @@ function ClaimForm({clinic,claimData,onSave,onBack,onInvoice}){
     }),
     div({key:"hdr",style:{marginBottom:isMobile?14:22}},[
       div({key:"top",style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:isMobile?8:0}},[
-        div({key:"l",style:{...S.fr,flex:1,minWidth:0,overflow:"hidden"}},[btn({key:"back",style:{...S.btnS,flexShrink:0,padding:"10px 14px"},onClick:onBack,"aria-label":"Back to dashboard"},"← Back"),div({key:"t",style:{fontWeight:700,fontSize:"0.9rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,paddingLeft:8}},claim.patientName||"New Claim")]),
-        isMobile?btn({key:"save",style:S.btnP,onClick:save},"Save claim"):div({key:"r",style:{display:"flex",gap:8,flexShrink:0}},[btn({key:"draft",style:S.btnS,onClick:saveDraft},"Save draft"),btn({key:"save",style:S.btnP,onClick:save},"Save claim")]),
+        div({key:"l",style:{...S.fr,flex:1,minWidth:0,overflow:"hidden"}},[btn({key:"back",style:{...S.btnS,flexShrink:0,padding:"10px 14px"},onClick:()=>{doAutosaveRef.current();onBack();},"aria-label":"Back to dashboard"},"← Back"),div({key:"t",style:{fontWeight:700,fontSize:"0.9rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,paddingLeft:8}},claim.patientName||"New Claim")]),
+        isMobile?btn({key:"save",style:S.btnP,onClick:save},"Save claim"):div({key:"r",style:{display:"flex",gap:8,flexShrink:0}},[autoSavedAt&&span({key:"as",style:{fontSize:"0.72rem",color:"#5B7A99",alignSelf:"center",marginRight:4}},"Autosaved "+new Date(autoSavedAt).toLocaleTimeString("en-AU",{hour:"numeric",minute:"2-digit"})),btn({key:"draft",style:S.btnS,onClick:saveDraft},"Save draft"),btn({key:"save",style:S.btnP,onClick:save},"Save claim")]),
       ]),
-      isMobile&&div({key:"mobile-draft",style:{display:"flex",justifyContent:"flex-end"}},[
+      isMobile&&div({key:"mobile-draft",style:{display:"flex",justifyContent:"flex-end",alignItems:"center",gap:10}},[
+        autoSavedAt&&span({key:"as",style:{fontSize:"0.72rem",color:"#5B7A99",alignSelf:"center"}},"Autosaved "+new Date(autoSavedAt).toLocaleTimeString("en-AU",{hour:"numeric",minute:"2-digit"})),
         btn({key:"draft",style:{...S.btnS,fontSize:"0.82rem",padding:"8px 16px"},onClick:saveDraft},"Save draft"),
       ]),
     ]),
@@ -1527,7 +1578,13 @@ function Tab2({claim,up,dSubTab:_dSubTabProp,setDSubTab:_setDSubTabProp}){
   const sugg=useMemo(()=>{if(!q||q.length<2)return[];const ql=q.toLowerCase();return DIAGNOSES_DB.filter(d=>d.label.toLowerCase().includes(ql)||d.icd10.toLowerCase().includes(ql)).slice(0,8);},[q]);
   const addD=d=>{if(diags.find(x=>x.icd10===d.icd10))return;const u=[...diags,d];setDiags(u);up("diagnoses",u);setQ("");setShow(false);};
   const remD=icd=>{const u=diags.filter(d=>d.icd10!==icd);setDiags(u);up("diagnoses",u);};
-  const setCap=(fid,opt)=>up("capacity",{...(claim.capacity||{}),[fid]:opt});
+  const setCap=(fid,opt)=>{
+    const cap={...(claim.capacity||{}),[fid]:opt};
+    up("capacity",cap);
+    const r=cbSyncRestrictions(cap,claim.workRestrictions,claim.activityRestrictions);
+    if(r.work!==(claim.workRestrictions||""))up("workRestrictions",r.work);
+    if(r.activity!==(claim.activityRestrictions||""))up("activityRestrictions",r.activity);
+  };
   const capColors={Can:"rgba(0,201,167,0.15)",Modified:"rgba(255,184,48,0.12)",Cannot:"rgba(255,77,109,0.12)"};
   const capBorders={Can:"rgba(0,201,167,0.35)",Modified:"rgba(255,184,48,0.3)",Cannot:"rgba(255,77,109,0.3)"};
   const capText={Can:"#00C9A7",Modified:"#FFB830",Cannot:"#FF4D6D"};
@@ -1926,7 +1983,8 @@ function cbRomOrtho(claim){
   return parts.join("\n");
 }
 // Functional outcome measure results (all recorded scores per measure, with direction of change)
-const CB_PSY_MEASURES=["DASS-21","Orebro Short","Orebro Long"];
+const CB_PSY_MEASURES=["DASS-21","DASS-21 Depression","DASS-21 Anxiety","DASS-21 Stress","Orebro Short","Orebro Long"];
+const CB_EPPOC_MEASURES=["BPI Severity","BPI Interference","PSEQ","PCS"];
 function cbOutcomeMeasures(claim,only,title){
   const all=claim.outcomeScores||{};
   const fmt=d=>{try{return new Date(d).toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"});}catch(e){return d||"";}};
@@ -2117,6 +2175,9 @@ function Tab4({claim,up,clinic,practitioners}){
       subTab===SUB.indexOf("Treatment & Recovery")&&div({key:"work-inline",style:S.card},[
         div({key:"h",style:{fontWeight:700,marginBottom:6}},"Work & activity restrictions"),
         div({key:"s",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:12}},"Restrictions auto-populate into the Certificate of Capacity."),
+        div({key:"cap-note",style:{fontSize:"0.82rem",color:"#5B7A99",marginBottom:12}},"Restrictions selected in the Physical capacity assessment (Diagnosis tab) are added below automatically. Please add any others that are missing."),
+        (()=>{const r=cbSyncRestrictions(claim.capacity||{},claim.workRestrictions,claim.activityRestrictions);const pending=r.work!==(claim.workRestrictions||"")||r.activity!==(claim.activityRestrictions||"");
+          return pending?div({key:"cap-sync",style:{marginBottom:12}},btn({style:{...S.btnS,fontSize:"0.78rem",padding:"6px 14px"},onClick:()=>{up("workRestrictions",r.work);up("activityRestrictions",r.activity);}},"Add restrictions from Physical capacity assessment")):null;})(),
         e(Ta,{key:"wr",label:"Work restrictions",value:claim.workRestrictions,onChange:v=>up("workRestrictions",v),placeholder:"e.g. No lifting >5kg, avoid prolonged sitting >30 min, no overhead work..."}),
         e(Ta,{key:"ar",label:"Activity restrictions",value:claim.activityRestrictions,onChange:v=>up("activityRestrictions",v),placeholder:"e.g. No driving, avoid stairs, limit walking to 20 min..."}),
         e(Ta,{key:"we",label:"Work environment considerations",value:claim.workEnvironment,onChange:v=>up("workEnvironment",v),placeholder:"e.g. Temperature, noise, space, lighting considerations..."}),
@@ -4816,7 +4877,7 @@ A treatment plan including baseline standardised outcome measures has been prepa
 - Documented advice to the patient regarding potential risks, adverse effects, and the potential for workplace impairment
 - A review schedule — initial trial period of approximately 3 months, with outcome measures reviewed at the end of the trial period and annually thereafter
 
-${[outcomeMeasures,cbOutcomeMeasures(claim,CB_PSY_MEASURES,"Recorded outcome measures")].filter(Boolean).join("\n\n")||"[Attach baseline standardised outcome measures]"}
+${[outcomeMeasures,cbOutcomeMeasures(claim,[...CB_PSY_MEASURES,...CB_EPPOC_MEASURES],"Recorded outcome measures")].filter(Boolean).join("\n\n")||"[Attach baseline standardised outcome measures]"}
 
 ──────────────────────────────────────
 OPIOID AND DEPENDENCY CONSIDERATIONS
@@ -6224,6 +6285,11 @@ function App(){
     const up=claims.find(c=>c.id===claim.id)?claims.map(c=>c.id===claim.id?claim:c):[...claims,claim];
     setClaims(up);await sset("claims10:"+clinic.id,up);setActiveClaim(claim);
   };
+  const handleAutosave=async claim=>{
+    const up=claims.find(c=>c.id===claim.id)?claims.map(c=>c.id===claim.id?claim:c):[...claims,claim];
+    setClaims(up);await sset("claims10:"+clinic.id,up);
+    if(activeClaim&&activeClaim.id===claim.id)setActiveClaim(claim);
+  };
   const[newClaimKey,setNewClaimKey]=React.useState(0);
   const handleNav=n=>{if(n==="new_claim"){setActiveClaim(null);setNewClaimKey(k=>k+1);setNav("claim");}else setNav(n);};
   const handleOpen=c=>{setActiveClaim(c);setNav("claim");};
@@ -6239,7 +6305,7 @@ function App(){
       e(TopBar,{key:"tb",clinic,nav,claim:activeClaim}),
       nav==="dashboard"&&e(Dashboard,{key:"d",clinic,claims,onNew:()=>{setActiveClaim(null);setNav("claim");},onOpen:handleOpen}),
       nav==="claims"&&e(ClaimsPage,{key:"cl",claims,onOpen:handleOpen,onNew:()=>{setActiveClaim(null);setNav("claim");}}),
-      nav==="claim"&&e(ClaimForm,{key:activeClaim?activeClaim.id:"new_"+newClaimKey,clinic,claimData:activeClaim,onSave:handleSave,onBack:handleBack,onInvoice:()=>{if(activeClaim)handleSave(activeClaim);setNav("invoicing");}}),
+      nav==="claim"&&e(ClaimForm,{key:activeClaim?activeClaim.id:"new_"+newClaimKey,clinic,claimData:activeClaim,onSave:handleSave,onAutosave:handleAutosave,onBack:handleBack,onInvoice:()=>{if(activeClaim)handleSave(activeClaim);setNav("invoicing");}}),
       nav==="practitioners"&&e(PractitionersPage,{key:"pr",clinic}),
       nav==="settings"&&e(SettingsPage,{key:"set",clinic,bankSettings,onSaveBank:saveBankSettings,insurerEmails,onSaveInsurerEmails:saveInsurerEmails,onReset:async()=>{await resetDemoData(clinic.id);const fresh=await sget("claims10:"+clinic.id)||[];setClaims(fresh);}}),
       nav==="help"&&div({key:"help",style:{padding:isMobile?"16px":"28px",maxWidth:960,margin:"0 auto"}},[
