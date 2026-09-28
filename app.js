@@ -2345,13 +2345,13 @@ function OutcomeMeasuresCompact({claim,up}){
   };
   return div({},[
     // Existing scores — compact rows
-    activeMeasures.length>0&&div({key:"scores",style:{marginBottom:10}},
+    activeMeasures.length>0&&div({key:"scores",className:"cb-grid-2",style:{marginBottom:10}},
       activeMeasures.map(key=>{
         const latest=getLatest(key);const trend=getTrend(key);
         const m=OUTCOME_MEASURES[key];
         const tCol=trend==="up"?"#00C9A7":trend==="down"?"#FF4D6D":"#FFB830";
         const scores=allScores[key]||[];
-        return div({key,style:{paddingBottom:6,marginBottom:4,borderBottom:"1px solid rgba(255,255,255,0.05)"}},[  
+        return div({key,style:{padding:12,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12}},[  
           div({key:"hdr",style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}},[
             div({key:"l",style:{fontSize:"0.77rem",fontWeight:600,color:"rgba(239,246,255,0.7)"}},key),
             div({key:"r",style:{display:"flex",alignItems:"center",gap:5}},[
