@@ -1266,6 +1266,8 @@ const CB_TASKS=[
   {id:"approval",label:"Request approval",desc:"Treatment, referral, imaging or procedure request, with a letter to the insurer.",steps:["Diagnosis","Treatment Plan","Letters & Approvals"],newRequest:true},
   {id:"ahrmp",label:"Update AHRMP (follow-up visit)",desc:"Starts from your last request. Record progress and update the Allied Health Recovery Management Plan.",
     steps:[{tab:"Treatment Plan",label:"Progress & goals",focus:"progress"},{tab:"Allied Health Forms",label:"AHRMP",focus:"ahrmp"}],newRequest:true,carry:true,needsForm:"ahrmp"},
+  {id:"ahrmp_first",label:"Complete first AHRMP",desc:"For a claim with no AHRMP yet: diagnosis and capacity, baseline scores and goals, then the Allied Health Recovery Management Plan.",
+    steps:["Diagnosis",{tab:"Treatment Plan",label:"Baseline & goals",focus:"progress"},{tab:"Allied Health Forms",label:"AHRMP",focus:"ahrmp"}],needsForm:"ahrmp"},
   {id:"coc",label:"Certificate of Capacity",desc:"Update capacity and restrictions, then issue the certificate.",steps:["Diagnosis","Treatment Plan","Certificate of Capacity"]},
   {id:"forms",label:"Other allied health forms",desc:"Household help, gym / swim, psychology forms and more.",steps:["Treatment Plan","Allied Health Forms"]},
   {id:"intake",label:"Set up / edit claim details",desc:"Patient and claim details, diagnosis and treatment plan.",steps:["Patient & Claim","Diagnosis","Treatment Plan","Certificate of Capacity"]},
@@ -1286,6 +1288,9 @@ function cbMergeTasks(tasks,TABS,order){
 }
 // fields carried into a follow-up request (period-specific AHRMP fields are cleared so they are re-entered)
 const CB_CARRY_FIELDS=["treatmentPlan","goalsShort","goalsLong","selfManagement","ahGoalLim1","ahGoalLim2","ahGoalLim3","ahGoalTarget1","ahGoalTarget2","ahGoalTarget3","ahGoalDate1","ahGoalDate2","ahGoalDate3","barriers","workRestrictions","activityRestrictions","workEnvironment","outcomeScores"];
+function cbHasAhrmp(ep){return !!(ep&&ep.ahrmData&&Object.values(ep.ahrmData).some(v=>v!==undefined&&v!==null&&v!==""));}
+// source for "Update AHRMP": latest request with an AHRMP, else the latest request
+function cbCarrySource(eps){for(let i=eps.length-1;i>=0;i--){if(cbHasAhrmp(eps[i]))return eps[i];}return eps[eps.length-1];}
 function cbCarryFromEpisode(prev){
   const out={carriedFrom:prev.label||"previous request",alliedForm:"ahrmp"};
   CB_CARRY_FIELDS.forEach(k=>{if(prev[k]!==undefined&&prev[k]!==null&&prev[k]!=="")out[k]=prev[k];});
@@ -1368,7 +1373,7 @@ function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
   const startEpisode=(carry)=>{
     const epNo=(claim.episodes||[]).length+1;
     const cocCount=Math.max(...(claim.episodes||[]).map(e=>e.cocCount||0),0)+1;
-    const prevEp=carry?(claim.episodes||[])[(claim.episodes||[]).length-1]:null;
+    const prevEp=carry?cbCarrySource(claim.episodes||[]):null;
     const newEp={id:"ep_"+claim.id+"_"+Date.now(),episodeNo:epNo,date:new Date().toISOString(),practitionerId:claim.practitionerId,practitionerName:claim.practitionerName,practitionerProfession:claim.practitionerProfession,label:"Request "+epNo,createdAt:new Date().toISOString(),cocCount,cocType:"Subsequent",referrals:[],letterHistory:[],medications:[],...(prevEp?cbCarryFromEpisode(prevEp):{})};
     setClaim(prev=>({...prev,episodes:[...(prev.episodes||[]),newEp]}));
     setActiveEpId(newEp.id);setPendingEpId(newEp.id);setShowImportModal(true);
@@ -1409,7 +1414,13 @@ function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
   const goIdx=i=>{if(activeEpId)setEpTab(i);else setTab(i);setDSubTab(0);window.scrollTo(0,0);};
   const stepPos=Math.max(0,taskSteps.indexOf(curIdx));
   const stepFocus=taskMode&&taskStepDefs[stepPos]?taskStepDefs[stepPos].focus:undefined;
-  const pickerTasks=CB_TASKS.filter(t=>!t.needsForm||!prof||getAllowedForms(prof).includes(t.needsForm));
+  const hasPriorAhrmp=(claim.episodes||[]).some(cbHasAhrmp)||cbHasAhrmp(claim);
+  const pickerTasks=(()=>{
+    const list=CB_TASKS.filter(t=>!t.needsForm||!prof||getAllowedForms(prof).includes(t.needsForm));
+    const i=list.findIndex(t=>t.id==="ahrmp_first"),j=list.findIndex(t=>t.id==="ahrmp");
+    if(i>=0&&j>=0&&(hasPriorAhrmp?i<j:j<i)){const x=list[i];list[i]=list[j];list[j]=x;}   // existing AHRMP -> "Update" first, otherwise "first AHRMP" first
+    return list;
+  })();
   const activeEpObj=(claim.episodes||[]).find(x=>x.id===activeEpId);
   const carriedNote=activeEpObj&&activeEpObj.carriedFrom?"Pre-filled from "+activeEpObj.carriedFrom+" \u2014 update anything that has changed.":null;
   const toTasks=()=>{doAutosaveRef.current();setActiveEpId(null);setTab(0);setDSubTab(0);setTaskId(null);window.scrollTo(0,0);};
