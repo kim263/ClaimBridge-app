@@ -1276,6 +1276,7 @@ const CB_TASKS=[
 ];
 // steps can be a tab name or {tab,label,focus}; returns normalised steps that exist for this profession
 function cbTaskSteps(task,TABS){return (task.steps||[]).map(x=>typeof x==="string"?{tab:x,label:x}:{label:x.tab,...x}).filter(x=>TABS.includes(x.tab));}
+function cbToday(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 // combine several ticked tasks into one ordered list of steps (each screen once; trimming only kept if every task agrees)
 function cbMergeTasks(tasks,TABS,order){
   const by={};
@@ -1284,7 +1285,7 @@ function cbMergeTasks(tasks,TABS,order){
     const list=by[tab];const same=k=>list.every(x=>x[k]===list[0][k]);
     return {tab,label:same("label")?list[0].label:tab,focus:same("focus")?list[0].focus:undefined};
   });
-  return {id:"multi",label:tasks.map(t=>t.label).join(" + "),steps,newRequest:tasks.some(t=>t.newRequest),carry:tasks.some(t=>t.carry)};
+  return {id:"multi",label:tasks.map(t=>t.label).join(" + "),steps,newRequest:tasks.some(t=>t.newRequest),carry:tasks.some(t=>t.carry),tag:tasks.map(t=>t.id).sort().join("+")};
 }
 // fields carried into a follow-up request (period-specific AHRMP fields are cleared so they are re-entered)
 const CB_CARRY_FIELDS=["treatmentPlan","goalsShort","goalsLong","selfManagement","ahGoalLim1","ahGoalLim2","ahGoalLim3","ahGoalTarget1","ahGoalTarget2","ahGoalTarget3","ahGoalDate1","ahGoalDate2","ahGoalDate3","barriers","workRestrictions","activityRestrictions","workEnvironment","outcomeScores"];
@@ -1339,12 +1340,14 @@ function TaskStepBar({task,steps,pos,onGo,onTasks,onAll,note}){
     note&&div({key:"note",style:{...S.ok,marginTop:12,fontSize:"0.8rem"}},note),
   ]);
 }
-function TaskNav({isMobile,pos,steps,finishLabel,onPrev,onNext}){
+function TaskNav({isMobile,pos,steps,finishLabel,onPrev,onNext,extra}){
   const last=pos===steps.length-1;
+  const sz=isMobile?{padding:"8px 14px",fontSize:"0.82rem"}:{};
+  const nextBtn=btn({key:"n",style:{...(extra?S.btnS:S.btnP),...(isMobile?{padding:"8px 16px",fontSize:"0.82rem"}:{})},onClick:onNext},last?(finishLabel||"Finish"):(isMobile?"Next \u2192":"Next: "+steps[pos+1]+" \u2192"));
   return div({style:{...S.fb,marginTop:0,paddingTop:isMobile?14:16,paddingBottom:isMobile?14:8,borderTop:"1px solid rgba(255,255,255,0.07)",boxShadow:isMobile?"0 -8px 24px rgba(7,16,30,0.95)":"none",display:"flex",position:"sticky",bottom:isMobile?62:0,background:"#07101E",zIndex:10,marginLeft:isMobile?-12:-28,marginRight:isMobile?-12:-28,paddingLeft:isMobile?12:28,paddingRight:isMobile?12:28}},[
-    btn({key:"p",style:{...S.btnS,...(isMobile?{padding:"8px 14px",fontSize:"0.82rem"}:{})},onClick:onPrev},pos===0?"\u2190 Tasks":"\u2190 Previous"),
+    btn({key:"p",style:{...S.btnS,...sz},onClick:onPrev},pos===0?"\u2190 Tasks":"\u2190 Previous"),
     span({key:"pg",style:{fontSize:isMobile?"0.7rem":"0.76rem",color:"#5B7A99",whiteSpace:"nowrap"}},"Step "+(pos+1)+" of "+steps.length),
-    btn({key:"n",style:{...S.btnP,...(isMobile?{padding:"8px 16px",fontSize:"0.82rem"}:{})},onClick:onNext},last?(finishLabel||"Finish"):(isMobile?"Next \u2192":"Next: "+steps[pos+1]+" \u2192")),
+    extra?div({key:"act",style:{display:"flex",gap:8,alignItems:"center"}},[btn({key:"x",style:{...S.btnP,...sz},onClick:extra.onClick},extra.label),nextBtn]):nextBtn,
   ]);
 }
 function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
@@ -1362,6 +1365,8 @@ function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
   const[showImportModal,setShowImportModal]=useState(!claimData);
   const[pendingEpId,setPendingEpId]=useState(null);
   const[logSub,setLogSub]=useState(null);   // starting sub-tab for the Claim Log (set by the Overview "certificate history" button)
+  const[pdfDone,setPdfDone]=useState({});          // AHRMP PDF downloaded, per request
+  const[resumedId,setResumedId]=useState(null);   // request re-opened by "Update AHRMP" instead of creating a duplicate
   const[taskCustom,setTaskCustom]=useState(null);   // merged definition when several tasks are ticked (taskId === "multi")
   const[taskId,setTaskId]=useState(claimData?null:"intake");   // null = show task picker, "all" = classic all-tabs view
   useEffect(()=>{sget("practitioners:"+clinic.id).then(p=>setPractitioners(p||[]));},[clinic.id]);
@@ -1370,11 +1375,11 @@ function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
     else{setClaim(prev=>({...prev,[field]:value}));}
   };
   const createEpisode=()=>startEpisode(false);
-  const startEpisode=(carry)=>{
+  const startEpisode=(carry,tag)=>{
     const epNo=(claim.episodes||[]).length+1;
     const cocCount=Math.max(...(claim.episodes||[]).map(e=>e.cocCount||0),0)+1;
     const prevEp=carry?cbCarrySource(claim.episodes||[]):null;
-    const newEp={id:"ep_"+claim.id+"_"+Date.now(),episodeNo:epNo,date:new Date().toISOString(),practitionerId:claim.practitionerId,practitionerName:claim.practitionerName,practitionerProfession:claim.practitionerProfession,label:"Request "+epNo,createdAt:new Date().toISOString(),cocCount,cocType:"Subsequent",referrals:[],letterHistory:[],medications:[],...(prevEp?cbCarryFromEpisode(prevEp):{})};
+    const newEp={id:"ep_"+claim.id+"_"+Date.now(),episodeNo:epNo,date:new Date().toISOString(),practitionerId:claim.practitionerId,practitionerName:claim.practitionerName,practitionerProfession:claim.practitionerProfession,label:"Request "+epNo,createdAt:new Date().toISOString(),cocCount,cocType:"Subsequent",referrals:[],letterHistory:[],medications:[],...(prevEp?cbCarryFromEpisode(prevEp):{}),...(tag?{startedBy:tag,startedDay:cbToday()}:{})};
     setClaim(prev=>({...prev,episodes:[...(prev.episodes||[]),newEp]}));
     setActiveEpId(newEp.id);setPendingEpId(newEp.id);setShowImportModal(true);
   };
@@ -1422,7 +1427,14 @@ function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
     return list;
   })();
   const activeEpObj=(claim.episodes||[]).find(x=>x.id===activeEpId);
-  const carriedNote=activeEpObj&&activeEpObj.carriedFrom?"Pre-filled from "+activeEpObj.carriedFrom+" \u2014 update anything that has changed.":null;
+  const resumedNow=!!activeEpObj&&resumedId===activeEpObj.id;
+  const carriedNote=activeEpObj&&(activeEpObj.carriedFrom||resumedNow)?(resumedNow?"Continuing the update you started earlier today. ":"")+(activeEpObj.carriedFrom?"Pre-filled from "+activeEpObj.carriedFrom+" \u2014 update anything that has changed.":""):null;
+  const pdfKey=activeEpId||"claim";
+  const downloadAhrmp=async()=>{
+    const ep=(claim.episodes||[]).find(x=>x.id===activeEpId);const vc=ep?mergeEpisodeToClaim(claim,ep):claim;
+    const prac=practitioners.find(x=>x.id===vc.practitionerId)||{};
+    try{await generateAHRMPPdf(vc,prac,clinic);setPdfDone(d=>({...d,[pdfKey]:true}));}catch(er){alert(er.message);}
+  };
   const toTasks=()=>{doAutosaveRef.current();setActiveEpId(null);setTab(0);setDSubTab(0);setTaskId(null);window.scrollTo(0,0);};
   const pickTask=id=>{
     const t=CB_TASKS.find(x=>x.id===id);if(!t)return;
@@ -1431,7 +1443,7 @@ function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
     const steps=cbTaskSteps(t,TABS).map(x=>ALL_TABS.indexOf(x.tab));
     setTaskId(id);setDSubTab(0);
     const eps=claim.episodes||[];
-    if(t.newRequest){startEpisode(!!t.carry);setEpTab(steps[0]);}else if(eps.length>0){setActiveEpId(eps[eps.length-1].id);setEpTab(steps[0]);}else{setActiveEpId(null);setTab(steps[0]);}
+    if(t.newRequest){const lastEp=eps[eps.length-1];if(t.carry&&lastEp&&lastEp.startedBy===t.id&&lastEp.startedDay===cbToday()){setActiveEpId(lastEp.id);setResumedId(lastEp.id);setEpTab(steps[0]);}else{startEpisode(!!t.carry,t.carry?t.id:null);setEpTab(steps[0]);}}else if(eps.length>0){setActiveEpId(eps[eps.length-1].id);setEpTab(steps[0]);}else{setActiveEpId(null);setTab(steps[0]);}
     window.scrollTo(0,0);
   };
   const previewTasks=ids=>cbMergeTasks(ids.map(i=>CB_TASKS.find(t=>t.id===i)).filter(Boolean),TABS,ALL_TABS).steps.map(x=>x.label);
@@ -1442,7 +1454,7 @@ function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
     const first=ALL_TABS.indexOf(m.steps[0].tab);
     setTaskCustom(m);setTaskId("multi");setDSubTab(0);
     const eps=claim.episodes||[];
-    if(m.newRequest){startEpisode(!!m.carry);setEpTab(first);}else if(eps.length>0){setActiveEpId(eps[eps.length-1].id);setEpTab(first);}else{setActiveEpId(null);setTab(first);}
+    if(m.newRequest){const lastEp=eps[eps.length-1];if(m.carry&&lastEp&&lastEp.startedBy===m.tag&&lastEp.startedDay===cbToday()){setActiveEpId(lastEp.id);setResumedId(lastEp.id);setEpTab(first);}else{startEpisode(!!m.carry,m.carry?m.tag:null);setEpTab(first);}}else if(eps.length>0){setActiveEpId(eps[eps.length-1].id);setEpTab(first);}else{setActiveEpId(null);setTab(first);}
     window.scrollTo(0,0);
   };
   const openCocHistory=()=>{setLogSub("coc");const i=ALL_TABS.indexOf("Claim Log");if(activeEpId)setEpTab(i);else setTab(i);setDSubTab(0);window.scrollTo(0,0);};
@@ -1512,15 +1524,15 @@ function ClaimForm({clinic,claimData,onSave,onAutosave,onBack,onInvoice}){
         curTab===2&&e(Tab2,{key:"t2",claim:viewClaim,up,readOnly:!!activeEp,dSubTab,setDSubTab}),
         curTab===3&&e(Tab4,{key:"t3",claim:viewClaim,up,clinic,practitioners,focus:stepFocus}),
         curTab===4&&e(Tab5,{key:"t4",claim:viewClaim,up,clinic,practitioners}),
-        curTab===5&&e(Tab6,{key:"t5",claim:viewClaim,up,clinic,practitioners,focus:stepFocus}),
+        curTab===5&&e(Tab6,{key:"t5",claim:viewClaim,up,clinic,practitioners,focus:stepFocus,onDownloaded:()=>setPdfDone(d=>({...d,[pdfKey]:true}))}),
         curTab===6&&e(Tab8,{key:"t6",claim:viewClaim,up,clinic,practitioners,onInvoice}),
         curTab===7&&e(TabClaimLog,{key:"t7",claim,up,clinic,practitioners,setActiveEpId,setEpTab,initialLogTab:logSub}),
       ];
     })(),
     isMobile&&div({key:"nav-spacer",style:{height:36}}),
-    taskMode&&e(TaskNav,{key:"tnav",isMobile,pos:stepPos,steps:taskStepDefs.map(x=>x.label),finishLabel:taskId==="intake"?"Save claim":"Finish",
+    taskMode&&e(TaskNav,{key:"tnav",isMobile,pos:stepPos,steps:taskStepDefs.map(x=>x.label),finishLabel:taskId==="intake"?"Save claim":"Finish",extra:stepFocus==="ahrmp"?{label:"Download AHRMP PDF",onClick:downloadAhrmp}:null,
       onPrev:()=>{if(stepPos===0)toTasks();else goIdx(taskSteps[stepPos-1]);},
-      onNext:()=>{if(stepPos<taskSteps.length-1)goIdx(taskSteps[stepPos+1]);else if(taskId==="intake")save();else toTasks();}}),
+      onNext:()=>{if(stepPos<taskSteps.length-1)goIdx(taskSteps[stepPos+1]);else{if(stepFocus==="ahrmp"&&!pdfDone[pdfKey]&&!window.confirm("You haven't downloaded the AHRMP PDF yet. Finish without downloading?"))return;if(taskId==="intake")save();else toTasks();}}}),
     (taskMode||showPicker)?null:div({key:"nav",style:{...S.fb,marginTop:0,paddingTop:isMobile?14:16,paddingBottom:isMobile?14:8,borderTop:"1px solid rgba(255,255,255,0.07)",boxShadow:isMobile?"0 -8px 24px rgba(7,16,30,0.95)":"none",display:(activeEpId?epTab:tab)===TABS.length-1&&!activeEpId?"none":"flex",position:"sticky",bottom:isMobile?62:0,background:"#07101E",zIndex:10,marginLeft:isMobile?-12:-28,marginRight:isMobile?-12:-28,paddingLeft:isMobile?12:28,paddingRight:isMobile?12:28}},
     [
       btn({key:"prev",style:{...S.btnS,...((activeEpId?epTab:tab)===0&&(activeEpId?epTab:tab!==2||dSubTab===0)?{opacity:0.3,pointerEvents:"none"}:{opacity:(activeEpId?epTab:tab)===0&&dSubTab===0?0.3:1,pointerEvents:(activeEpId?epTab:tab)===0&&dSubTab===0?"none":"auto"}),...(isMobile?{padding:"8px 14px",fontSize:"0.82rem"}:{})},onClick:()=>{
@@ -2193,6 +2205,9 @@ I am satisfied that the requested travel assistance is reasonable and necessary 
 }
 
 function Tab4({claim,up,clinic,practitioners,focus}){
+  const tx=cbTxView(claim);
+  const setTxFrom=v=>{up("txFrom",v);const to=cbTxEnd(v,tx.weeks);if(to)up("txTo",to);};
+  const setTxWeeks=v=>{up("txWeeks",v);const to=cbTxEnd(tx.from,v);if(to)up("txTo",to);};
   const[subTab,setSubTab]=useState(0);
   const SUB=["Treatment & Recovery","Proposed Procedure / Surgery","Referrals","Medication & Investigations"];
   const isPrescriber=PRESCRIBING.includes(claim.practitionerProfession);
@@ -2286,14 +2301,15 @@ function Tab4({claim,up,clinic,practitioners,focus}){
             e(Inp,{key:"date",label:n===1?"Est. date":"",value:(claim["ahGoalDate"+n]||""),onChange:v=>up("ahGoalDate"+n,v),type:"date",mb:0}),
           ])),
           div({key:"tx-grid",className:"cb-grid-3",style:{marginBottom:14}},[
-            e(Inp,{key:"ns",label:"No. of treatments",value:claim.txNum,onChange:v=>up("txNum",v),placeholder:"e.g. 12",mb:0}),
-            e(Inp,{key:"wks",label:"Over (weeks)",value:claim.txWeeks,onChange:v=>up("txWeeks",v),placeholder:"e.g. 6",mb:0}),
-            e(Inp,{key:"disc",label:"Anticipated discharge",value:claim.txDischarge,onChange:v=>up("txDischarge",v),type:"date",mb:0}),
+            e(Inp,{key:"ns",label:"No. of treatments",value:tx.num,onChange:v=>up("txNum",v),placeholder:"e.g. 12",mb:0}),
+            e(Inp,{key:"wks",label:"Over (weeks)",value:tx.weeks,onChange:setTxWeeks,placeholder:"e.g. 6",mb:0}),
+            e(Inp,{key:"disc",label:"Anticipated discharge",value:tx.discharge,onChange:v=>up("txDischarge",v),type:"date",mb:0}),
           ]),
           div({key:"dates",className:"cb-grid-2",style:{marginBottom:14}},[
-            e(Inp,{key:"from",label:"Treatment from",value:claim.txFrom,onChange:v=>up("txFrom",v),type:"date",mb:0}),
-            e(Inp,{key:"to",label:"Treatment to",value:claim.txTo,onChange:v=>up("txTo",v),type:"date",mb:0}),
+            e(Inp,{key:"from",label:"Treatment from",value:tx.from,onChange:setTxFrom,type:"date",mb:0}),
+            e(Inp,{key:"to",label:"Treatment to",value:tx.to,onChange:v=>up("txTo",v),type:"date",mb:0}),
           ]),
+          div({key:"tx-hint",style:{fontSize:"0.74rem",color:"#5B7A99",marginTop:-6,marginBottom:14}},"Treatment to is worked out from Treatment from + Over (weeks). You can still change it."),
           e(Ta,{key:"tp",label:"Treatment methods / proposed treatment",value:claim.treatmentPlan,onChange:v=>up("treatmentPlan",v),placeholder:"Describe treatment methods to be used...",rows:3}),
           e(Ta,{key:"sm",label:"Self-management strategies",value:claim.selfManagement,onChange:v=>up("selfManagement",v),placeholder:"Strategies the worker will use to manage their condition..."}),
           div({key:"ahrmp-send",style:{marginTop:4,paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.07)"}},[
@@ -3243,11 +3259,12 @@ async function generateAHRMPPdf(claim, prac, clinic) {
   });
 
   // Section 6: Proposed treatment plan
-  setText("over", claim.txNum || ah.sessions || "");
-  setText("number of weeks", claim.txWeeks || ah.duration || "");
-  setText("From", claim.txFrom ? fmtAU(claim.txFrom) : "");
-  setText("to", claim.txTo ? fmtAU(claim.txTo) : "");
-  setText("Date11_af_date", claim.txDischarge ? fmtAU(claim.txDischarge) : "");
+  const tx = cbTxView(claim);
+  setText("over", tx.num || "");
+  setText("number of weeks", tx.weeks || ah.duration || "");
+  setText("From", tx.from ? fmtAU(tx.from) : "");
+  setText("to", tx.to ? fmtAU(tx.to) : "");
+  setText("Date11_af_date", tx.discharge ? fmtAU(tx.discharge) : "");
 
   // Section 7: Treatment methods
   setText("Treatment details", claim.treatmentPlan || ah.justification || "");
@@ -3704,7 +3721,7 @@ function fmtD(d){if(!d)return"";try{return new Date(d).toLocaleDateString("en-AU
 function AHRMPPrint({claim,clinic,practitioners,onBack}){
   const prac=practitioners.find(p=>p.id===claim.practitionerId)||{};
   const diags=(claim.diagnoses||[]).map(d=>d.label).join("; ")||"";
-  const ah=claim.ahrmData||{};const capMap=claim.capacity||{};
+  const ah=claim.ahrmData||{};const capMap=claim.capacity||{};const tx=cbTxView(claim);
   const PHYS_ROWS=[["Sitting","sit"],["Standing","stand"],["Walking","walk"],["Bending / Stooping","bend"],["Kneeling / Squatting","kneel"],["Climbing stairs","stairs"],["Lifting/Carrying light (<5kg)","lift_light"],["Lifting/Carrying moderate (5-15kg)","lift_mod"],["Lifting/Carrying heavy (>15kg)","lift_heavy"],["Push/Pull","push_pull"],["Reaching overhead","overhead"],["Fine motor / Keyboard","fine_motor"],["Driving","drive"],["Working at heights","heights"]];
   return e(WSPrintWrap,{title:"Allied Health Recovery Management Plan",code:"FOR912/04/06.25",onBack},[
     div({key:"s1"},[div({key:"h",style:wsHdr("#F5A623")},"Section 1 \u2014 Patient / Worker Details"),div({key:"b",style:wsBody},[div({key:"r1",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}},[wsField("First name",claim.patientFirstName||claim.patientName||""),wsField("Last name",claim.patientLastName||""),wsField("Date of birth",fmtD(claim.dob))]),div({key:"r2",style:{display:"grid",gridTemplateColumns:"2fr 1fr",gap:8,marginTop:4}},[wsField("Address",claim.patientAddress||""),wsField("Postcode",claim.patientPostcode||"")])])]),
@@ -3713,7 +3730,7 @@ function AHRMPPrint({claim,clinic,practitioners,onBack}){
     div({key:"s4"},[div({key:"h",style:wsHdr("#F5A623")},"Section 4 \u2014 Functional Capacity Assessment"),div({key:"b",style:{...wsBody,padding:"6px 10px"}},[e("table",{key:"t",style:wsTbl},[e("thead",{key:"hd"},e("tr",null,[e("th",{key:"fn",style:{...wsTh,width:"40%",textAlign:"left"}},"Function"),e("th",{key:"c",style:{...wsTh,width:"15%",textAlign:"center"}},"Can"),e("th",{key:"m",style:{...wsTh,width:"20%",textAlign:"center"}},"With Modifications"),e("th",{key:"cn",style:{...wsTh,width:"15%",textAlign:"center"}},"Cannot"),e("th",{key:"cm",style:{...wsTh,textAlign:"left"}},"Comments")])),e("tbody",{key:"bd"},PHYS_ROWS.map(([label,id])=>{const c=capMap[id];return e("tr",{key:id},[e("td",{key:"l",style:wsTd},label),e("td",{key:"c",style:{...wsTd,textAlign:"center"}},wsCheck(c==="Can")),e("td",{key:"m",style:{...wsTd,textAlign:"center"}},wsCheck(c==="Modified")),e("td",{key:"cn",style:{...wsTd,textAlign:"center"}},wsCheck(c==="Cannot")),e("td",{key:"cm",style:{...wsTd,minWidth:60}},"")]);}))])])]),
     div({key:"s5"},[div({key:"h",style:wsHdr("#F5A623")},"Section 5 \u2014 Outcome Measures"),div({key:"b",style:wsBody},wsOMTable(claim))]),
     div({key:"s6"},[div({key:"h",style:wsHdr("#F5A623")},"Section 6 \u2014 Treatment Goals"),div({key:"b",style:wsBody},[wsField("Short-term goals (0-4 weeks)",claim.goalsShort||ah.goalsShort||""),div({key:"sp",style:{height:6}}),wsField("Long-term goals (4+ weeks)",claim.goalsLong||ah.goalsLong||""),div({key:"sp2",style:{height:6}}),wsField("Specific functional goals for this referral",ah.goals||"")])]),
-    div({key:"s7"},[div({key:"h",style:wsHdr("#F5A623")},"Section 7 \u2014 Proposed Treatment"),div({key:"b",style:wsBody},[div({key:"r1",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}},[wsField("Treatment type",ah.treatment||""),wsField("Frequency",ah.frequency||""),wsField("Duration",ah.duration||""),wsField("Sessions requested",ah.sessions||"")]),div({key:"r2",style:{marginTop:4}},wsField("Expected outcomes",ah.outcomes||claim.goalsLong||"")),div({key:"r3",style:{marginTop:4}},wsField("Clinical justification",ah.justification||claim.treatmentPlan||""))])]),
+    div({key:"s7"},[div({key:"h",style:wsHdr("#F5A623")},"Section 7 \u2014 Proposed Treatment"),div({key:"b",style:wsBody},[div({key:"r1",style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}},[wsField("Treatment type",ah.treatment||""),wsField("Frequency",ah.frequency||""),wsField("Duration",tx.durationText),wsField("Sessions requested",tx.num)]),div({key:"r2",style:{marginTop:4}},wsField("Expected outcomes",ah.outcomes||claim.goalsLong||"")),div({key:"r3",style:{marginTop:4}},wsField("Clinical justification",ah.justification||claim.treatmentPlan||""))])]),
     div({key:"s8"},[div({key:"h",style:wsHdr("#F5A623")},"Section 8 \u2014 Barriers to Recovery"),div({key:"b",style:wsBody},wsField("Identified barriers",claim.barriers||ah.barriers||""))]),
     div({key:"s9"},[div({key:"h",style:wsHdr("#F5A623")},"Section 9 \u2014 Treating Practitioner Declaration"),div({key:"b",style:wsBody},[div({key:"r1",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}},[wsField("Practitioner name",prac.name||""),wsField("Profession",prac.profession||""),wsField("Provider number",prac.providerNo||""),wsField("Phone",prac.phone||clinic.phone||"")]),div({key:"sig",style:{display:"grid",gridTemplateColumns:"2fr 1fr",gap:16,marginTop:12}},[div({key:"s",style:{borderBottom:"1px solid #333",minHeight:36,fontSize:9,color:"#999"}},"Signature"),div({key:"d",style:{borderBottom:"1px solid #333",minHeight:36,fontSize:9,color:"#555"}},"Date: "+fmtD(new Date().toISOString()))])])]),
     div({key:"footer",style:{marginTop:10,fontSize:8,color:"#999",textAlign:"center",borderTop:"1px solid #eee",paddingTop:6}},"Allied Health Recovery Management Plan \u2014 WorkSafe Victoria FOR912/04/06.25 \u2014 Generated by ClaimBridge"),
@@ -3782,7 +3799,7 @@ function PS109Print({claim,clinic,practitioners,onBack}){
   ]);
 }
 
-function Tab6({claim,up,clinic,practitioners,focus}){
+function Tab6({claim,up,clinic,practitioners,focus,onDownloaded}){
   const prac=practitioners.find(p=>p.id===claim.practitionerId)||{};
   const[sel,setSel]=useState(claim.alliedForm||"");
   const[printForm,setPrintForm]=useState(null);
@@ -3812,12 +3829,20 @@ function Tab6({claim,up,clinic,practitioners,focus}){
     prof&&div({key:"prof-note",style:{...S.ok,marginBottom:16}},"Showing forms for "+prof),
     focus!=="ahrmp"&&div({key:"pills",style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}},visibleForms.map(f=>btn({key:f.id,onClick:()=>{setSel(f.id);up("alliedForm",f.id);},style:{...S.pill,...(selForm===f.id?S.pillT:S.pillM),fontSize:"0.8rem",padding:"8px 16px"}},f.label))),
     selForm==="ahrmp"&&div({key:"ahrmp"},[div({key:"card",style:{...S.card,borderTop:"3px solid #F5A623"}},[
-      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Allied Health Recovery Management Plan"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR912/04/06.25")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generateAHRMPPdf(claim,prac,clinic);}catch(e){alert(e.message);}}},"Download PDF")])]),
+      div({key:"hdr",style:{...S.fb,marginBottom:14}},[div({key:"t"},[div({key:"n",style:{fontWeight:700,fontSize:"0.95rem"}},"Allied Health Recovery Management Plan"),div({key:"c",style:{fontSize:"0.72rem",color:"#5B7A99"}},"FOR912/04/06.25")]),div({key:"btns",style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},[btn({key:"pdf",style:{...S.btnP,fontSize:"0.78rem",padding:"8px 12px"},onClick:async()=>{try{await generateAHRMPPdf(claim,prac,clinic);if(onDownloaded)onDownloaded();}catch(e){alert(e.message);}}},"Download PDF")])]),
       e(OK,{key:"ok"},"Patient, diagnosis and capacity details pre-populated from Treatment Plan"),
       e(Ta,{key:"g",label:"Specific goals for this referral",value:ah.goals||"",onChange:upAH("goals"),placeholder:"Goals...",rows:4}),
       div({key:"gr",style:S.g2},[e(Sel,{key:"t",label:"Treatment type",value:ah.treatment||"",onChange:upAH("treatment"),options:["Physiotherapy","Chiropractic","Osteopathy","Podiatry","EIPF Physiotherapy","Exercise Physiology","Occupational Therapy"],mb:0}),e(Inp,{key:"f",label:"Frequency",value:ah.frequency||"",onChange:upAH("frequency"),placeholder:"e.g. 2x per week",mb:0})]),
-      div({key:"gr2",style:{...S.g2,marginTop:16}},[e(Inp,{key:"d",label:"Duration",value:ah.duration||"",onChange:upAH("duration"),placeholder:"e.g. 6 weeks"}),e(Inp,{key:"s",label:"Sessions requested",value:ah.sessions||"",onChange:upAH("sessions"),placeholder:"e.g. 12"})]),
-      div({key:"dates",style:S.g2},[e(Inp,{key:"from",label:"Treatment from",value:ah.txFrom||"",onChange:upAH("txFrom"),type:"date",mb:0}),e(Inp,{key:"to",label:"Treatment to",value:ah.txTo||"",onChange:upAH("txTo"),type:"date",mb:0})]),
+      (()=>{
+        const tx=cbTxView(claim);
+        const fd=d=>{try{return new Date(d+"T12:00:00").toLocaleDateString("en-AU");}catch(er){return d;}};
+        const parts=[tx.num?tx.num+" treatments":"",tx.durationText?"over "+tx.durationText:"",(tx.from||tx.to)?"from "+(tx.from?fd(tx.from):"?")+" to "+(tx.to?fd(tx.to):"?"):"",tx.discharge?"anticipated discharge "+fd(tx.discharge):""].filter(Boolean);
+        return div({key:"txsum",style:{...S.cardSm,marginTop:16,marginBottom:16,padding:"12px 14px"}},[
+          div({key:"l",style:S.label},"Treatment period"),
+          div({key:"v",style:{fontSize:"0.9rem",lineHeight:1.5}},parts.length>0?parts.join(", "):"Not set yet"),
+          div({key:"n",style:{fontSize:"0.74rem",color:"#5B7A99",marginTop:4}},"Entered once in Goals & management (Treatment Plan): no. of treatments, weeks, dates and discharge."),
+        ]);
+      })(),
       e(Ta,{key:"o",label:"Expected outcomes",value:ah.outcomes||"",onChange:upAH("outcomes"),placeholder:"Expected functional improvements..."}),
       e(Ta,{key:"j",label:"Clinical justification / treatment methods",value:ah.justification||"",onChange:upAH("justification"),placeholder:"Clinical reasoning...",rows:4}),
       e(Ta,{key:"b",label:"Barriers to recovery",value:ah.barriers||"",onChange:upAH("barriers"),placeholder:"Identified barriers...",rows:3}),
@@ -4049,8 +4074,8 @@ function Tab8({claim,up,clinic,practitioners,onInvoice}){
   if(claim.imagingReferral)treatmentStrategyParts.push("imaging referral for "+claim.imagingReferral);
   const treatmentStrategy=treatmentStrategyParts.length>0?"The current treatment strategy includes: "+treatmentStrategyParts.join("; ")+".":"The current treatment strategy is as per clinical assessment and management plan.";
   const ahrmTreatment=claim.ahrmData&&claim.ahrmData.treatment||pracProf||"";
-  const ahrmSessions=claim.ahrmData&&claim.ahrmData.sessions||claim.txNum||"";
-  const ahrmDuration=claim.ahrmData&&claim.ahrmData.duration||(claim.txWeeks?claim.txWeeks+" weeks":"")||"";
+  const ahrmSessions=cbTxView(claim).num||"";
+  const ahrmDuration=cbTxView(claim).durationText||"";
   const ahrmFreq=claim.ahrmData&&claim.ahrmData.frequency||"";
   const ahrmGoals=claim.ahrmData&&claim.ahrmData.goals||goalsText||"";
   const ahrmJust=claim.ahrmData&&claim.ahrmData.justification||treatPlan||"";
@@ -5483,6 +5508,25 @@ ${meds.length>0 ? `
 }
 
 // ── TAB: OVERVIEW ─────────────────────────────────────────────────────────────
+// Treatment period (no. of treatments, weeks, dates, discharge): entered ONCE on the Treatment tab (claim.tx*),
+// older claims that only have it in the AHRMP form (ahrmData) still show those values.
+function cbTxView(claim){
+  const a=claim.ahrmData||{};
+  const pick=(v,fb)=>v!==undefined?v:(fb||"");
+  const m=/^\s*(\d+(?:\.\d+)?)\s*(?:weeks?|wks?)?\s*$/i.exec(a.duration||"");
+  return {
+    num:pick(claim.txNum,a.sessions),
+    weeks:claim.txWeeks!==undefined?String(claim.txWeeks):(m?m[1]:""),
+    durationText:claim.txWeeks!==undefined?(claim.txWeeks?claim.txWeeks+" weeks":""):(a.duration||""),
+    from:pick(claim.txFrom,a.txFrom),to:pick(claim.txTo,a.txTo),discharge:claim.txDischarge||""
+  };
+}
+// end date = start date + weeks (same weekday, n weeks later); "" if either is missing/invalid
+function cbTxEnd(from,weeks){
+  const w=parseFloat(weeks);if(!from||!(w>0))return "";
+  const d=new Date(from+"T12:00:00Z");if(isNaN(d.getTime()))return "";
+  d.setUTCDate(d.getUTCDate()+Math.round(w*7));return d.toISOString().slice(0,10);
+}
 // Certificates issued on each request, latest first. Falls back to the claim-level certificate when no request has one.
 function cbCertificates(claim){
   const pick=o=>({fit:o.fitnessForWork||"",from:o.cocFrom||o.fitNormalFrom||o.fitRestrictFrom||o.unfitFrom||"",to:o.cocTo||o.fitRestrictTo||o.unfitTo||"",type:o.cocType||"",number:o.cocCount||""});
